@@ -113,9 +113,9 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       if (assetsRes.error) setError(assetsRes.error.message);
       else setAssets((assetsRes.data ?? []).map(fromDb));
 
-      if (!subRes.error) setSubsidiaries((subRes.data ?? []).map(r => r.name));
-      if (!cat1Res.error) setCategories1((cat1Res.data ?? []).map(r => r.name));
-      if (!cat2Res.error) setCategories2((cat2Res.data ?? []).map(r => r.name));
+      if (!subRes.error) setSubsidiaries([...new Set((subRes.data ?? []).map(r => r.name))]);
+      if (!cat1Res.error) setCategories1([...new Set((cat1Res.data ?? []).map(r => r.name))]);
+      if (!cat2Res.error) setCategories2([...new Set((cat2Res.data ?? []).map(r => r.name))]);
 
       setLoading(false);
     };
@@ -123,10 +123,9 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addSubsidiary = (name: string) => {
-    if (name && !subsidiaries.includes(name)) {
-      setSubsidiaries(prev => [...prev, name]);
-      supabase.from('subsidiaries').upsert({ name }).then();
-    }
+    if (!name) return;
+    setSubsidiaries(prev => prev.includes(name) ? prev : [...prev, name]);
+    supabase.from('subsidiaries').upsert({ name }, { onConflict: 'name' }).then();
   };
   const deleteSubsidiary = (name: string) => {
     setSubsidiaries(prev => prev.filter(s => s !== name));
@@ -134,10 +133,9 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   };
 
   const addCategory1 = (name: string) => {
-    if (name && !categories1.includes(name)) {
-      setCategories1(prev => [...prev, name]);
-      supabase.from('category_segments_1').upsert({ name }).then();
-    }
+    if (!name) return;
+    setCategories1(prev => prev.includes(name) ? prev : [...prev, name]);
+    supabase.from('category_segments_1').upsert({ name }, { onConflict: 'name' }).then();
   };
   const deleteCategory1 = (name: string) => {
     setCategories1(prev => prev.filter(c => c !== name));
@@ -145,10 +143,9 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   };
 
   const addCategory2 = (name: string) => {
-    if (name && !categories2.includes(name)) {
-      setCategories2(prev => [...prev, name]);
-      supabase.from('category_segments_2').upsert({ name }).then();
-    }
+    if (!name) return;
+    setCategories2(prev => prev.includes(name) ? prev : [...prev, name]);
+    supabase.from('category_segments_2').upsert({ name }, { onConflict: 'name' }).then();
   };
   const deleteCategory2 = (name: string) => {
     setCategories2(prev => prev.filter(c => c !== name));

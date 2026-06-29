@@ -15,19 +15,19 @@ export default function MasterData() {
 
   const handleAddSub = (e: React.FormEvent) => {
     e.preventDefault();
-    addSubsidiary(newSub);
+    addSubsidiary(newSub.trim());
     setNewSub('');
   };
 
   const handleAddCat1 = (e: React.FormEvent) => {
     e.preventDefault();
-    addCategory1(newCat1);
+    addCategory1(newCat1.trim());
     setNewCat1('');
   };
 
   const handleAddCat2 = (e: React.FormEvent) => {
     e.preventDefault();
-    addCategory2(newCat2);
+    addCategory2(newCat2.trim());
     setNewCat2('');
   };
 
