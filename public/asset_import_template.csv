@@ -1,0 +1,6 @@
+Asset Number,Asset Description,Asset Book,Subsidiary,Asset Cost,Date Place In Service,Asset Units,Asset Category Segment 1,Asset Category Segment 2,Depreciation Method,Life in Months,Listed,Status
+AST-001,Laptop Dell XPS 15,Book 1,PT Raja Utama,15000000,2024-01-15,1,IT Equipment,Laptop,Straight Line,60,No,Active
+AST-002,Meja Kantor Kayu Jati,Book 1,PT Raja Utama,2500000,2024-02-01,4,Furniture,Desk,Straight Line,120,No,Active
+AST-003,Kendaraan Toyota Avanza,Book 1,PT Raja Cabang Surabaya,250000000,2023-06-01,1,Vehicle,Car,Straight Line,60,Yes,Active
+AST-004,AC Split Daikin 1.5 PK,Book 1,PT Raja Cabang Bandung,4500000,2024-03-10,2,Office Equipment,Air Conditioner,Straight Line,84,No,Active
+AST-005,Server HPE ProLiant,Book 2,PT Raja Utama,85000000,2023-11-20,1,IT Equipment,Server,Straight Line,60,No,Active

@@ -122,23 +122,23 @@ export default function Inventory() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         const data = results.data as any[];
-        
+
         if (data.length > 5000) {
           alert(`File exceeds the maximum limit of 5000 rows. Your file has ${data.length} rows. Please split your file and try again.`);
           if (event.target) event.target.value = '';
           return;
         }
 
-        let importedCount = 0;
-        
+        const promises: Promise<void>[] = [];
+
         data.forEach(row => {
           const assetNumber = row['Asset Number'] || row['assetNumber'];
           const assetDescription = row['Asset Description'] || row['assetDescription'];
-          
+
           if (assetNumber && assetDescription) {
-            addAsset({
+            promises.push(addAsset({
               assetBook: row['Asset Book'] || row['assetBook'] || '',
               subsidiary: row['Subsidiary'] || row['subsidiary'] || 'Default',
               assetNumber: assetNumber,
@@ -152,13 +152,18 @@ export default function Inventory() {
               lifeInMonths: row['Life in Months'] || row['lifeInMonths'] || '0',
               listed: row['Listed'] || row['listed'] || 'No',
               status: row['Status'] || row['status'] || 'Active'
-            });
-            importedCount++;
+            }));
           }
         });
-        
-        alert(`Successfully imported ${importedCount} assets!`);
-        if (event.target) event.target.value = '';
+
+        try {
+          await Promise.all(promises);
+          alert(`Successfully imported ${promises.length} assets!`);
+        } catch (err) {
+          alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        } finally {
+          if (event.target) event.target.value = '';
+        }
       },
       error: (error) => {
         alert('Error parsing CSV file: ' + error.message);
