@@ -1,0 +1,6 @@
+{
+  "name": "Asset Inventory System",
+  "description": "A React-based asset management and inventory tracking system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
