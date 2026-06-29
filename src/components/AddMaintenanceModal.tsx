@@ -36,12 +36,12 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const asset = assets.find(a => a.id === selectedAssetId);
     if (!asset) return;
 
-    addRecord({
+    await addRecord({
       assetBook: asset.assetBook || asset.id,
       subsidiary: asset.subsidiary,
       assetNumber: asset.assetNumber,
@@ -55,7 +55,7 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
       status: formData.status,
       scheduledDate: formData.scheduledDate
     });
-    
+
     onClose();
   };
 

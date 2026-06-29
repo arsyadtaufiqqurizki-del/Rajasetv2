@@ -26,13 +26,13 @@ export default function AddAssetModal() {
 
   if (!isAddModalOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const dataToSave = {
       ...formData,
       assetCost: formData.assetCost.replace(/,/g, '')
     };
-    addAsset(dataToSave);
+    await addAsset(dataToSave);
     setIsAddModalOpen(false);
     // Reset form
     setFormData({

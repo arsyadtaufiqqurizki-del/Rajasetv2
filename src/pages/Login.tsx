@@ -4,22 +4,22 @@ import { KeyRound, ShieldAlert } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
-  const [code, setCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    if (code.trim() === '') {
-      setError('Please enter a login code.');
-      return;
+    setIsLoading(true);
+
+    const { error: loginError } = await login(email, password);
+    if (loginError) {
+      setError('Invalid email or password. Please try again.');
     }
 
-    const success = login(code);
-    if (!success) {
-      setError('Invalid code. Please try again.');
-    }
+    setIsLoading(false);
   };
 
   return (
@@ -33,35 +33,50 @@ export default function Login() {
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Sign in to your account
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Temporary access using your numeric code
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="code" className="block text-sm font-medium text-gray-700">
-                Access Code
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email
               </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
+              <div className="mt-1">
                 <input
-                  id="code"
-                  name="code"
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="you@example.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <div className="mt-1">
+                <input
+                  id="password"
+                  name="password"
                   type="password"
                   required
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className={`appearance-none block w-full px-3 py-2 border ${
-                    error ? 'border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500'
-                  } rounded-md shadow-sm focus:outline-none sm:text-sm`}
-                  placeholder="Enter your numeric code"
+                    error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none sm:text-sm`}
+                  placeholder="••••••••"
                 />
               </div>
               {error && (
                 <div className="mt-2 flex items-center text-sm text-red-600">
-                  <ShieldAlert className="h-4 w-4 mr-1" />
+                  <ShieldAlert className="h-4 w-4 mr-1 flex-shrink-0" />
                   {error}
                 </div>
               )}
@@ -70,9 +85,10 @@ export default function Login() {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                disabled={isLoading}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Sign in
+                {isLoading ? 'Signing in...' : 'Sign in'}
               </button>
             </div>
           </form>

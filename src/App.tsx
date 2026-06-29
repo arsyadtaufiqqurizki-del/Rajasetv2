@@ -20,12 +20,14 @@ import { MaintenanceProvider } from "./contexts/MaintenanceContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
   
   return (
     <Routes>

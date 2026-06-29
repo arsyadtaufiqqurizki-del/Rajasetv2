@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 
 export type MaintenanceRecord = {
   id: string;
@@ -18,31 +19,104 @@ export type MaintenanceRecord = {
 
 interface MaintenanceContextType {
   records: MaintenanceRecord[];
-  addRecord: (record: Omit<MaintenanceRecord, 'id'>) => void;
-  updateRecord: (id: string, record: Omit<MaintenanceRecord, 'id'>) => void;
-  deleteRecord: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  addRecord: (record: Omit<MaintenanceRecord, 'id'>) => Promise<void>;
+  updateRecord: (id: string, record: Omit<MaintenanceRecord, 'id'>) => Promise<void>;
+  deleteRecord: (id: string) => Promise<void>;
 }
 
 const MaintenanceContext = createContext<MaintenanceContextType | undefined>(undefined);
 
+const parseAmount = (val: string): number | null => {
+  const clean = val.replace(/[^\d.]/g, '');
+  const n = parseFloat(clean);
+  return isNaN(n) ? null : n;
+};
+
+const fromDb = (row: any): MaintenanceRecord => ({
+  id: row.id,
+  assetBook: row.asset_book ?? '',
+  subsidiary: row.subsidiary ?? '',
+  assetNumber: row.asset_number ?? '',
+  assetDescription: row.asset_description ?? '',
+  assetUnits: row.asset_units != null ? String(row.asset_units) : '',
+  serviceType: row.service_type ?? '',
+  assetCategorySegment1: row.asset_category_segment1 ?? '',
+  assetCategorySegment2: row.asset_category_segment2 ?? '',
+  estimateCost: row.estimate_cost != null ? String(row.estimate_cost) : '',
+  actualCost: row.actual_cost != null ? String(row.actual_cost) : '',
+  status: row.status ?? '',
+  scheduledDate: row.scheduled_date ?? '',
+});
+
+const toDb = (record: Omit<MaintenanceRecord, 'id'>) => ({
+  asset_book: record.assetBook,
+  subsidiary: record.subsidiary,
+  asset_number: record.assetNumber,
+  asset_description: record.assetDescription,
+  asset_units: record.assetUnits ? parseFloat(record.assetUnits) : null,
+  service_type: record.serviceType,
+  asset_category_segment1: record.assetCategorySegment1,
+  asset_category_segment2: record.assetCategorySegment2,
+  estimate_cost: record.estimateCost ? parseAmount(record.estimateCost) : null,
+  actual_cost: record.actualCost ? parseAmount(record.actualCost) : null,
+  status: record.status,
+  scheduled_date: record.scheduledDate || null,
+});
+
 export function MaintenanceProvider({ children }: { children: ReactNode }) {
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const addRecord = (record: Omit<MaintenanceRecord, 'id'>) => {
-    const newRecord = { ...record, id: Math.random().toString(36).substring(2, 9).toUpperCase() };
-    setRecords(prev => [...prev, newRecord]);
+  useEffect(() => {
+    const fetchRecords = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('maintenance_records')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) setError(error.message);
+      else setRecords((data ?? []).map(fromDb));
+
+      setLoading(false);
+    };
+    fetchRecords();
+  }, []);
+
+  const addRecord = async (record: Omit<MaintenanceRecord, 'id'>) => {
+    const { data, error } = await supabase
+      .from('maintenance_records')
+      .insert(toDb(record))
+      .select()
+      .single();
+
+    if (error) { setError(error.message); return; }
+    setRecords(prev => [fromDb(data), ...prev]);
   };
 
-  const updateRecord = (id: string, updated: Omit<MaintenanceRecord, 'id'>) => {
-    setRecords(prev => prev.map(r => r.id === id ? { ...updated, id } : r));
+  const updateRecord = async (id: string, updated: Omit<MaintenanceRecord, 'id'>) => {
+    const { data, error } = await supabase
+      .from('maintenance_records')
+      .update(toDb(updated))
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) { setError(error.message); return; }
+    setRecords(prev => prev.map(r => r.id === id ? fromDb(data) : r));
   };
 
-  const deleteRecord = (id: string) => {
+  const deleteRecord = async (id: string) => {
+    const { error } = await supabase.from('maintenance_records').delete().eq('id', id);
+    if (error) { setError(error.message); return; }
     setRecords(prev => prev.filter(r => r.id !== id));
   };
 
   return (
-    <MaintenanceContext.Provider value={{ records, addRecord, updateRecord, deleteRecord }}>
+    <MaintenanceContext.Provider value={{ records, loading, error, addRecord, updateRecord, deleteRecord }}>
       {children}
     </MaintenanceContext.Provider>
   );

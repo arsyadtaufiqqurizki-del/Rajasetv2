@@ -65,13 +65,13 @@ export default function EditAssetModal() {
 
   if (!isEditModalOpen || !editingAsset) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const dataToSave = {
       ...formData,
       assetCost: formData.assetCost.replace(/,/g, '')
     };
-    updateAsset(editingAsset.id, dataToSave);
+    await updateAsset(editingAsset.id, dataToSave);
     setIsEditModalOpen(false);
     setEditingAsset(null);
   };

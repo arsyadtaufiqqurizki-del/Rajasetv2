@@ -35,11 +35,11 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
 
   if (!isOpen || !recordToEdit) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recordId) return;
 
-    updateRecord(recordId, {
+    await updateRecord(recordId, {
       ...recordToEdit,
       serviceType: formData.serviceType,
       estimateCost: formData.estimateCost,
@@ -47,7 +47,7 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
       status: formData.status,
       scheduledDate: formData.scheduledDate
     });
-    
+
     onClose();
   };
 
