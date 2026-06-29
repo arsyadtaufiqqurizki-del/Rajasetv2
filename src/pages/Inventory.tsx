@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download } from 'lucide-react';
+import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAsset } from '../contexts/AssetContext';
 import Papa from 'papaparse';
@@ -20,6 +20,16 @@ export default function Inventory() {
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  const [importModal, setImportModal] = useState({
+    isOpen: false,
+    status: 'importing' as 'importing' | 'done',
+    total: 0,
+    processed: 0,
+    successCount: 0,
+    failedCount: 0,
+    skippedCount: 0,
+  });
 
   const uniqueStatuses = useMemo(() => Array.from(new Set(assets.map(a => a.status).filter(Boolean))), [assets]);
 
@@ -131,39 +141,60 @@ export default function Inventory() {
           return;
         }
 
-        const promises: Promise<void>[] = [];
-
-        data.forEach(row => {
+        const validRows = data.filter(row => {
           const assetNumber = row['Asset Number'] || row['assetNumber'];
           const assetDescription = row['Asset Description'] || row['assetDescription'];
+          return assetNumber && assetDescription;
+        });
+        const skippedCount = data.length - validRows.length;
 
-          if (assetNumber && assetDescription) {
-            promises.push(addAsset({
-              assetBook: row['Asset Book'] || row['assetBook'] || '',
-              subsidiary: row['Subsidiary'] || row['subsidiary'] || 'Default',
-              assetNumber: assetNumber,
-              assetDescription: assetDescription,
-              assetCost: row['Asset Cost'] || row['assetCost'] || '0',
-              datePlaceInService: row['Date Place In Service'] || row['datePlaceInService'] || '',
-              assetUnits: row['Asset Units'] || row['assetUnits'] || '1',
-              categorySegment1: row['Asset Category Segment 1'] || row['categorySegment1'] || 'Uncategorized',
-              categorySegment2: row['Asset Category Segment 2'] || row['categorySegment2'] || 'Uncategorized',
-              depreciationMethod: row['Depreciation Method'] || row['depreciationMethod'] || '',
-              lifeInMonths: row['Life in Months'] || row['lifeInMonths'] || '0',
-              listed: row['Listed'] || row['listed'] || 'No',
-              status: row['Status'] || row['status'] || 'Active'
-            }));
-          }
+        setImportModal({
+          isOpen: true,
+          status: 'importing',
+          total: validRows.length,
+          processed: 0,
+          successCount: 0,
+          failedCount: 0,
+          skippedCount,
         });
 
-        try {
-          await Promise.all(promises);
-          alert(`Successfully imported ${promises.length} assets!`);
-        } catch (err) {
-          alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        } finally {
-          if (event.target) event.target.value = '';
-        }
+        const promises = validRows.map(row => {
+          const assetNumber = row['Asset Number'] || row['assetNumber'];
+          const assetDescription = row['Asset Description'] || row['assetDescription'];
+          return addAsset({
+            assetBook: row['Asset Book'] || row['assetBook'] || '',
+            subsidiary: row['Subsidiary'] || row['subsidiary'] || 'Default',
+            assetNumber,
+            assetDescription,
+            assetCost: row['Asset Cost'] || row['assetCost'] || '0',
+            datePlaceInService: row['Date Place In Service'] || row['datePlaceInService'] || '',
+            assetUnits: row['Asset Units'] || row['assetUnits'] || '1',
+            categorySegment1: row['Asset Category Segment 1'] || row['categorySegment1'] || 'Uncategorized',
+            categorySegment2: row['Asset Category Segment 2'] || row['categorySegment2'] || 'Uncategorized',
+            depreciationMethod: row['Depreciation Method'] || row['depreciationMethod'] || '',
+            lifeInMonths: row['Life in Months'] || row['lifeInMonths'] || '0',
+            listed: row['Listed'] || row['listed'] || 'No',
+            status: row['Status'] || row['status'] || 'Active',
+          })
+          .then(() => {
+            setImportModal(prev => ({
+              ...prev,
+              processed: prev.processed + 1,
+              successCount: prev.successCount + 1,
+            }));
+          })
+          .catch(() => {
+            setImportModal(prev => ({
+              ...prev,
+              processed: prev.processed + 1,
+              failedCount: prev.failedCount + 1,
+            }));
+          });
+        });
+
+        await Promise.all(promises);
+        setImportModal(prev => ({ ...prev, status: 'done' }));
+        if (event.target) event.target.value = '';
       },
       error: (error) => {
         alert('Error parsing CSV file: ' + error.message);
@@ -188,7 +219,8 @@ export default function Inventory() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm"
+            disabled={importModal.isOpen && importModal.status === 'importing'}
+            className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Upload className="h-4 w-4" />
             Import CSV
@@ -390,6 +422,76 @@ export default function Inventory() {
           </div>
         </div>
       </div>
+
+      {/* CSV Import Progress Modal */}
+      {importModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              {importModal.status === 'importing' ? (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+                    <h3 className="text-xl font-bold text-on-surface">Importing Assets...</h3>
+                  </div>
+                  <p className="text-sm text-on-surface-variant mb-5">
+                    Please wait while your CSV file is being processed.
+                  </p>
+                  <div className="mb-2 h-2.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${importModal.total > 0 ? Math.round((importModal.processed / importModal.total) * 100) : 0}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-on-surface-variant mt-1.5">
+                    <span>{importModal.processed} of {importModal.total} assets processed</span>
+                    <span className="font-semibold text-primary">
+                      {importModal.total > 0 ? Math.round((importModal.processed / importModal.total) * 100) : 0}%
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    {importModal.failedCount === 0 ? (
+                      <CheckCircle className="h-6 w-6 text-emerald-500 shrink-0" />
+                    ) : (
+                      <XCircle className="h-6 w-6 text-amber-500 shrink-0" />
+                    )}
+                    <h3 className="text-xl font-bold text-on-surface">Import Complete</h3>
+                  </div>
+                  <div className="bg-surface-container rounded-xl p-4 mb-6 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-on-surface-variant">Successfully imported</span>
+                      <span className="font-semibold text-emerald-600">{importModal.successCount} assets</span>
+                    </div>
+                    {importModal.failedCount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-on-surface-variant">Failed</span>
+                        <span className="font-semibold text-error">{importModal.failedCount} assets</span>
+                      </div>
+                    )}
+                    {importModal.skippedCount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-on-surface-variant">Skipped (invalid rows)</span>
+                        <span className="font-semibold text-on-surface-variant">{importModal.skippedCount} rows</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => setImportModal(prev => ({ ...prev, isOpen: false }))}
+                      className="px-5 py-2 bg-primary text-on-primary rounded-md hover:bg-primary/90 font-medium text-sm transition-colors shadow-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Multiple Confirmation Modal */}
       {isDeleteModalOpen && (
