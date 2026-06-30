@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, FileDown, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAsset } from '../contexts/AssetContext';
 import Papa from 'papaparse';
@@ -225,6 +225,14 @@ export default function Inventory() {
             <Upload className="h-4 w-4" />
             Import CSV
           </button>
+          <a
+            href="/asset_import_template.csv"
+            download="asset_import_template.csv"
+            className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm"
+          >
+            <FileDown className="h-4 w-4" />
+            Download Template
+          </a>
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm"
