@@ -2,11 +2,18 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 
+const CLOUD_RUN_URL = import.meta.env.VITE_AI_SERVER_URL;
+
 type Message = {
   id: string;
   role: "user" | "ai";
   content: string;
   timestamp: Date;
+};
+
+type HistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
 };
 
 export default function AIAssistant() {
@@ -19,8 +26,25 @@ export default function AIAssistant() {
       timestamp: new Date()
     }
   ]);
+  const [history, setHistory] = useState<HistoryMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingStep, setLoadingStep] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const loadingSteps = [
+    "Mengambil data inventaris...",
+    "Menganalisis data aset...",
+    "Menyusun laporan...",
+  ];
+
+  useEffect(() => {
+    if (!isTyping) { setLoadingStep(0); return; }
+    const interval = setInterval(() => {
+      setLoadingStep(prev => (prev + 1) % loadingSteps.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isTyping]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -30,32 +54,145 @@ export default function AIAssistant() {
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isTyping) return;
 
+    const question = input.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: question,
       timestamp: new Date()
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsTyping(true);
+    setError(null);
 
-    // Simulate AI response for the frontend layout
-    setTimeout(() => {
+    try {
+      const response = await fetch(`${CLOUD_RUN_URL}/chat`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question, history }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Server error");
+      }
+
+      const data = await response.json();
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "ai",
-        content: "Ini adalah simulasi jawaban dari AI. Di tahap selanjutnya, bagian ini akan dihubungkan ke backend (contohnya Gemini API) agar dapat menjawab berdasarkan data inventaris secara real-time.",
+        content: data.answer,
         timestamp: new Date()
       };
+
       setMessages((prev) => [...prev, aiMessage]);
+      setHistory((prev) => [
+        ...prev,
+        { role: "user", content: question },
+        { role: "assistant", content: data.answer },
+      ]);
+    } catch (err: any) {
+      setError(err.message || "Gagal menghubungi server AI.");
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
+  };
+
+  const renderMarkdown = (text: string) => {
+    const lines = text.split("\n");
+    const elements: React.ReactNode[] = [];
+    let listItems: string[] = [];
+    let tableLines: string[] = [];
+
+    const parseLine = (line: string): React.ReactNode[] => {
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      return parts.map((part, i) =>
+        part.startsWith("**") && part.endsWith("**")
+          ? <strong key={i}>{part.slice(2, -2)}</strong>
+          : part as React.ReactNode
+      );
+    };
+
+    const parseTableCells = (line: string) =>
+      line.split("|").map(c => c.trim()).filter((_, i, arr) => i !== 0 && i !== arr.length - 1);
+
+    const flushList = () => {
+      if (listItems.length > 0) {
+        elements.push(
+          <ul key={elements.length} className="my-1 ml-4 list-disc space-y-0.5">
+            {listItems.map((item, i) => <li key={i}>{parseLine(item)}</li>)}
+          </ul>
+        );
+        listItems = [];
+      }
+    };
+
+    const flushTable = () => {
+      if (tableLines.length >= 2) {
+        const headers = parseTableCells(tableLines[0]);
+        const rows = tableLines.slice(2).map(parseTableCells);
+        elements.push(
+          <div key={elements.length} className="my-2 overflow-x-auto rounded-lg border border-outline-variant/50">
+            <table className="w-full text-xs">
+              <thead className="bg-surface-container-high">
+                <tr>
+                  {headers.map((h, i) => (
+                    <th key={i} className="px-3 py-2 text-left font-semibold text-on-surface">{parseLine(h)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, ri) => (
+                  <tr key={ri} className="border-t border-outline-variant/30 even:bg-surface-container-lowest/50">
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-3 py-2 text-on-surface">{parseLine(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      tableLines = [];
+    };
+
+    const isTableLine = (line: string) => line.trim().startsWith("|") && line.trim().endsWith("|");
+    const isSeparatorLine = (line: string) => /^\|[\s|:-]+\|$/.test(line.trim());
+
+    lines.forEach((line, idx) => {
+      if (isTableLine(line)) {
+        flushList();
+        if (!isSeparatorLine(line)) tableLines.push(line);
+        else tableLines.push(line);
+      } else {
+        flushTable();
+        if (line.startsWith("- ") || line.startsWith("* ")) {
+          listItems.push(line.slice(2));
+        } else {
+          flushList();
+          if (line.startsWith("### ")) {
+            elements.push(<p key={idx} className="font-semibold mt-2">{parseLine(line.slice(4))}</p>);
+          } else if (line.startsWith("## ")) {
+            elements.push(<p key={idx} className="font-bold mt-2">{parseLine(line.slice(3))}</p>);
+          } else if (line.trim() === "") {
+            elements.push(<div key={idx} className="h-1" />);
+          } else {
+            elements.push(<p key={idx} className="leading-relaxed">{parseLine(line)}</p>);
+          }
+        }
+      }
+    });
+    flushList();
+    flushTable();
+    return <div className="space-y-0.5">{elements}</div>;
   };
 
   const quickSuggestions = [
@@ -106,7 +243,7 @@ export default function AIAssistant() {
                   : "bg-surface-container-low text-on-surface rounded-tl-sm border border-outline-variant/50"
               )}
             >
-              <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              {msg.role === "ai" ? renderMarkdown(msg.content) : <p className="leading-relaxed">{msg.content}</p>}
               <span 
                 className={cn(
                   "mt-1 block text-[10px] opacity-70",
@@ -124,11 +261,21 @@ export default function AIAssistant() {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface">
               <Bot className="h-4 w-4" />
             </div>
-            <div className="rounded-2xl rounded-tl-sm bg-surface-container-low px-4 py-4 border border-outline-variant/50 flex items-center gap-1.5">
-              <div className="h-1.5 w-1.5 rounded-full bg-on-surface-variant animate-bounce" style={{ animationDelay: "0ms" }} />
-              <div className="h-1.5 w-1.5 rounded-full bg-on-surface-variant animate-bounce" style={{ animationDelay: "150ms" }} />
-              <div className="h-1.5 w-1.5 rounded-full bg-on-surface-variant animate-bounce" style={{ animationDelay: "300ms" }} />
+            <div className="rounded-2xl rounded-tl-sm bg-surface-container-low px-4 py-3 border border-outline-variant/50 flex items-center gap-3">
+              <div className="flex gap-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+              <span key={loadingStep} className="text-xs text-on-surface-variant animate-pulse">
+                {loadingSteps[loadingStep]}
+              </span>
             </div>
+          </div>
+        )}
+        {error && (
+          <div className="mx-4 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+            {error}
           </div>
         )}
         <div ref={messagesEndRef} />
