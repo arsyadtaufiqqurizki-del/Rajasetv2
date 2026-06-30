@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid 
@@ -95,31 +95,41 @@ export default function Dashboard() {
     }))
     .sort((a, b) => (b.value as number) - (a.value as number));
 
-  const availableYears = Array.from(new Set(assets.map(asset => {
-    const date = new Date(asset.datePlaceInService);
-    return isNaN(date.getTime()) ? null : date.getFullYear().toString();
-  }).filter(Boolean))) as string[];
+  const availableYears = useMemo(() => {
+    const years = Array.from(new Set(
+      assets
+        .map(asset => {
+          const date = new Date(asset.datePlaceInService);
+          return isNaN(date.getTime()) ? null : date.getFullYear().toString();
+        })
+        .filter(Boolean)
+    )) as string[];
 
-  if (availableYears.length === 0) {
-    availableYears.push(new Date().getFullYear().toString());
-  }
-  
-  availableYears.sort((a, b) => b.localeCompare(a));
+    if (years.length === 0) years.push(new Date().getFullYear().toString());
+    return years.sort((a, b) => b.localeCompare(a));
+  }, [assets]);
 
-  const trendDataMap = assets.reduce((acc, curr) => {
-    const date = new Date(curr.datePlaceInService);
-    if (!isNaN(date.getTime()) && date.getFullYear().toString() === selectedYear) {
-      const month = date.toLocaleString('default', { month: 'short' });
-      const cost = parseFloat(curr.assetCost.replace(/[^0-9.-]+/g, ""));
-      acc[month] = (acc[month] || 0) + (isNaN(cost) ? 0 : cost);
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
     }
-    return acc;
-  }, {} as Record<string, number>);
+  }, [availableYears]);
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const trendData = months.map(month => ({
+
+  const trendDataMap = useMemo(() => assets.reduce((acc, curr) => {
+    const date = new Date(curr.datePlaceInService);
+    if (!isNaN(date.getTime()) && date.getFullYear().toString() === selectedYear) {
+      const monthIndex = date.getMonth();
+      const cost = parseFloat(curr.assetCost.replace(/[^0-9.-]+/g, ""));
+      acc[monthIndex] = (acc[monthIndex] || 0) + (isNaN(cost) ? 0 : cost);
+    }
+    return acc;
+  }, {} as Record<number, number>), [assets, selectedYear]);
+
+  const trendData = months.map((month, index) => ({
     month,
-    value: trendDataMap[month] || 0
+    value: trendDataMap[index] || 0
   }));
 
   const indexOfLastItem = currentPage * itemsPerPage;

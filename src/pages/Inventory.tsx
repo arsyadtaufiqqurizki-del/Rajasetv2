@@ -158,41 +158,44 @@ export default function Inventory() {
           skippedCount,
         });
 
-        const promises = validRows.map(row => {
-          const assetNumber = row['Asset Number'] || row['assetNumber'];
-          const assetDescription = row['Asset Description'] || row['assetDescription'];
-          return addAsset({
-            assetBook: row['Asset Book'] || row['assetBook'] || '',
-            subsidiary: row['Subsidiary'] || row['subsidiary'] || 'Default',
-            assetNumber,
-            assetDescription,
-            assetCost: row['Asset Cost'] || row['assetCost'] || '0',
-            datePlaceInService: row['Date Place In Service'] || row['datePlaceInService'] || '',
-            assetUnits: row['Asset Units'] || row['assetUnits'] || '1',
-            categorySegment1: row['Asset Category Segment 1'] || row['categorySegment1'] || 'Uncategorized',
-            categorySegment2: row['Asset Category Segment 2'] || row['categorySegment2'] || 'Uncategorized',
-            depreciationMethod: row['Depreciation Method'] || row['depreciationMethod'] || '',
-            lifeInMonths: row['Life in Months'] || row['lifeInMonths'] || '0',
-            listed: row['Listed'] || row['listed'] || 'No',
-            status: row['Status'] || row['status'] || 'Active',
-          })
-          .then(() => {
-            setImportModal(prev => ({
-              ...prev,
-              processed: prev.processed + 1,
-              successCount: prev.successCount + 1,
-            }));
-          })
-          .catch(() => {
-            setImportModal(prev => ({
-              ...prev,
-              processed: prev.processed + 1,
-              failedCount: prev.failedCount + 1,
-            }));
-          });
-        });
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
+          const batch = validRows.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(row => {
+            const assetNumber = row['Asset Number'] || row['assetNumber'];
+            const assetDescription = row['Asset Description'] || row['assetDescription'];
+            return addAsset({
+              assetBook: row['Asset Book'] || row['assetBook'] || '',
+              subsidiary: row['Subsidiary'] || row['subsidiary'] || 'Default',
+              assetNumber,
+              assetDescription,
+              assetCost: row['Asset Cost'] || row['assetCost'] || '0',
+              datePlaceInService: row['Date Place In Service'] || row['datePlaceInService'] || '',
+              assetUnits: row['Asset Units'] || row['assetUnits'] || '1',
+              categorySegment1: row['Asset Category Segment 1'] || row['categorySegment1'] || 'Uncategorized',
+              categorySegment2: row['Asset Category Segment 2'] || row['categorySegment2'] || 'Uncategorized',
+              depreciationMethod: row['Depreciation Method'] || row['depreciationMethod'] || '',
+              lifeInMonths: row['Life in Months'] || row['lifeInMonths'] || '0',
+              listed: row['Listed'] || row['listed'] || 'No',
+              status: row['Status'] || row['status'] || 'Active',
+            })
+            .then(() => {
+              setImportModal(prev => ({
+                ...prev,
+                processed: prev.processed + 1,
+                successCount: prev.successCount + 1,
+              }));
+            })
+            .catch(() => {
+              setImportModal(prev => ({
+                ...prev,
+                processed: prev.processed + 1,
+                failedCount: prev.failedCount + 1,
+              }));
+            });
+          }));
+        }
 
-        await Promise.all(promises);
         setImportModal(prev => ({ ...prev, status: 'done' }));
         if (event.target) event.target.value = '';
       },
