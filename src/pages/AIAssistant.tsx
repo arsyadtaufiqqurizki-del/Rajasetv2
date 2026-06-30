@@ -78,12 +78,14 @@ export default function AIAssistant() {
         body: JSON.stringify({ question, history }),
       });
 
+      const text = await response.text();
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Server error");
+        let errMsg = "Server error";
+        try { errMsg = JSON.parse(text).error || errMsg; } catch {}
+        throw new Error(errMsg);
       }
 
-      const data = await response.json();
+      const data = JSON.parse(text);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
