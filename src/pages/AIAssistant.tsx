@@ -3,6 +3,8 @@ import { Send, Bot, User, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const CLOUD_RUN_URL = import.meta.env.VITE_AI_SERVER_URL;
+const STORAGE_KEY_MESSAGES = "ai_assistant_messages";
+const STORAGE_KEY_HISTORY = "ai_assistant_history";
 
 type Message = {
   id: string;
@@ -16,17 +18,40 @@ type HistoryMessage = {
   content: string;
 };
 
+const defaultMessages: Message[] = [
+  {
+    id: "1",
+    role: "ai",
+    content: "Halo! Saya adalah Asisten AI Anda. Anda bisa menanyakan apa saja seputar data aset, jadwal maintenance, atau laporan kondisi barang di Perusahaan Raja.",
+    timestamp: new Date()
+  }
+];
+
+const loadMessages = (): Message[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_MESSAGES);
+    if (!stored) return defaultMessages;
+    const parsed = JSON.parse(stored);
+    return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+  } catch {
+    return defaultMessages;
+  }
+};
+
+const loadHistory = (): HistoryMessage[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_HISTORY);
+    if (!stored) return [];
+    return JSON.parse(stored);
+  } catch {
+    return [];
+  }
+};
+
 export default function AIAssistant() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "ai",
-      content: "Halo! Saya adalah Asisten AI Anda. Anda bisa menanyakan apa saja seputar data aset, jadwal maintenance, atau laporan kondisi barang di Perusahaan Raja.",
-      timestamp: new Date()
-    }
-  ]);
-  const [history, setHistory] = useState<HistoryMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>(loadMessages);
+  const [history, setHistory] = useState<HistoryMessage[]>(loadHistory);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -45,6 +70,14 @@ export default function AIAssistant() {
     }, 3000);
     return () => clearInterval(interval);
   }, [isTyping]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
+  }, [history]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
