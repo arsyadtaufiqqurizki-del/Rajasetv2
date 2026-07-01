@@ -5,7 +5,7 @@ import { useAsset } from '../contexts/AssetContext';
 import Papa from 'papaparse';
 
 export default function Inventory() {
-  const { assets, deleteAsset, deleteMultipleAssets, setEditingAsset, setIsEditModalOpen, subsidiaries, categories1, addAsset } = useAsset();
+  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, subsidiaries, categories1, addAsset } = useAsset();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -543,7 +543,13 @@ export default function Inventory() {
                   onClick={async () => {
                     if (deleteConfirmText === 'DELETE') {
                       setIsDeleting(true);
-                      await deleteMultipleAssets(Array.from(selectedAssets));
+                      const noFilters = !filterSubsidiary && !filterCategory && !filterStatus && !debouncedSearchQuery;
+                      const allSelected = selectedAssets.size === filteredAssets.length;
+                      if (noFilters && allSelected) {
+                        await deleteAllAssets();
+                      } else {
+                        await deleteMultipleAssets(Array.from(selectedAssets));
+                      }
                       setSelectedAssets(new Set());
                       setIsDeleteModalOpen(false);
                       setDeleteConfirmText('');

@@ -30,6 +30,7 @@ interface AssetContextType {
   updateAsset: (id: string, asset: Omit<Asset, 'id' | 'statusLevel'>) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
   deleteMultipleAssets: (ids: string[]) => Promise<void>;
+  deleteAllAssets: () => Promise<void>;
   addSubsidiary: (name: string) => void;
   deleteSubsidiary: (name: string) => void;
   addCategory1: (name: string) => void;
@@ -200,11 +201,17 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     setAssets(prev => prev.filter(a => !idSet.has(a.id)));
   };
 
+  const deleteAllAssets = async () => {
+    const { error } = await supabase.from('assets').delete().not('id', 'is', null);
+    if (error) { setError(error.message); return; }
+    setAssets([]);
+  };
+
   return (
     <AssetContext.Provider value={{
       assets, loading, error,
       subsidiaries, categories1, categories2,
-      addAsset, updateAsset, deleteAsset, deleteMultipleAssets,
+      addAsset, updateAsset, deleteAsset, deleteMultipleAssets, deleteAllAssets,
       addSubsidiary, deleteSubsidiary, addCategory1, deleteCategory1, addCategory2, deleteCategory2,
       isAddModalOpen, setIsAddModalOpen,
       isEditModalOpen, setIsEditModalOpen,
