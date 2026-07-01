@@ -1,4 +1,4 @@
-import { Bell, Search, UserCircle, Menu } from "lucide-react";
+import { Search, UserCircle, Menu } from "lucide-react";
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { LayoutDashboard, Archive, Wrench, BarChart2, Settings, Plus, HelpCircle, LogOut, Database, Sparkles, BookOpen } from "lucide-react";
@@ -6,6 +6,7 @@ import { cn } from "../lib/utils";
 import { useAsset } from "../contexts/AssetContext";
 import { useAuth } from "../contexts/AuthContext";
 import AddAssetModal from "./AddAssetModal";
+import NotificationBell from "./NotificationBell";
 import EditAssetModal from "./EditAssetModal";
 
 const NAV_ITEMS = [
@@ -125,10 +126,7 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="relative rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-error" />
-            </button>
+            <NotificationBell />
             <button className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors">
               <UserCircle className="h-6 w-6" />
             </button>

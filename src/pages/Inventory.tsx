@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { logActivity } from '../lib/activityLogger';
 import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, FileDown, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAsset } from '../contexts/AssetContext';
@@ -188,6 +189,8 @@ export default function Inventory() {
         });
 
         const BATCH_SIZE = 10;
+        let localSuccess = 0;
+        let localFailed = 0;
         for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
           const batch = validRows.slice(i, i + BATCH_SIZE);
           await Promise.all(batch.map(row => {
@@ -209,6 +212,7 @@ export default function Inventory() {
               status: row['Status'] || row['status'] || 'Active',
             })
             .then(() => {
+              localSuccess++;
               setImportModal(prev => ({
                 ...prev,
                 processed: prev.processed + 1,
@@ -216,6 +220,7 @@ export default function Inventory() {
               }));
             })
             .catch(() => {
+              localFailed++;
               setImportModal(prev => ({
                 ...prev,
                 processed: prev.processed + 1,
@@ -226,6 +231,7 @@ export default function Inventory() {
         }
 
         setImportModal(prev => ({ ...prev, status: 'done' }));
+        logActivity({ actionType: 'IMPORT_CSV', entityType: 'asset', details: { total: validRows.length + invalidRows.length, success: localSuccess, failed: localFailed + invalidRows.length } });
         if (event.target) event.target.value = '';
       },
       error: (error) => {

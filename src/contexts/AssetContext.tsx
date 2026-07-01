@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { logActivity } from '../lib/activityLogger';
 
 export type Asset = {
   id: string;
@@ -180,6 +181,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
 
     if (error) { setError(error.message); return; }
     setAssets(prev => [fromDb(data), ...prev]);
+    logActivity({ actionType: 'ADD_ASSET', entityType: 'asset', entityId: data.id, details: { assetName: newAssetData.assetDescription, category: newAssetData.categorySegment1 } });
   };
 
   const updateAsset = async (id: string, updatedData: Omit<Asset, 'id' | 'statusLevel'>) => {
@@ -196,12 +198,15 @@ export function AssetProvider({ children }: { children: ReactNode }) {
 
     if (error) { setError(error.message); return; }
     setAssets(prev => prev.map(a => a.id === id ? fromDb(data) : a));
+    logActivity({ actionType: 'UPDATE_ASSET', entityType: 'asset', entityId: id, details: { assetName: updatedData.assetDescription } });
   };
 
   const deleteAsset = async (id: string) => {
+    const target = assets.find(a => a.id === id);
     const { error } = await supabase.from('assets').delete().eq('id', id);
     if (error) { setError(error.message); return; }
     setAssets(prev => prev.filter(a => a.id !== id));
+    logActivity({ actionType: 'DELETE_ASSET', entityType: 'asset', details: { assetName: target?.assetDescription ?? '' } });
   };
 
   const deleteMultipleAssets = async (ids: string[]) => {
@@ -213,12 +218,15 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       if (error) { setError(error.message); return; }
     }
     setAssets(prev => prev.filter(a => !idSet.has(a.id)));
+    logActivity({ actionType: 'BULK_DELETE', entityType: 'asset', details: { count: ids.length } });
   };
 
   const deleteAllAssets = async () => {
+    const count = assets.length;
     const { error } = await supabase.from('assets').delete().not('id', 'is', null);
     if (error) { setError(error.message); return; }
     setAssets([]);
+    logActivity({ actionType: 'BULK_DELETE', entityType: 'asset', details: { count } });
   };
 
   return (

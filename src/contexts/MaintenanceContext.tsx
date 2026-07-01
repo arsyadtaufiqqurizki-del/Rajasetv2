@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { logActivity } from '../lib/activityLogger';
 
 export type MaintenanceRecord = {
   id: string;
@@ -95,9 +96,11 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
 
     if (error) { setError(error.message); return; }
     setRecords(prev => [fromDb(data), ...prev]);
+    logActivity({ actionType: 'ADD_MAINTENANCE', entityType: 'maintenance', entityId: data.id, details: { assetName: record.assetDescription, scheduledDate: record.scheduledDate } });
   };
 
   const updateRecord = async (id: string, updated: Omit<MaintenanceRecord, 'id'>) => {
+    const existing = records.find(r => r.id === id);
     const { data, error } = await supabase
       .from('maintenance_records')
       .update(toDb(updated))
@@ -107,6 +110,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
 
     if (error) { setError(error.message); return; }
     setRecords(prev => prev.map(r => r.id === id ? fromDb(data) : r));
+    logActivity({ actionType: 'UPDATE_MAINTENANCE', entityType: 'maintenance', entityId: id, details: { assetName: updated.assetDescription, from: existing?.status, to: updated.status } });
   };
 
   const deleteRecord = async (id: string) => {
