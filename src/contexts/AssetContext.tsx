@@ -104,15 +104,29 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
-      const [assetsRes, subRes, cat1Res, cat2Res] = await Promise.all([
-        supabase.from('assets').select('*').order('created_at', { ascending: false }),
+
+      // Fetch all assets in chunks to bypass Supabase's default 1000-row limit
+      const CHUNK = 1000;
+      let allRows: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('assets')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + CHUNK - 1);
+        if (error) { setError(error.message); break; }
+        allRows = allRows.concat(data ?? []);
+        if (!data || data.length < CHUNK) break;
+        from += CHUNK;
+      }
+      setAssets(allRows.map(fromDb));
+
+      const [subRes, cat1Res, cat2Res] = await Promise.all([
         supabase.from('subsidiaries').select('name').order('name'),
         supabase.from('category_segments_1').select('name').order('name'),
         supabase.from('category_segments_2').select('name').order('name'),
       ]);
-
-      if (assetsRes.error) setError(assetsRes.error.message);
-      else setAssets((assetsRes.data ?? []).map(fromDb));
 
       if (!subRes.error) setSubsidiaries([...new Set((subRes.data ?? []).map(r => r.name))]);
       if (!cat1Res.error) setCategories1([...new Set((cat1Res.data ?? []).map(r => r.name))]);
