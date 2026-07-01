@@ -5,6 +5,9 @@ import { cn } from "../lib/utils";
 const CLOUD_RUN_URL = import.meta.env.VITE_AI_SERVER_URL;
 const STORAGE_KEY_MESSAGES = "ai_assistant_messages";
 const STORAGE_KEY_HISTORY = "ai_assistant_history";
+const STORAGE_KEY_TRIMMED = "ai_assistant_trimmed";
+const MAX_MESSAGES = 21; // 1 welcome + 20 chat
+const MAX_HISTORY = 20;  // 10 pasang user-AI
 
 type Message = {
   id: string;
@@ -56,6 +59,7 @@ export default function AIAssistant() {
   const [error, setError] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const [wasTrimmed, setWasTrimmed] = useState(() => localStorage.getItem(STORAGE_KEY_TRIMMED) === "true");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadingSteps = [
@@ -80,6 +84,10 @@ export default function AIAssistant() {
     localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
   }, [history]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_TRIMMED, String(wasTrimmed));
+  }, [wasTrimmed]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -97,6 +105,7 @@ export default function AIAssistant() {
     }];
     setMessages(fresh);
     setHistory([]);
+    setWasTrimmed(false);
     setShowConfirmClear(false);
   };
 
@@ -140,12 +149,18 @@ export default function AIAssistant() {
         timestamp: new Date()
       };
 
-      setMessages((prev) => [...prev, aiMessage]);
-      setHistory((prev) => [
-        ...prev,
-        { role: "user", content: question },
-        { role: "assistant", content: data.answer },
-      ]);
+      setMessages((prev) => {
+        const updated = [...prev, aiMessage];
+        if (updated.length > MAX_MESSAGES) {
+          setWasTrimmed(true);
+          return [updated[0], ...updated.slice(-(MAX_MESSAGES - 1))];
+        }
+        return updated;
+      });
+      setHistory((prev) => {
+        const updated = [...prev, { role: "user" as const, content: question }, { role: "assistant" as const, content: data.answer }];
+        return updated.slice(-MAX_HISTORY);
+      });
     } catch (err: any) {
       setError(err.message || "Gagal menghubungi server AI.");
     } finally {
@@ -297,9 +312,16 @@ export default function AIAssistant() {
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-surface-container-lowest/30">
-        {messages.map((msg) => (
+        {messages.map((msg, idx) => (
+          <React.Fragment key={msg.id}>
+            {wasTrimmed && idx === 1 && (
+              <div className="flex items-center gap-3 py-1">
+                <div className="h-px flex-1 bg-outline-variant/50" />
+                <span className="text-[11px] text-on-surface-variant/60 select-none">Pesan lebih lama tidak ditampilkan</span>
+                <div className="h-px flex-1 bg-outline-variant/50" />
+              </div>
+            )}
           <div
-            key={msg.id}
             className={cn(
               "flex gap-4 max-w-[85%]",
               msg.role === "user" ? "ml-auto flex-row-reverse" : ""
@@ -334,6 +356,7 @@ export default function AIAssistant() {
               </span>
             </div>
           </div>
+          </React.Fragment>
         ))}
 
         {isTyping && (
