@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, ChevronDown, Search } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import { useMaintenance } from '../contexts/MaintenanceContext';
 
@@ -12,7 +12,10 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
   const { assets } = useAsset();
   const { addRecord } = useMaintenance();
   const [selectedAssetId, setSelectedAssetId] = useState('');
-  
+  const [assetSearch, setAssetSearch] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState({
     serviceType: '',
     estimateCost: '',
@@ -21,9 +24,20 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
     scheduledDate: new Date().toISOString().split('T')[0]
   });
 
+  const filteredAssets = useMemo(() => {
+    const q = assetSearch.trim().toLowerCase();
+    if (!q) return assets.slice(0, 50);
+    return assets.filter(a =>
+      a.assetNumber?.toLowerCase().includes(q) ||
+      a.assetDescription?.toLowerCase().includes(q)
+    ).slice(0, 50);
+  }, [assets, assetSearch]);
+
   useEffect(() => {
     if (!isOpen) {
       setSelectedAssetId('');
+      setAssetSearch('');
+      setDropdownOpen(false);
       setFormData({
         serviceType: '',
         estimateCost: '',
@@ -33,6 +47,16 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
       });
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen]);
 
   if (!isOpen) return null;
 
@@ -74,19 +98,68 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
           
           <div>
             <label className="block text-sm font-medium text-on-surface mb-2">Select Asset *</label>
-            <select
-              required
-              value={selectedAssetId}
-              onChange={(e) => setSelectedAssetId(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="" disabled>Select an asset</option>
-              {assets.map(asset => (
-                <option key={asset.id} value={asset.id}>
-                  {asset.assetNumber} - {asset.assetDescription}
-                </option>
-              ))}
-            </select>
+            <div ref={dropdownRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setDropdownOpen(prev => !prev)}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <span className={selectedAssetId ? 'text-on-surface' : 'text-on-surface-variant'}>
+                  {selectedAsset
+                    ? `${selectedAsset.assetNumber} - ${selectedAsset.assetDescription}`
+                    : 'Select an asset'}
+                </span>
+                <ChevronDown className="h-4 w-4 text-on-surface-variant shrink-0 ml-2" />
+              </button>
+              {/* hidden input to satisfy form required validation */}
+              <input type="text" required className="sr-only" value={selectedAssetId} readOnly tabIndex={-1} />
+
+              {dropdownOpen && (
+                <div className="absolute z-50 mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg">
+                  <div className="p-2 border-b border-outline-variant flex items-center gap-2">
+                    <Search className="h-4 w-4 text-on-surface-variant shrink-0" />
+                    <input
+                      autoFocus
+                      type="text"
+                      value={assetSearch}
+                      onChange={e => setAssetSearch(e.target.value)}
+                      placeholder="Cari asset number atau deskripsi..."
+                      className="flex-1 bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none"
+                    />
+                    {assetSearch && (
+                      <button type="button" onClick={() => setAssetSearch('')} className="text-on-surface-variant hover:text-on-surface">
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  <ul className="max-h-56 overflow-y-auto py-1">
+                    {filteredAssets.length === 0 ? (
+                      <li className="px-3 py-2 text-sm text-on-surface-variant">Tidak ada hasil</li>
+                    ) : (
+                      filteredAssets.map(asset => (
+                        <li
+                          key={asset.id}
+                          onClick={() => {
+                            setSelectedAssetId(asset.id);
+                            setDropdownOpen(false);
+                            setAssetSearch('');
+                          }}
+                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-surface-container-low ${selectedAssetId === asset.id ? 'bg-primary/10 text-primary font-medium' : 'text-on-surface'}`}
+                        >
+                          <span className="font-medium">{asset.assetNumber}</span>
+                          <span className="text-on-surface-variant"> — {asset.assetDescription}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                  {!assetSearch && assets.length > 50 && (
+                    <p className="px-3 py-2 text-xs text-on-surface-variant border-t border-outline-variant">
+                      Menampilkan 50 dari {assets.length} aset. Ketik untuk mencari.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {selectedAsset && (
