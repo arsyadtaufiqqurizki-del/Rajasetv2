@@ -20,6 +20,7 @@ export default function Inventory() {
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [importModal, setImportModal] = useState({
     isOpen: false,
@@ -511,9 +512,14 @@ export default function Inventory() {
             <div className="p-6">
               <h3 className="text-xl font-bold text-on-surface mb-2">Delete Multiple Assets</h3>
               <p className="text-on-surface-variant mb-4 text-sm">
-                You are about to delete <strong>{selectedAssets.size}</strong> assets. This action is irreversible. 
+                You are about to delete <strong>{selectedAssets.size}</strong> assets. This action is irreversible.
                 Please type <strong>DELETE</strong> below to confirm.
               </p>
+              {selectedAssets.size > 100 && (
+                <p className="text-on-surface-variant mb-4 text-xs bg-surface-container rounded-md px-3 py-2">
+                  Data sebanyak {selectedAssets.size} aset akan diproses dalam {Math.ceil(selectedAssets.size / 100)} batch. Proses ini mungkin memakan beberapa detik.
+                </p>
+              )}
               
               <input
                 type="text"
@@ -526,24 +532,35 @@ export default function Inventory() {
               <div className="flex gap-3 justify-end">
                 <button
                   type="button"
-                  onClick={() => setIsDeleteModalOpen(false)}
-                  className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-md font-medium text-sm transition-colors"
+                  onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-md font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     if (deleteConfirmText === 'DELETE') {
-                      deleteMultipleAssets(Array.from(selectedAssets));
+                      setIsDeleting(true);
+                      await deleteMultipleAssets(Array.from(selectedAssets));
                       setSelectedAssets(new Set());
                       setIsDeleteModalOpen(false);
+                      setDeleteConfirmText('');
+                      setIsDeleting(false);
                     }
                   }}
-                  disabled={deleteConfirmText !== 'DELETE'}
-                  className="px-4 py-2 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+                  className="px-4 py-2 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Yes, Delete All
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Yes, Delete All'
+                  )}
                 </button>
               </div>
             </div>

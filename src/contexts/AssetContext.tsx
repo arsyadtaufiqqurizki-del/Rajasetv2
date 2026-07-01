@@ -190,9 +190,14 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteMultipleAssets = async (ids: string[]) => {
-    const { error } = await supabase.from('assets').delete().in('id', ids);
-    if (error) { setError(error.message); return; }
-    setAssets(prev => prev.filter(a => !ids.includes(a.id)));
+    const BATCH_SIZE = 100;
+    const idSet = new Set(ids);
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = ids.slice(i, i + BATCH_SIZE);
+      const { error } = await supabase.from('assets').delete().in('id', batch);
+      if (error) { setError(error.message); return; }
+    }
+    setAssets(prev => prev.filter(a => !idSet.has(a.id)));
   };
 
   return (
