@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Sparkles } from "lucide-react";
+import { Send, Bot, User, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const CLOUD_RUN_URL = import.meta.env.VITE_AI_SERVER_URL;
@@ -55,6 +55,7 @@ export default function AIAssistant() {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadingSteps = [
@@ -86,6 +87,18 @@ export default function AIAssistant() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  const handleClearChat = () => {
+    const fresh: Message[] = [{
+      id: Date.now().toString(),
+      role: "ai",
+      content: "Halo! Saya adalah Asisten AI Anda. Anda bisa menanyakan apa saja seputar data aset, jadwal maintenance, atau laporan kondisi barang di Perusahaan Raja.",
+      timestamp: new Date()
+    }];
+    setMessages(fresh);
+    setHistory([]);
+    setShowConfirmClear(false);
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,16 +251,48 @@ export default function AIAssistant() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col rounded-2xl border border-outline-variant bg-surface overflow-hidden">
+    <div className="relative flex h-[calc(100vh-8rem)] flex-col rounded-2xl border border-outline-variant bg-surface overflow-hidden">
+      {/* Confirm Clear Dialog */}
+      {showConfirmClear && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 rounded-2xl">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-surface p-6 shadow-lg border border-outline-variant">
+            <h3 className="font-semibold text-on-surface mb-1">Hapus semua percakapan?</h3>
+            <p className="text-sm text-on-surface-variant mb-6">Aksi ini tidak bisa dibatalkan. Seluruh riwayat chat akan dihapus.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirmClear(false)}
+                className="rounded-full border border-outline-variant px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleClearChat}
+                className="rounded-full bg-error px-4 py-2 text-sm text-on-error hover:opacity-90 transition-opacity"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-outline-variant bg-surface-container-lowest p-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Sparkles className="h-5 w-5" />
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="font-semibold text-on-surface">Data Assistant</h2>
           <p className="text-xs text-on-surface-variant">Tanya seputar data inventaris & maintenance</p>
         </div>
+        <button
+          onClick={() => setShowConfirmClear(true)}
+          disabled={messages.length <= 1}
+          className="flex items-center gap-1.5 rounded-full border border-outline-variant px-3 py-1.5 text-xs text-on-surface-variant hover:bg-error/10 hover:text-error hover:border-error/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-on-surface-variant disabled:hover:border-outline-variant"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Hapus Chat
+        </button>
       </div>
 
       {/* Chat Area */}
