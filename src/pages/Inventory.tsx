@@ -22,14 +22,24 @@ export default function Inventory() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [importModal, setImportModal] = useState({
+  const [importModal, setImportModal] = useState<{
+    isOpen: boolean;
+    status: 'importing' | 'done';
+    total: number;
+    processed: number;
+    successCount: number;
+    failedCount: number;
+    skippedCount: number;
+    invalidRows: { rowNumber: number; assetNumber: string; assetDescription: string; reason: string }[];
+  }>({
     isOpen: false,
-    status: 'importing' as 'importing' | 'done',
+    status: 'importing',
     total: 0,
     processed: 0,
     successCount: 0,
     failedCount: 0,
     skippedCount: 0,
+    invalidRows: [],
   });
 
   const uniqueStatuses = useMemo(() => Array.from(new Set(assets.map(a => a.status).filter(Boolean))), [assets]);
@@ -142,12 +152,29 @@ export default function Inventory() {
           return;
         }
 
-        const validRows = data.filter(row => {
-          const assetNumber = row['Asset Number'] || row['assetNumber'];
-          const assetDescription = row['Asset Description'] || row['assetDescription'];
-          return assetNumber && assetDescription;
+        const validRows: any[] = [];
+        const invalidRows: { rowNumber: number; assetNumber: string; assetDescription: string; reason: string }[] = [];
+
+        data.forEach((row, index) => {
+          const assetNumber = row['Asset Number'] || row['assetNumber'] || '';
+          const assetDescription = row['Asset Description'] || row['assetDescription'] || '';
+          const missingNumber = !assetNumber;
+          const missingDescription = !assetDescription;
+
+          if (missingNumber || missingDescription) {
+            const reasons = [];
+            if (missingNumber) reasons.push('Asset Number kosong');
+            if (missingDescription) reasons.push('Asset Description kosong');
+            invalidRows.push({
+              rowNumber: index + 2, // +2 karena baris 1 = header
+              assetNumber,
+              assetDescription,
+              reason: reasons.join(', '),
+            });
+          } else {
+            validRows.push(row);
+          }
         });
-        const skippedCount = data.length - validRows.length;
 
         setImportModal({
           isOpen: true,
@@ -156,7 +183,8 @@ export default function Inventory() {
           processed: 0,
           successCount: 0,
           failedCount: 0,
-          skippedCount,
+          skippedCount: invalidRows.length,
+          invalidRows,
         });
 
         const BATCH_SIZE = 10;
@@ -205,6 +233,22 @@ export default function Inventory() {
       }
     });
   }, [addAsset]);
+
+  const handleDownloadInvalidRows = useCallback(() => {
+    const rows = importModal.invalidRows;
+    if (rows.length === 0) return;
+    const csv = [
+      ['Row Number', 'Asset Number', 'Asset Description', 'Reason'],
+      ...rows.map(r => [r.rowNumber, r.assetNumber, r.assetDescription, r.reason]),
+    ].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'invalid_rows.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [importModal.invalidRows]);
 
   return (
     <div className="flex flex-col gap-6 w-full h-[calc(100vh-[180px])] min-h-[600px]">
@@ -472,7 +516,7 @@ export default function Inventory() {
                     )}
                     <h3 className="text-xl font-bold text-on-surface">Import Complete</h3>
                   </div>
-                  <div className="bg-surface-container rounded-xl p-4 mb-6 space-y-2 text-sm">
+                  <div className="bg-surface-container rounded-xl p-4 mb-4 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-on-surface-variant">Successfully imported</span>
                       <span className="font-semibold text-emerald-600">{importModal.successCount} assets</span>
@@ -486,10 +530,48 @@ export default function Inventory() {
                     {importModal.skippedCount > 0 && (
                       <div className="flex justify-between">
                         <span className="text-on-surface-variant">Skipped (invalid rows)</span>
-                        <span className="font-semibold text-on-surface-variant">{importModal.skippedCount} rows</span>
+                        <span className="font-semibold text-amber-600">{importModal.skippedCount} rows</span>
                       </div>
                     )}
                   </div>
+
+                  {importModal.invalidRows.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                          Baris yang dilewati
+                        </span>
+                        <button
+                          onClick={handleDownloadInvalidRows}
+                          className="flex items-center gap-1 text-xs text-primary hover:underline font-medium"
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                          Download CSV
+                        </button>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto rounded-lg border border-outline-variant text-xs">
+                        <table className="w-full">
+                          <thead className="bg-surface-container sticky top-0">
+                            <tr>
+                              <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Baris</th>
+                              <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Asset Number</th>
+                              <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Alasan</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {importModal.invalidRows.map((row, i) => (
+                              <tr key={i} className="border-t border-outline-variant/50">
+                                <td className="px-3 py-1.5 text-on-surface-variant">{row.rowNumber}</td>
+                                <td className="px-3 py-1.5 text-on-surface">{row.assetNumber || <span className="italic text-on-surface-variant">—</span>}</td>
+                                <td className="px-3 py-1.5 text-amber-600">{row.reason}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex justify-end">
                     <button
                       onClick={() => setImportModal(prev => ({ ...prev, isOpen: false }))}
