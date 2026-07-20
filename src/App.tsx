@@ -9,6 +9,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Maintenance from "./pages/Maintenance";
+import Reclassification from "./pages/Reclassification";
 import Reports from "./pages/Reports";
 import MasterData from "./pages/MasterData";
 import Settings from "./pages/Settings";
@@ -17,6 +18,7 @@ import Guide from "./pages/Guide";
 import Login from "./pages/Login";
 import { AssetProvider } from "./contexts/AssetContext";
 import { MaintenanceProvider } from "./contexts/MaintenanceContext";
+import { ReclassificationProvider } from "./contexts/ReclassificationContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -36,6 +38,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="inventory" element={<Inventory />} />
         <Route path="maintenance" element={<Maintenance />} />
+        <Route path="reclassification" element={<Reclassification />} />
         <Route path="master-data" element={<MasterData />} />
         <Route path="reports" element={<Reports />} />
         <Route path="ai-assistant" element={<AIAssistant />} />
@@ -52,9 +55,11 @@ export default function App() {
     <AuthProvider>
       <AssetProvider>
         <MaintenanceProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
+          <ReclassificationProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </ReclassificationProvider>
         </MaintenanceProvider>
       </AssetProvider>
     </AuthProvider>

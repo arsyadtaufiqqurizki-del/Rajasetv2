@@ -1,18 +1,22 @@
 import { Search, UserCircle, Menu } from "lucide-react";
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Archive, Wrench, BarChart2, Settings, Plus, HelpCircle, LogOut, Database, Sparkles, BookOpen } from "lucide-react";
+import { LayoutDashboard, Archive, Wrench, BarChart2, Settings, Plus, HelpCircle, LogOut, Database, Sparkles, BookOpen, ClipboardCheck } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAsset } from "../contexts/AssetContext";
 import { useAuth } from "../contexts/AuthContext";
 import AddAssetModal from "./AddAssetModal";
 import NotificationBell from "./NotificationBell";
 import EditAssetModal from "./EditAssetModal";
+import AddReclassificationModal from "./AddReclassificationModal";
+import EditReclassificationModal from "./EditReclassificationModal";
+import VerifyReclassificationModal from "./VerifyReclassificationModal";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Asset Inventory", href: "/inventory", icon: Archive },
   { label: "Maintenance", href: "/maintenance", icon: Wrench },
+  { label: "Reclassification", href: "/reclassification", icon: ClipboardCheck },
   { label: "Master Data", href: "/master-data", icon: Database },
   { label: "Reports", href: "/reports", icon: BarChart2 },
   { label: "AI Assistant", href: "/ai-assistant", icon: Sparkles },
@@ -143,6 +147,9 @@ export default function Layout() {
 
       <AddAssetModal />
       <EditAssetModal />
+      <AddReclassificationModal />
+      <EditReclassificationModal />
+      <VerifyReclassificationModal />
     </div>
   );
 }

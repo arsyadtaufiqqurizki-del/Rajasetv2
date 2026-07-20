@@ -8,8 +8,12 @@ export type ActionType =
   | 'BULK_DELETE'
   | 'ADD_MAINTENANCE'
   | 'UPDATE_MAINTENANCE'
+  | 'ADD_RECLASSIFICATION'
+  | 'UPDATE_RECLASSIFICATION'
+  | 'DELETE_RECLASSIFICATION'
+  | 'VERIFY_RECLASSIFICATION'
 
-export type EntityType = 'asset' | 'maintenance' | 'system'
+export type EntityType = 'asset' | 'maintenance' | 'reclassification' | 'system'
 
 interface LogActivityParams {
   actionType: ActionType
