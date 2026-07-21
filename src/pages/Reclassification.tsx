@@ -5,6 +5,13 @@ import { useReclassification } from '../contexts/ReclassificationContext';
 import { logActivity } from '../lib/activityLogger';
 import Papa from 'papaparse';
 
+// Mencegah CSV injection: field yang diawali =, +, -, @, tab, atau CR akan
+// dieksekusi sebagai formula oleh Excel/Sheets kalau tidak dinetralkan.
+const sanitizeCsvField = (value: unknown): unknown => {
+  if (typeof value !== 'string') return value;
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+};
+
 export default function Reclassification() {
   const {
     reclassifications, deleteReclassification, addReclassification,
@@ -92,15 +99,15 @@ export default function Reclassification() {
 
   const handleExportCSV = useCallback(() => {
     const dataToExport = filteredItems.map(item => ({
-      'Asset Category': item.assetCategory,
-      'Asset Description': item.assetDescription,
-      'Location': item.location,
+      'Asset Category': sanitizeCsvField(item.assetCategory),
+      'Asset Description': sanitizeCsvField(item.assetDescription),
+      'Location': sanitizeCsvField(item.location),
       'Unit': item.unit,
-      'Ownership': item.ownership,
-      'Category': item.category,
+      'Ownership': sanitizeCsvField(item.ownership),
+      'Category': sanitizeCsvField(item.category),
       'Verified': item.verified ? 'Yes' : 'No',
       'Verification Date': item.verificationDate,
-      'Verified By': item.verifiedBy,
+      'Verified By': sanitizeCsvField(item.verifiedBy),
     }));
 
     const csv = Papa.unparse(dataToExport);
@@ -171,7 +178,7 @@ export default function Reclassification() {
               unit: row['Unit'] || row['unit'] || '',
               ownership: row['Ownership'] || row['ownership'] || '',
               category: row['Category'] || row['category'] || 'Needs Review',
-            })
+            }, true)
             .then(() => {
               localSuccess++;
               setImportModal(prev => ({
@@ -206,7 +213,7 @@ export default function Reclassification() {
     if (rows.length === 0) return;
     const csv = [
       ['Row Number', 'Asset Description', 'Reason'],
-      ...rows.map(r => [r.rowNumber, r.assetDescription, r.reason]),
+      ...rows.map(r => [r.rowNumber, sanitizeCsvField(r.assetDescription), r.reason]),
     ].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

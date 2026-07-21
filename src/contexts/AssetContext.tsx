@@ -27,7 +27,7 @@ interface AssetContextType {
   subsidiaries: string[];
   categories1: string[];
   categories2: string[];
-  addAsset: (asset: Omit<Asset, 'id' | 'statusLevel'>) => Promise<void>;
+  addAsset: (asset: Omit<Asset, 'id' | 'statusLevel'>, skipLog?: boolean) => Promise<void>;
   updateAsset: (id: string, asset: Omit<Asset, 'id' | 'statusLevel'>) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
   deleteMultipleAssets: (ids: string[]) => Promise<void>;
@@ -168,7 +168,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     supabase.from('category_segments_2').delete().eq('name', name).then();
   };
 
-  const addAsset = async (newAssetData: Omit<Asset, 'id' | 'statusLevel'>) => {
+  const addAsset = async (newAssetData: Omit<Asset, 'id' | 'statusLevel'>, skipLog = false) => {
     if (newAssetData.subsidiary) addSubsidiary(newAssetData.subsidiary);
     if (newAssetData.categorySegment1) addCategory1(newAssetData.categorySegment1);
     if (newAssetData.categorySegment2) addCategory2(newAssetData.categorySegment2);
@@ -181,7 +181,9 @@ export function AssetProvider({ children }: { children: ReactNode }) {
 
     if (error) { setError(error.message); return; }
     setAssets(prev => [fromDb(data), ...prev]);
-    logActivity({ actionType: 'ADD_ASSET', entityType: 'asset', entityId: data.id, details: { assetName: newAssetData.assetDescription, category: newAssetData.categorySegment1 } });
+    if (!skipLog) {
+      logActivity({ actionType: 'ADD_ASSET', entityType: 'asset', entityId: data.id, details: { assetName: newAssetData.assetDescription, category: newAssetData.categorySegment1 } });
+    }
   };
 
   const updateAsset = async (id: string, updatedData: Omit<Asset, 'id' | 'statusLevel'>) => {

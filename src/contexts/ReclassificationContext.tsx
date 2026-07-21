@@ -29,7 +29,7 @@ interface ReclassificationContextType {
   reclassifications: Reclassification[];
   loading: boolean;
   error: string | null;
-  addReclassification: (item: ReclassificationInput) => Promise<void>;
+  addReclassification: (item: ReclassificationInput, skipLog?: boolean) => Promise<void>;
   updateReclassification: (id: string, item: ReclassificationInput) => Promise<void>;
   deleteReclassification: (id: string) => Promise<void>;
   verifyReclassification: (id: string, verified: boolean) => Promise<void>;
@@ -105,7 +105,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
     fetchAll();
   }, []);
 
-  const addReclassification = async (newItemData: ReclassificationInput) => {
+  const addReclassification = async (newItemData: ReclassificationInput, skipLog = false) => {
     const { data: { user } } = await supabase.auth.getUser();
 
     const { data, error } = await supabase
@@ -116,12 +116,14 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
 
     if (error) { setError(error.message); return; }
     setReclassifications(prev => [fromDb(data), ...prev]);
-    logActivity({
-      actionType: 'ADD_RECLASSIFICATION',
-      entityType: 'reclassification',
-      entityId: data.id,
-      details: { assetDescription: newItemData.assetDescription, category: newItemData.category },
-    });
+    if (!skipLog) {
+      logActivity({
+        actionType: 'ADD_RECLASSIFICATION',
+        entityType: 'reclassification',
+        entityId: data.id,
+        details: { assetDescription: newItemData.assetDescription, category: newItemData.category },
+      });
+    }
   };
 
   const updateReclassification = async (id: string, updatedData: ReclassificationInput) => {

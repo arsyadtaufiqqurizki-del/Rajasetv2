@@ -210,7 +210,7 @@ export default function Inventory() {
               lifeInMonths: row['Life in Months'] || row['lifeInMonths'] || '0',
               listed: row['Listed'] || row['listed'] || 'No',
               status: row['Status'] || row['status'] || 'Active',
-            })
+            }, true)
             .then(() => {
               localSuccess++;
               setImportModal(prev => ({
