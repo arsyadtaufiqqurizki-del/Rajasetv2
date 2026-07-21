@@ -1,17 +1,31 @@
-import { User, SlidersHorizontal, BellRing, Shield, Camera, Lock, Save, Check } from 'lucide-react';
+import { User, SlidersHorizontal, BellRing, Shield, Camera, Lock, Save, Check, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('Changes saved successfully');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Form States (Frontend Only)
+  // Form States
   const [profile, setProfile] = useState({
-    name: 'Admin User',
-    email: 'admin@perusahaanraja.com'
+    name: '',
+    email: ''
   });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setProfile({
+          name: (data.user.user_metadata?.name as string | undefined) || '',
+          email: data.user.email || '',
+        });
+      }
+    });
+  }, []);
 
   const [config, setConfig] = useState({
     language: 'id',
@@ -34,11 +48,101 @@ export default function Settings() {
     twoFactor: false
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaveError(null);
+
+    if (activeTab === 'profile') {
+      if (!profile.name.trim() || !profile.email.trim()) {
+        setSaveError('Name and email cannot be empty.');
+        return;
+      }
+
+      setIsSaving(true);
+      try {
+        const { data: userData, error: getUserError } = await supabase.auth.getUser();
+        if (getUserError || !userData.user) {
+          throw new Error('Unable to verify current session.');
+        }
+
+        const currentName = (userData.user.user_metadata?.name as string | undefined) || '';
+        const emailChanged = profile.email !== userData.user.email;
+        const nameChanged = profile.name !== currentName;
+
+        if (emailChanged || nameChanged) {
+          const updates: { email?: string; data?: { name: string } } = {};
+          if (emailChanged) updates.email = profile.email;
+          if (nameChanged) updates.data = { name: profile.name };
+
+          const { error: updateError } = await supabase.auth.updateUser(updates);
+          if (updateError) throw updateError;
+        }
+
+        setIsSaving(false);
+        setSuccessMessage(
+          emailChanged
+            ? 'Profile updated. Check your inbox to confirm the new email address.'
+            : 'Changes saved successfully'
+        );
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+      } catch (err) {
+        setIsSaving(false);
+        setSaveError(err instanceof Error ? err.message : 'Failed to update profile.');
+      }
+      return;
+    }
+
+    if (activeTab === 'security') {
+      if (!security.currentPassword || !security.newPassword || !security.confirmPassword) {
+        setSaveError('Please fill in all password fields.');
+        return;
+      }
+      if (security.newPassword !== security.confirmPassword) {
+        setSaveError('New password and confirmation do not match.');
+        return;
+      }
+      if (security.newPassword.length < 6) {
+        setSaveError('New password must be at least 6 characters.');
+        return;
+      }
+
+      setIsSaving(true);
+      try {
+        const { data: userData, error: getUserError } = await supabase.auth.getUser();
+        if (getUserError || !userData.user?.email) {
+          throw new Error('Unable to verify current session.');
+        }
+
+        const { error: reauthError } = await supabase.auth.signInWithPassword({
+          email: userData.user.email,
+          password: security.currentPassword,
+        });
+        if (reauthError) {
+          throw new Error('Current password is incorrect.');
+        }
+
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: security.newPassword,
+        });
+        if (updateError) throw updateError;
+
+        setSecurity({ currentPassword: '', newPassword: '', confirmPassword: '', twoFactor: security.twoFactor });
+        setIsSaving(false);
+        setSuccessMessage('Changes saved successfully');
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+      } catch (err) {
+        setIsSaving(false);
+        setSaveError(err instanceof Error ? err.message : 'Failed to update password.');
+      }
+      return;
+    }
+
     setIsSaving(true);
     // Simulate network request
     setTimeout(() => {
       setIsSaving(false);
+      setSuccessMessage('Changes saved successfully');
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     }, 800);
@@ -57,7 +161,13 @@ export default function Settings() {
           {showSuccess && (
             <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-bold animate-in fade-in slide-in-from-top-2">
               <Check className="h-4 w-4" />
-              Changes saved successfully
+              {successMessage}
+            </div>
+          )}
+          {saveError && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-800 rounded-lg text-sm font-bold animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="h-4 w-4" />
+              {saveError}
             </div>
           )}
         </div>
@@ -66,29 +176,29 @@ export default function Settings() {
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {/* Settings Navigation Sidebar */}
         <nav className="w-full lg:w-64 shrink-0 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 scrollbar-hide bg-surface-container-lowest rounded-xl border border-outline-variant p-2 shadow-sm">
-           <button 
-             onClick={() => setActiveTab('profile')}
+           <button
+             onClick={() => { setActiveTab('profile'); setSaveError(null); }}
              className={cn("text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors whitespace-nowrap",
                activeTab === 'profile' ? "bg-surface-container-low text-primary font-bold" : "text-on-surface-variant hover:bg-surface-container"
              )}>
               <User className={cn("h-5 w-5", activeTab === 'profile' && "fill-current")} /> User Profile
            </button>
-           <button 
-             onClick={() => setActiveTab('config')}
+           <button
+             onClick={() => { setActiveTab('config'); setSaveError(null); }}
              className={cn("text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors whitespace-nowrap",
                activeTab === 'config' ? "bg-surface-container-low text-primary font-bold" : "text-on-surface-variant hover:bg-surface-container"
              )}>
               <SlidersHorizontal className={cn("h-5 w-5", activeTab === 'config' && "fill-current")} /> System Configuration
            </button>
-           <button 
-             onClick={() => setActiveTab('notif')}
+           <button
+             onClick={() => { setActiveTab('notif'); setSaveError(null); }}
              className={cn("text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors whitespace-nowrap",
                activeTab === 'notif' ? "bg-surface-container-low text-primary font-bold" : "text-on-surface-variant hover:bg-surface-container"
              )}>
               <BellRing className={cn("h-5 w-5", activeTab === 'notif' && "fill-current")} /> Notifications
            </button>
-            <button 
-             onClick={() => setActiveTab('security')}
+            <button
+             onClick={() => { setActiveTab('security'); setSaveError(null); }}
              className={cn("text-left px-4 py-3 rounded-lg flex items-center gap-3 font-medium transition-colors whitespace-nowrap",
                activeTab === 'security' ? "bg-surface-container-low text-primary font-bold" : "text-on-surface-variant hover:bg-surface-container"
              )}>
@@ -333,17 +443,20 @@ export default function Settings() {
                 </div>
 
                 <div className="pt-6 border-t border-outline-variant max-w-md">
-                  <label className="flex items-start gap-4 p-4 rounded-lg bg-surface-container-low border border-outline-variant cursor-pointer transition-colors">
+                  <label className="flex items-start gap-4 p-4 rounded-lg bg-surface-container-low border border-outline-variant opacity-60 cursor-not-allowed transition-colors">
                     <div className="mt-0.5">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={security.twoFactor}
-                        onChange={(e) => setSecurity({...security, twoFactor: e.target.checked})}
-                        className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary accent-primary" 
+                        disabled
+                        className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary accent-primary"
                       />
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-sm font-bold text-on-surface">Two-Factor Authentication</h4>
+                      <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
+                        Two-Factor Authentication
+                        <span className="text-xs font-mono font-normal px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">Coming soon</span>
+                      </h4>
                       <p className="text-sm text-on-surface-variant mt-1">Add an extra layer of security to your account by requiring a verification code upon login.</p>
                     </div>
                   </label>
