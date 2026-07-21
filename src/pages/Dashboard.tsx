@@ -219,7 +219,14 @@ export default function Dashboard() {
                 <XAxis type="number" hide />
                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} 
                   tick={{ fill: '#45464d', fontSize: 12 }} />
-                <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: '1px solid #c6c6cd' }} />
+                <Tooltip
+                  cursor={{ fill: 'transparent' }}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #c6c6cd' }}
+                  formatter={(value: number) => [
+                    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value),
+                    'Valuation'
+                  ]}
+                />
                 <Bar dataKey="value" fill="#0F172A" radius={[0, 4, 4, 0]} barSize={24} />
               </BarChart>
             </ResponsiveContainer>
@@ -236,7 +243,12 @@ export default function Dashboard() {
                     <Cell key={index} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  formatter={(value: number) => [
+                    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value),
+                    'Valuation'
+                  ]}
+                />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col mt-2">

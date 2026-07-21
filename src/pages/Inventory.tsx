@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { logActivity } from '../lib/activityLogger';
-import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, FileDown, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, FileDown, CheckCircle, XCircle, Loader2, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAsset } from '../contexts/AssetContext';
 import Papa from 'papaparse';
 
 export default function Inventory() {
-  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, subsidiaries, categories1, addAsset } = useAsset();
+  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, addAsset } = useAsset();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -293,6 +293,13 @@ export default function Inventory() {
           >
             <Download className="h-4 w-4" />
             Export CSV
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-md hover:opacity-90 font-medium text-sm transition-opacity shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add New Asset
           </button>
           {selectedAssets.size > 0 && (
             <button
