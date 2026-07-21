@@ -1,63 +1,68 @@
-# Asset Inventory System
+# Asset Inventory System (Rajaset v2)
 
-Aplikasi web berbasis React untuk manajemen aset perusahaan dan pelacakan inventaris serta pemeliharaan aset. Aplikasi ini dibangun menggunakan ekosistem modern dengan fokus pada performa dan antarmuka pengguna yang interaktif.
+Aplikasi web untuk manajemen aset perusahaan, pelacakan inventaris, pemeliharaan, dan reklasifikasi aset. Dibangun dengan React + TypeScript di sisi klien dan **Supabase** (Postgres, Auth, RLS, pg_cron) sebagai backend.
 
 ## Tech Stack & Dependensi Utama
 
-- **Framework & Build Tool**: React 19, Vite, dan TypeScript.
+- **Framework & Build Tool**: React 19, Vite 6, TypeScript.
+- **Backend / Database**: Supabase (`@supabase/supabase-js`, `@supabase/ssr`) — Postgres, Auth, Row Level Security, dan scheduled jobs via `pg_cron`.
 - **Routing**: React Router DOM v7.
 - **Styling**: Tailwind CSS v4, `clsx`, dan `tailwind-merge`.
-- **Ikon & Animasi**: `lucide-react` untuk ikon dan `motion` untuk animasi transisi halus.
-- **Visualisasi Data**: `recharts` untuk komponen grafik interaktif pada Dashboard.
-- **Utility**: `date-fns` untuk pemrosesan tanggal, dan `@google/genai` untuk kapabilitas Artificial Intelligence (jika diaktifkan).
+- **Ikon & Animasi**: `lucide-react` untuk ikon dan `motion` untuk animasi transisi.
+- **Visualisasi Data**: `recharts` untuk grafik interaktif pada Dashboard.
+- **Utility**: `date-fns` untuk pemrosesan tanggal, `papaparse` untuk import/export CSV, `@google/genai` untuk fitur AI Assistant.
+- **Deployment**: Cloudflare Workers (`wrangler`).
 
-## Struktur "Database" (State Management)
+## Arsitektur Data (Supabase)
 
-Aplikasi berjalan sepenuhnya di sisi klien (Client-Side). Manajemen *state* atau "database" in-memory dikelola secara terpusat menggunakan **React Context** melalui dua konteks utama:
+Aplikasi tidak lagi menggunakan state in-memory — seluruh data persisten disimpan di Supabase Postgres dan diakses lewat client di `src/lib/supabase.ts`. Autentikasi ditangani oleh `AuthContext.tsx` (Supabase Auth), dan setiap operasi CRUD utama tercatat ke tabel `activity_logs` (lihat `src/lib/activityLogger.ts` dan `src/hooks/useActivityLog.ts`) untuk feed notifikasi real-time (`NotificationBell.tsx`, `useSystemAlerts.ts`).
 
-### 1. AssetContext (`AssetContext.tsx`)
-Mengelola data utama aset dan master data referensi pendukung.
+Skema database dikelola lewat migration di `supabase/migrations/`:
+- `create_activity_logs` — tabel log aktivitas bersama sebagai feed notifikasi.
+- `create_asset_reclassifications` — tabel untuk fitur reklasifikasi aset.
+- `purge_old_activity_logs` — job `pg_cron` yang menghapus log aktivitas berumur lebih dari 3 bulan setiap tanggal 1 jam 3 pagi (tanpa arsip).
 
-**Skema Tabel Aset (`Asset`)**:
-- `id` (string): *Primary Key* unik.
-- `assetBook` (string): Jenis buku aset / pembukuan.
-- `subsidiary` (string): Entitas anak perusahaan / cabang kepemilikan.
-- `assetNumber` (string): Nomor seri identifikasi unik.
-- `assetDescription` (string): Deskripsi aset.
-- `assetCost` (string): Nilai / harga beli awal aset.
-- `datePlaceInService` (string): Tanggal mulai digunakan.
-- `assetUnits` (string): Jumlah item / unit.
-- `categorySegment1` (string): Kategori Utama (Contoh: *Vehicles*, *Buildings*).
-- `categorySegment2` (string): Kategori Turunan / Tambahan.
-- `depreciationMethod` (string): Metode penyusutan.
-- `lifeInMonths` (string): Umur ekonomis dalam bulan.
-- `listed` (string): Status listing.
-- `status` (string): Status kondisional (*Active*, *In Maintenance*, *Broken*).
-- `statusLevel` (`'success' | 'warning' | 'error' | 'default'`): Kolom komputasi untuk penentuan warna badge (badge UI).
+State pada sisi klien dikelola per-domain melalui React Context, masing-masing membungkus query/mutasi Supabase:
+- **`AssetContext.tsx`** — data aset dan master data referensi (subsidiary, kategori 1 & 2), termasuk import/export CSV massal dengan proteksi CSV injection.
+- **`MaintenanceContext.tsx`** — jadwal dan riwayat pemeliharaan aset.
+- **`ReclassificationContext.tsx`** — pengajuan dan verifikasi reklasifikasi kategori/subsidiary aset.
 
-**Tabel Referensi (Master Data)**:
-Disimpan sebagai array string dan mendukung fitur *auto-upsert* saat input aset baru.
-- `subsidiaries` (string[]): Daftar cabang/perusahaan.
-- `categories1` (string[]): Master data Kategori 1.
-- `categories2` (string[]): Master data Kategori 2.
+## Fitur Utama
 
-### 2. MaintenanceContext (`MaintenanceContext.tsx`)
-Mengelola seluruh jadwal dan log perbaikan (maintenance) aset. Memiliki skema mandiri dan mendukung operasi CRUD terpisah khusus untuk entitas *Maintenance*.
+- **Manajemen Inventaris Aset**: CRUD lengkap dengan pagination, debounce search, dan autocomplete master data (`AutocompleteInput.tsx`).
+- **Import/Export CSV**: Import massal aset dan reklasifikasi dengan sanitasi terhadap CSV injection, serta logging teragregasi (bukan per baris) agar `activity_logs` tidak membengkak.
+- **Modul Pemeliharaan (Maintenance)**: Pelacakan tiket perbaikan aset (`AddMaintenanceModal.tsx`, `EditMaintenanceModal.tsx`).
+- **Reklasifikasi Aset**: Alur pengajuan dan verifikasi perubahan kategori/subsidiary aset (`AddReclassificationModal.tsx`, `EditReclassificationModal.tsx`, `VerifyReclassificationModal.tsx`).
+- **Dashboard & Analitik**: Statistik dan grafik interaktif (top subsidiary, distribusi kategori) dengan tooltip currency formatting.
+- **Notifikasi & Activity Log**: Feed aktivitas real-time lintas modul dengan retention policy otomatis (purge 3 bulan via `pg_cron`).
+- **AI Assistant**: Antarmuka bertenaga Gemini API (`@google/genai`) untuk membantu analisis/penggunaan aplikasi.
+- **Autentikasi**: Login terproteksi berbasis Supabase Auth dengan route privat (`PrivateRoute`).
 
-## Fitur & Peningkatan Sistem
+## Arsitektur Halaman (Routes)
 
-- **Modul Pemeliharaan (Maintenance)**: Fitur pelacakan Maintenance yang komprehensif, didukung konteks terpisah beserta modal khusus penambahan dan pengeditan tiket perbaikan (`AddMaintenanceModal.tsx`, `EditMaintenanceModal.tsx`).
-- **Dashboard & Analitik Visual**: Menyajikan metrik aset menggunakan pustaka diagram interaktif (`recharts`).
-- **Input Autocomplete**: Komponen input pintar (`AutocompleteInput.tsx`) yang terhubung dengan tabel referensi (Master Data) agar input lebih cepat dan konsisten tanpa perlu ketik ulang dari awal.
-- **Pagination & Debounce Search**: Pengalaman interaksi tabel (*Inventory*) dikelola secara optimal menggunakan mekanisme halaman dan pemfilteran anti-lag (debounce search).
-- **Animasi Komponen**: Penggunaan *motion* untuk feedback visual modern pada transisi modal dan interaksi tombol.
+- **`/login`**: Halaman login.
+- **`/` (Dashboard)**: Ringkasan statistik dan analitik interaktif aset.
+- **`/inventory`**: Tabel utama daftar aset — pencarian, CRUD, import/export CSV.
+- **`/maintenance`**: Pemantauan dan pencatatan riwayat aset yang rusak/dalam perawatan.
+- **`/reclassification`**: Pengajuan dan verifikasi reklasifikasi aset.
+- **`/master-data`**: Manajemen entitas referensi (Kategori, Subsidiary, dll).
+- **`/reports`**: Rekapitulasi pelaporan periodik.
+- **`/ai-assistant`**: Asisten AI.
+- **`/guide`**: Panduan penggunaan aplikasi.
+- **`/settings`**: Konfigurasi umum aplikasi.
 
-## Arsitektur Halaman (Views)
+Semua route (kecuali `/login`) dibungkus `PrivateRoute` dan memerlukan sesi Supabase Auth aktif.
 
-Aplikasi memecah fitur menjadi rute halaman terpisah:
-- **Dashboard (`/`)**: Antarmuka ringkasan statistik dan analitik interaktif aset.
-- **Inventory (`/inventory`)**: Antarmuka tabular utama daftar aset lengkap dengan operasi pencarian dan CRUD.
-- **Maintenance (`/maintenance`)**: Pemantauan spesifik dan pencatatan riwayat aset yang rusak atau dalam perawatan berkala.
-- **Master Data (`/master-data`)**: Manajemen terpusat untuk daftar entitas referensi pendukung (Kategori, Subsidiary, dll).
-- **Reports (`/reports`)**: Antarmuka khusus untuk rekapitulasi pelaporan periodik.
-- **Settings (`/settings`)**: Konfigurasi umum aplikasi.
+## Menjalankan Secara Lokal
+
+```bash
+npm install
+npm run dev      # Vite dev server di http://localhost:3000
+```
+
+Buat file `.env` berdasarkan `.env.example` dan isi kredensial Supabase (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) serta `GEMINI_API_KEY` bila fitur AI Assistant digunakan.
+
+Script lain:
+- `npm run build` — build produksi via Vite.
+- `npm run lint` — type-check dengan `tsc --noEmit`.
+- `npm run deploy` — build lalu deploy ke Cloudflare Workers via `wrangler`.
