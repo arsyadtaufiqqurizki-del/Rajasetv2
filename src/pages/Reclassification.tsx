@@ -15,6 +15,7 @@ const sanitizeCsvField = (value: unknown): unknown => {
 export default function Reclassification() {
   const {
     reclassifications, deleteReclassification, addReclassification,
+    deleteMultipleReclassifications, deleteAllReclassifications,
     setEditingReclassification, setIsEditModalOpen,
     setVerifyingReclassification, setIsVerifyModalOpen,
     setIsAddModalOpen,
@@ -29,6 +30,11 @@ export default function Reclassification() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [importModal, setImportModal] = useState<{
     isOpen: boolean;
@@ -105,6 +111,7 @@ export default function Reclassification() {
       'Unit': item.unit,
       'Ownership': sanitizeCsvField(item.ownership),
       'Category': sanitizeCsvField(item.category),
+      'Remarks': sanitizeCsvField(item.remarks),
       'Verified': item.verified ? 'Yes' : 'No',
       'Verification Date': item.verificationDate,
       'Verified By': sanitizeCsvField(item.verifiedBy),
@@ -178,6 +185,7 @@ export default function Reclassification() {
               unit: row['Unit'] || row['unit'] || '',
               ownership: row['Ownership'] || row['ownership'] || '',
               category: row['Category'] || row['category'] || 'Needs Review',
+              remarks: row['Remarks'] || row['remarks'] || '',
             }, true)
             .then(() => {
               localSuccess++;
@@ -240,6 +248,26 @@ export default function Reclassification() {
     }
   }, [deleteReclassification]);
 
+  const handleSelectAll = useCallback((checked: boolean) => {
+    if (checked) {
+      setSelectedItems(new Set(filteredItems.map(item => item.id)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  }, [filteredItems]);
+
+  const handleSelectItem = useCallback((id: string, checked: boolean) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(id);
+      } else {
+        newSet.delete(id);
+      }
+      return newSet;
+    });
+  }, []);
+
   const categoryBadgeClass = (category: string) => {
     if (category === 'Asset') return "bg-emerald-50 border-emerald-200 text-emerald-800";
     if (category === 'Inventory') return "bg-secondary-container/40 border-outline-variant text-on-secondary-container";
@@ -292,6 +320,18 @@ export default function Reclassification() {
             <Plus className="h-4 w-4" />
             Tambah Item
           </button>
+          {selectedItems.size > 0 && (
+            <button
+              onClick={() => {
+                setIsDeleteModalOpen(true);
+                setDeleteConfirmText("");
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors shadow-sm"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Selected ({selectedItems.size})
+            </button>
+          )}
         </div>
       </div>
 
@@ -408,6 +448,14 @@ export default function Reclassification() {
           <table className="w-full text-left border-collapse">
             <thead className="bg-surface-container-low border-b border-outline-variant sticky top-0">
               <tr>
+                <th className="py-3 px-4 w-12 text-center">
+                  <input
+                    type="checkbox"
+                    className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                    checked={filteredItems.length > 0 && filteredItems.every(item => selectedItems.has(item.id))}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  />
+                </th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Actions</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Description</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Category</th>
@@ -415,13 +463,22 @@ export default function Reclassification() {
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Unit</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Ownership</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Category</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Remarks</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap text-center tracking-wider">Status</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Verification Date</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-outline-variant/30">
               {paginatedItems.length > 0 ? paginatedItems.map(item => (
-                <tr key={item.id} className="hover:bg-surface-container-low/50 transition-colors group">
+                <tr key={item.id} className={cn("hover:bg-surface-container-low/50 transition-colors group", selectedItems.has(item.id) && "bg-primary/5")}>
+                  <td className="py-4 px-4 text-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                      checked={selectedItems.has(item.id)}
+                      onChange={(e) => handleSelectItem(item.id, e.target.checked)}
+                    />
+                  </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
@@ -453,6 +510,7 @@ export default function Reclassification() {
                       {item.category}
                     </span>
                   </td>
+                  <td className="py-4 px-4 text-on-surface-variant max-w-xs truncate" title={item.remarks}>{item.remarks || '-'}</td>
                   <td className="py-4 px-4 text-center">
                     <button
                       onClick={() => handleVerify(item)}
@@ -475,7 +533,7 @@ export default function Reclassification() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-on-surface-variant">Belum ada data reclassification</td>
+                  <td colSpan={11} className="py-8 text-center text-on-surface-variant">Belum ada data reclassification</td>
                 </tr>
               )}
             </tbody>
@@ -609,6 +667,75 @@ export default function Reclassification() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Multiple Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-on-surface mb-2">Delete Multiple Items</h3>
+              <p className="text-on-surface-variant mb-4 text-sm">
+                You are about to delete <strong>{selectedItems.size}</strong> reclassification items. This action is irreversible.
+                Please type <strong>DELETE</strong> below to confirm.
+              </p>
+              {selectedItems.size > 100 && (
+                <p className="text-on-surface-variant mb-4 text-xs bg-surface-container rounded-md px-3 py-2">
+                  Data sebanyak {selectedItems.size} item akan diproses dalam {Math.ceil(selectedItems.size / 100)} batch. Proses ini mungkin memakan beberapa detik.
+                </p>
+              )}
+
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className="w-full bg-surface border border-outline-variant rounded-md text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-error focus:border-transparent text-on-surface mb-6"
+              />
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-md font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (deleteConfirmText === 'DELETE') {
+                      setIsDeleting(true);
+                      const noFilters = !filterCategory && !filterVerified && !filterOwnership && !debouncedSearchQuery;
+                      const allSelected = selectedItems.size === filteredItems.length;
+                      if (noFilters && allSelected) {
+                        await deleteAllReclassifications();
+                      } else {
+                        await deleteMultipleReclassifications(Array.from(selectedItems));
+                      }
+                      setSelectedItems(new Set());
+                      setIsDeleteModalOpen(false);
+                      setDeleteConfirmText('');
+                      setIsDeleting(false);
+                    }
+                  }}
+                  disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+                  className="px-4 py-2 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Yes, Delete All'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

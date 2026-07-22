@@ -14,6 +14,7 @@ export type Reclassification = {
   unit: string;
   ownership: string;
   category: ReclassificationCategory;
+  remarks: string;
   verified: boolean;
   verificationDate: string;
   verifiedBy: string;
@@ -32,6 +33,8 @@ interface ReclassificationContextType {
   addReclassification: (item: ReclassificationInput, skipLog?: boolean) => Promise<void>;
   updateReclassification: (id: string, item: ReclassificationInput) => Promise<void>;
   deleteReclassification: (id: string) => Promise<void>;
+  deleteMultipleReclassifications: (ids: string[]) => Promise<void>;
+  deleteAllReclassifications: () => Promise<void>;
   verifyReclassification: (id: string, verified: boolean) => Promise<void>;
   isAddModalOpen: boolean;
   setIsAddModalOpen: (isOpen: boolean) => void;
@@ -55,6 +58,7 @@ const fromDb = (row: any): Reclassification => ({
   unit: row.unit != null ? String(row.unit) : '',
   ownership: row.ownership ?? '',
   category: row.category ?? 'Needs Review',
+  remarks: row.remarks ?? '',
   verified: row.verified ?? false,
   verificationDate: row.verification_date ?? '',
   verifiedBy: row.verified_by ?? '',
@@ -68,6 +72,7 @@ const toDb = (item: ReclassificationInput) => ({
   unit: item.unit ? parseFloat(item.unit) : null,
   ownership: item.ownership,
   category: item.category,
+  remarks: item.remarks,
 });
 
 export function ReclassificationProvider({ children }: { children: ReactNode }) {
@@ -156,6 +161,26 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
     });
   };
 
+  const deleteMultipleReclassifications = async (ids: string[]) => {
+    const BATCH_SIZE = 100;
+    const idSet = new Set(ids);
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = ids.slice(i, i + BATCH_SIZE);
+      const { error } = await supabase.from('asset_reclassifications').delete().in('id', batch);
+      if (error) { setError(error.message); return; }
+    }
+    setReclassifications(prev => prev.filter(r => !idSet.has(r.id)));
+    logActivity({ actionType: 'BULK_DELETE', entityType: 'reclassification', details: { count: ids.length } });
+  };
+
+  const deleteAllReclassifications = async () => {
+    const count = reclassifications.length;
+    const { error } = await supabase.from('asset_reclassifications').delete().not('id', 'is', null);
+    if (error) { setError(error.message); return; }
+    setReclassifications([]);
+    logActivity({ actionType: 'BULK_DELETE', entityType: 'reclassification', details: { count } });
+  };
+
   const verifyReclassification = async (id: string, verified: boolean) => {
     const { data: { user } } = await supabase.auth.getUser();
     const verifiedBy = verified
@@ -187,7 +212,8 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
   return (
     <ReclassificationContext.Provider value={{
       reclassifications, loading, error,
-      addReclassification, updateReclassification, deleteReclassification, verifyReclassification,
+      addReclassification, updateReclassification, deleteReclassification,
+      deleteMultipleReclassifications, deleteAllReclassifications, verifyReclassification,
       isAddModalOpen, setIsAddModalOpen,
       isEditModalOpen, setIsEditModalOpen,
       editingReclassification, setEditingReclassification,

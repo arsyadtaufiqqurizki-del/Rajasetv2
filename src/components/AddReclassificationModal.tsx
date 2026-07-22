@@ -9,6 +9,7 @@ const EMPTY_FORM = {
   location: '',
   unit: '1',
   ownership: '',
+  remarks: '',
 };
 
 export default function AddReclassificationModal() {
@@ -134,6 +135,18 @@ export default function AddReclassificationModal() {
                 />
               </div>
             )}
+
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className="text-sm font-semibold text-on-surface">Remarks</label>
+              <textarea
+                name="remarks"
+                value={formData.remarks}
+                onChange={handleChange as any}
+                placeholder="Catatan tambahan (opsional)"
+                rows={3}
+                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              />
+            </div>
           </div>
 
           <div className="mt-4 pt-4 border-t border-outline-variant/30 flex justify-end gap-3">
