@@ -30,8 +30,8 @@ interface AssetContextType {
   addAsset: (asset: Omit<Asset, 'id' | 'statusLevel'>, skipLog?: boolean) => Promise<void>;
   updateAsset: (id: string, asset: Omit<Asset, 'id' | 'statusLevel'>) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
-  deleteMultipleAssets: (ids: string[]) => Promise<void>;
-  deleteAllAssets: () => Promise<void>;
+  deleteMultipleAssets: (ids: string[], onProgress?: (processed: number, failed: number) => void) => Promise<void>;
+  deleteAllAssets: (onProgress?: (processed: number, failed: number) => void) => Promise<void>;
   addSubsidiary: (name: string) => void;
   deleteSubsidiary: (name: string) => void;
   addCategory1: (name: string) => void;
@@ -211,24 +211,31 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     logActivity({ actionType: 'DELETE_ASSET', entityType: 'asset', details: { assetName: target?.assetDescription ?? '' } });
   };
 
-  const deleteMultipleAssets = async (ids: string[]) => {
+  const deleteMultipleAssets = async (ids: string[], onProgress?: (processed: number, failed: number) => void) => {
     const BATCH_SIZE = 100;
-    const idSet = new Set(ids);
+    let processed = 0;
+    let failed = 0;
+    let deletedCount = 0;
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
       const batch = ids.slice(i, i + BATCH_SIZE);
       const { error } = await supabase.from('assets').delete().in('id', batch);
-      if (error) { setError(error.message); return; }
+      if (error) {
+        failed += batch.length;
+      } else {
+        deletedCount += batch.length;
+        const batchSet = new Set(batch);
+        setAssets(prev => prev.filter(a => !batchSet.has(a.id)));
+      }
+      processed += batch.length;
+      onProgress?.(processed, failed);
     }
-    setAssets(prev => prev.filter(a => !idSet.has(a.id)));
-    logActivity({ actionType: 'BULK_DELETE', entityType: 'asset', details: { count: ids.length } });
+    if (deletedCount > 0) {
+      logActivity({ actionType: 'BULK_DELETE', entityType: 'asset', details: { count: deletedCount } });
+    }
   };
 
-  const deleteAllAssets = async () => {
-    const count = assets.length;
-    const { error } = await supabase.from('assets').delete().not('id', 'is', null);
-    if (error) { setError(error.message); return; }
-    setAssets([]);
-    logActivity({ actionType: 'BULK_DELETE', entityType: 'asset', details: { count } });
+  const deleteAllAssets = async (onProgress?: (processed: number, failed: number) => void) => {
+    await deleteMultipleAssets(assets.map(a => a.id), onProgress);
   };
 
   return (

@@ -33,8 +33,8 @@ interface ReclassificationContextType {
   addReclassification: (item: ReclassificationInput, skipLog?: boolean) => Promise<void>;
   updateReclassification: (id: string, item: ReclassificationInput) => Promise<void>;
   deleteReclassification: (id: string) => Promise<void>;
-  deleteMultipleReclassifications: (ids: string[]) => Promise<void>;
-  deleteAllReclassifications: () => Promise<void>;
+  deleteMultipleReclassifications: (ids: string[], onProgress?: (processed: number, failed: number) => void) => Promise<void>;
+  deleteAllReclassifications: (onProgress?: (processed: number, failed: number) => void) => Promise<void>;
   verifyReclassification: (id: string, verified: boolean) => Promise<void>;
   isAddModalOpen: boolean;
   setIsAddModalOpen: (isOpen: boolean) => void;
@@ -161,24 +161,31 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
     });
   };
 
-  const deleteMultipleReclassifications = async (ids: string[]) => {
+  const deleteMultipleReclassifications = async (ids: string[], onProgress?: (processed: number, failed: number) => void) => {
     const BATCH_SIZE = 100;
-    const idSet = new Set(ids);
+    let processed = 0;
+    let failed = 0;
+    let deletedCount = 0;
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
       const batch = ids.slice(i, i + BATCH_SIZE);
       const { error } = await supabase.from('asset_reclassifications').delete().in('id', batch);
-      if (error) { setError(error.message); return; }
+      if (error) {
+        failed += batch.length;
+      } else {
+        deletedCount += batch.length;
+        const batchSet = new Set(batch);
+        setReclassifications(prev => prev.filter(r => !batchSet.has(r.id)));
+      }
+      processed += batch.length;
+      onProgress?.(processed, failed);
     }
-    setReclassifications(prev => prev.filter(r => !idSet.has(r.id)));
-    logActivity({ actionType: 'BULK_DELETE', entityType: 'reclassification', details: { count: ids.length } });
+    if (deletedCount > 0) {
+      logActivity({ actionType: 'BULK_DELETE', entityType: 'reclassification', details: { count: deletedCount } });
+    }
   };
 
-  const deleteAllReclassifications = async () => {
-    const count = reclassifications.length;
-    const { error } = await supabase.from('asset_reclassifications').delete().not('id', 'is', null);
-    if (error) { setError(error.message); return; }
-    setReclassifications([]);
-    logActivity({ actionType: 'BULK_DELETE', entityType: 'reclassification', details: { count } });
+  const deleteAllReclassifications = async (onProgress?: (processed: number, failed: number) => void) => {
+    await deleteMultipleReclassifications(reclassifications.map(r => r.id), onProgress);
   };
 
   const verifyReclassification = async (id: string, verified: boolean) => {

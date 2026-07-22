@@ -21,7 +21,20 @@ export default function Inventory() {
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  const [deleteProgressModal, setDeleteProgressModal] = useState<{
+    isOpen: boolean;
+    status: 'deleting' | 'done';
+    total: number;
+    processed: number;
+    failedCount: number;
+  }>({
+    isOpen: false,
+    status: 'deleting',
+    total: 0,
+    processed: 0,
+    failedCount: 0,
+  });
 
   const [importModal, setImportModal] = useState<{
     isOpen: boolean;
@@ -610,12 +623,7 @@ export default function Inventory() {
                 You are about to delete <strong>{selectedAssets.size}</strong> assets. This action is irreversible.
                 Please type <strong>DELETE</strong> below to confirm.
               </p>
-              {selectedAssets.size > 100 && (
-                <p className="text-on-surface-variant mb-4 text-xs bg-surface-container rounded-md px-3 py-2">
-                  Data sebanyak {selectedAssets.size} aset akan diproses dalam {Math.ceil(selectedAssets.size / 100)} batch. Proses ini mungkin memakan beberapa detik.
-                </p>
-              )}
-              
+
               <input
                 type="text"
                 value={deleteConfirmText}
@@ -628,7 +636,6 @@ export default function Inventory() {
                 <button
                   type="button"
                   onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
-                  disabled={isDeleting}
                   className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-md font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
@@ -637,33 +644,98 @@ export default function Inventory() {
                   type="button"
                   onClick={async () => {
                     if (deleteConfirmText === 'DELETE') {
-                      setIsDeleting(true);
+                      const total = selectedAssets.size;
                       const noFilters = !filterSubsidiary && !filterCategory && !filterStatus && !debouncedSearchQuery;
                       const allSelected = selectedAssets.size === filteredAssets.length;
-                      if (noFilters && allSelected) {
-                        await deleteAllAssets();
-                      } else {
-                        await deleteMultipleAssets(Array.from(selectedAssets));
-                      }
-                      setSelectedAssets(new Set());
+
                       setIsDeleteModalOpen(false);
                       setDeleteConfirmText('');
-                      setIsDeleting(false);
+                      setDeleteProgressModal({ isOpen: true, status: 'deleting', total, processed: 0, failedCount: 0 });
+
+                      const onProgress = (processed: number, failedCount: number) => {
+                        setDeleteProgressModal(prev => ({ ...prev, processed, failedCount }));
+                      };
+
+                      if (noFilters && allSelected) {
+                        await deleteAllAssets(onProgress);
+                      } else {
+                        await deleteMultipleAssets(Array.from(selectedAssets), onProgress);
+                      }
+
+                      setSelectedAssets(new Set());
+                      setDeleteProgressModal(prev => ({ ...prev, status: 'done' }));
                     }
                   }}
-                  disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+                  disabled={deleteConfirmText !== 'DELETE'}
                   className="px-4 py-2 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {isDeleting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    'Yes, Delete All'
-                  )}
+                  Yes, Delete All
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Progress Modal */}
+      {deleteProgressModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              {deleteProgressModal.status === 'deleting' ? (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+                    <h3 className="text-xl font-bold text-on-surface">Deleting Assets...</h3>
+                  </div>
+                  <p className="text-sm text-on-surface-variant mb-5">
+                    Please wait while the selected assets are being deleted.
+                  </p>
+                  <div className="mb-2 h-2.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${deleteProgressModal.total > 0 ? Math.round((deleteProgressModal.processed / deleteProgressModal.total) * 100) : 0}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-on-surface-variant mt-1.5">
+                    <span>{deleteProgressModal.processed} of {deleteProgressModal.total} assets deleted</span>
+                    <span className="font-semibold text-primary">
+                      {deleteProgressModal.total > 0 ? Math.round((deleteProgressModal.processed / deleteProgressModal.total) * 100) : 0}%
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    {deleteProgressModal.failedCount === 0 ? (
+                      <CheckCircle className="h-6 w-6 text-emerald-500 shrink-0" />
+                    ) : (
+                      <XCircle className="h-6 w-6 text-amber-500 shrink-0" />
+                    )}
+                    <h3 className="text-xl font-bold text-on-surface">Delete Complete</h3>
+                  </div>
+                  <div className="bg-surface-container rounded-xl p-4 mb-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-on-surface-variant">Successfully deleted</span>
+                      <span className="font-semibold text-emerald-600">{deleteProgressModal.processed - deleteProgressModal.failedCount} assets</span>
+                    </div>
+                    {deleteProgressModal.failedCount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-on-surface-variant">Failed</span>
+                        <span className="font-semibold text-error">{deleteProgressModal.failedCount} assets</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => setDeleteProgressModal(prev => ({ ...prev, isOpen: false }))}
+                      className="px-5 py-2 bg-primary text-on-primary rounded-md hover:bg-primary/90 font-medium text-sm transition-colors shadow-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
