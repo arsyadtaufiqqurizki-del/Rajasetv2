@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid 
 } from 'recharts';
 import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp, Download, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, formatCurrency } from '../lib/utils';
 
 import { useAsset } from '../contexts/AssetContext';
 
@@ -311,7 +311,7 @@ export default function Dashboard() {
                 <th className="p-3">Subsidiaries</th>
                 <th className="p-3">Asset Number</th>
                 <th className="p-3">Asset Description</th>
-                <th className="p-3">Asset Cost</th>
+                <th className="p-3 text-right">Asset Cost</th>
                 <th className="p-3">Date Place in Service</th>
                 <th className="p-3">Asset Units</th>
                 <th className="p-3">Category Segment 1</th>
@@ -329,7 +329,7 @@ export default function Dashboard() {
                   <td className="p-3 text-on-surface text-xs">{asset.subsidiary}</td>
                   <td className="p-3 font-mono text-on-surface text-xs">{asset.assetNumber}</td>
                   <td className="p-3 text-on-surface font-semibold">{asset.assetDescription}</td>
-                  <td className="p-3 text-on-surface-variant">{asset.assetCost}</td>
+                  <td className="p-3 text-on-surface-variant text-right font-mono tabular-nums">{formatCurrency(asset.assetCost)}</td>
                   <td className="p-3 text-on-surface font-mono text-xs">{asset.datePlaceInService}</td>
                   <td className="p-3 text-on-surface-variant">{asset.assetUnits}</td>
                   <td className="p-3 text-on-surface">{asset.categorySegment1}</td>

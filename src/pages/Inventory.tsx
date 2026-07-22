@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { logActivity } from '../lib/activityLogger';
 import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, FileDown, CheckCircle, XCircle, Loader2, Plus } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, formatCurrency } from '../lib/utils';
 import { useAsset } from '../contexts/AssetContext';
 import Papa from 'papaparse';
 
@@ -395,7 +395,7 @@ export default function Inventory() {
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Subsidiaries</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Number</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Description</th>
-                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Cost</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider text-right">Asset Cost</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Date Place in Service</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Units</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Category Segment 1</th>
@@ -439,7 +439,7 @@ export default function Inventory() {
                   <td className="py-4 px-4 text-on-surface text-xs">{asset.subsidiary}</td>
                   <td className="py-4 px-4 font-mono text-on-surface text-xs">{asset.assetNumber}</td>
                   <td className="py-4 px-4 font-semibold text-on-surface">{asset.assetDescription}</td>
-                  <td className="py-4 px-4 text-on-surface-variant">{asset.assetCost}</td>
+                  <td className="py-4 px-4 text-on-surface-variant text-right font-mono tabular-nums">{formatCurrency(asset.assetCost)}</td>
                   <td className="py-4 px-4 text-on-surface font-mono text-xs">{asset.datePlaceInService}</td>
                   <td className="py-4 px-4 text-on-surface-variant">{asset.assetUnits}</td>
                   <td className="py-4 px-4 text-on-surface">{asset.categorySegment1}</td>
