@@ -18,6 +18,7 @@ export type Asset = {
   listed: string;
   status: string;
   statusLevel: 'success' | 'warning' | 'error' | 'default';
+  createdAt: string;
 };
 
 interface AssetContextType {
@@ -27,8 +28,8 @@ interface AssetContextType {
   subsidiaries: string[];
   categories1: string[];
   categories2: string[];
-  addAsset: (asset: Omit<Asset, 'id' | 'statusLevel'>, skipLog?: boolean) => Promise<void>;
-  updateAsset: (id: string, asset: Omit<Asset, 'id' | 'statusLevel'>) => Promise<void>;
+  addAsset: (asset: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>, skipLog?: boolean) => Promise<void>;
+  updateAsset: (id: string, asset: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
   deleteMultipleAssets: (ids: string[], onProgress?: (processed: number, failed: number) => void) => Promise<void>;
   deleteAllAssets: (onProgress?: (processed: number, failed: number) => void) => Promise<void>;
@@ -72,9 +73,10 @@ const fromDb = (row: any): Asset => ({
   listed: row.listed ?? '',
   status: row.status ?? '',
   statusLevel: computeStatusLevel(row.status ?? ''),
+  createdAt: row.created_at ?? '',
 });
 
-const toDb = (asset: Omit<Asset, 'id' | 'statusLevel'>) => ({
+const toDb = (asset: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>) => ({
   asset_book: asset.assetBook,
   subsidiary: asset.subsidiary,
   asset_number: asset.assetNumber,
@@ -168,7 +170,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     supabase.from('category_segments_2').delete().eq('name', name).then();
   };
 
-  const addAsset = async (newAssetData: Omit<Asset, 'id' | 'statusLevel'>, skipLog = false) => {
+  const addAsset = async (newAssetData: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>, skipLog = false) => {
     if (newAssetData.subsidiary) addSubsidiary(newAssetData.subsidiary);
     if (newAssetData.categorySegment1) addCategory1(newAssetData.categorySegment1);
     if (newAssetData.categorySegment2) addCategory2(newAssetData.categorySegment2);
@@ -186,7 +188,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateAsset = async (id: string, updatedData: Omit<Asset, 'id' | 'statusLevel'>) => {
+  const updateAsset = async (id: string, updatedData: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>) => {
     if (updatedData.subsidiary) addSubsidiary(updatedData.subsidiary);
     if (updatedData.categorySegment1) addCategory1(updatedData.categorySegment1);
     if (updatedData.categorySegment2) addCategory2(updatedData.categorySegment2);

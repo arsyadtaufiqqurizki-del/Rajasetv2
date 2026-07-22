@@ -23,12 +23,12 @@ export default function Dashboard() {
   const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
   const currentMonthAssets = assets.filter(a => {
-    const d = new Date(a.datePlaceInService);
+    const d = new Date(a.createdAt);
     return !isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
-  
+
   const lastMonthAssets = assets.filter(a => {
-    const d = new Date(a.datePlaceInService);
+    const d = new Date(a.createdAt);
     return !isNaN(d.getTime()) && d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear;
   });
 
