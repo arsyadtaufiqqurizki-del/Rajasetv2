@@ -1,5 +1,5 @@
-import { Search, UserCircle, Menu } from "lucide-react";
-import { useState } from "react";
+import { UserCircle, Menu } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { LayoutDashboard, Archive, Wrench, BarChart2, Settings, Plus, HelpCircle, LogOut, Database, Sparkles, BookOpen, ClipboardCheck } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -26,9 +26,21 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const { setIsAddModalOpen } = useAsset();
-  const { logout } = useAuth();
+  const { logout, userEmail } = useAuth();
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileMenuOpen]);
 
   return (
     <div className="flex min-h-screen w-full overflow-hidden bg-background">
@@ -117,23 +129,47 @@ export default function Layout() {
               <Menu className="h-6 w-6" />
             </button>
             
-            <div className="hidden md:flex relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-              <input
-                type="text"
-                placeholder="Search assets, records..."
-                className="w-64 rounded-full border border-outline-variant bg-surface-container-lowest py-1.5 pl-10 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            
             <h1 className="text-xl font-bold text-primary md:hidden">PR</h1>
           </div>
 
           <div className="flex items-center gap-3">
             <NotificationBell />
-            <button className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors">
-              <UserCircle className="h-6 w-6" />
-            </button>
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                onClick={() => setProfileMenuOpen((v) => !v)}
+                className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors"
+              >
+                <UserCircle className="h-6 w-6" />
+              </button>
+
+              {profileMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-outline-variant bg-surface shadow-xl z-50 overflow-hidden">
+                  <div className="border-b border-outline-variant px-4 py-3">
+                    <p className="truncate text-sm font-medium text-on-surface">{userEmail ?? "..."}</p>
+                  </div>
+                  <div className="flex flex-col py-1">
+                    <Link
+                      to="/settings"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                    >
+                      <Settings className="h-4 w-4" />
+                      Settings
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        logout();
+                      }}
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
