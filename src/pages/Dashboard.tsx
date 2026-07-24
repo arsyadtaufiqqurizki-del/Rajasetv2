@@ -61,7 +61,15 @@ export default function Dashboard() {
 
   const formattedValuation = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD'
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1
+  }).format(totalValuation);
+
+  const fullValuation = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
   }).format(totalValuation);
 
   const subsidiaryDataMap = assets.reduce((acc, curr) => {
@@ -179,7 +187,15 @@ export default function Dashboard() {
             <span>Asset Cost</span>
             <FileUp className="h-5 w-5 text-primary" />
           </div>
-          <div className="text-4xl font-bold text-primary mb-2">{formattedValuation}</div>
+          <div className="relative group w-fit">
+            <div className="text-4xl font-bold text-primary mb-2 cursor-default">{formattedValuation}</div>
+            <div
+              className="pointer-events-none absolute left-0 bottom-full mb-1 whitespace-nowrap rounded-lg border bg-white px-2.5 py-1.5 text-xs font-medium text-[#45464d] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100"
+              style={{ borderColor: '#c6c6cd' }}
+            >
+              {fullValuation}
+            </div>
+          </div>
           <div className="flex items-center gap-1 text-xs">
             {assetCostChange !== 0 ? (
               <>

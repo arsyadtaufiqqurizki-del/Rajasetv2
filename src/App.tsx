@@ -19,6 +19,7 @@ import Login from "./pages/Login";
 import { AssetProvider } from "./contexts/AssetContext";
 import { MaintenanceProvider } from "./contexts/MaintenanceContext";
 import { ReclassificationProvider } from "./contexts/ReclassificationContext";
+import { ReportProvider } from "./contexts/ReportContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -56,9 +57,11 @@ export default function App() {
       <AssetProvider>
         <MaintenanceProvider>
           <ReclassificationProvider>
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
+            <ReportProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </ReportProvider>
           </ReclassificationProvider>
         </MaintenanceProvider>
       </AssetProvider>

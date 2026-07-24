@@ -12,6 +12,8 @@ export type ActionType =
   | 'UPDATE_RECLASSIFICATION'
   | 'DELETE_RECLASSIFICATION'
   | 'VERIFY_RECLASSIFICATION'
+  | 'GENERATE_REPORT'
+  | 'EXPORT_REPORT'
 
 export type EntityType = 'asset' | 'maintenance' | 'reclassification' | 'system'
 

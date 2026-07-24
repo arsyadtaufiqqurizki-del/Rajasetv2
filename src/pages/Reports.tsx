@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
-import { ChevronRight, Play, Download, Table2, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Play, Download, Table2, CheckCircle2, Trash2 } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import { useMaintenance } from '../contexts/MaintenanceContext';
-import { 
+import { useReport } from '../contexts/ReportContext';
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line
 } from 'recharts';
 import { cn } from '../lib/utils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { logActivity } from '../lib/activityLogger';
 
 export default function Reports() {
   const { assets, subsidiaries } = useAsset();
   const { records } = useMaintenance();
+  const { reportHistory, page, totalPages, totalCount, setPage, saveReport, deleteReport } = useReport();
 
   const [reportType, setReportType] = useState('Asset Valuation Summary');
   const [subsidiary, setSubsidiary] = useState('All Divisions');
@@ -18,9 +24,9 @@ export default function Reports() {
   const [dateEnd, setDateEnd] = useState('2023-12-31');
 
   const [previewData, setPreviewData] = useState<any>(null);
-  const [recentReports, setRecentReports] = useState<any[]>([]);
+  const [generating, setGenerating] = useState(false);
 
-  const generatePreview = () => {
+  const generatePreview = async () => {
     const start = new Date(dateStart);
     const end = new Date(dateEnd);
 
@@ -119,21 +125,51 @@ export default function Reports() {
     }
 
     setPreviewData(generated);
-    
-    setRecentReports(prev => [
-      {
-        id: Math.random().toString(36).substr(2, 6),
-        name: `${reportType} - ${subsidiary}`,
-        createdBy: 'Current User',
-        date: new Date().toLocaleDateString(),
-        status: 'Generated'
-      },
-      ...prev
-    ].slice(0, 5));
+
+    if (generated) {
+      setGenerating(true);
+      await saveReport({ reportType, subsidiary, dateStart, dateEnd, reportData: generated });
+      setGenerating(false);
+    }
   };
 
-  const handleExport = (type: string) => {
-    alert(`Exporting as ${type} is not yet implemented.`);
+  const handleDeleteReport = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this report?')) {
+      deleteReport(id);
+    }
+  };
+
+  const exportFileName = () => `${reportType.replace(/\s+/g, '_')}_${dateStart}_to_${dateEnd}`;
+
+  const handleExportPDF = () => {
+    if (!previewData || !previewData.data.length) return;
+
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(previewData.title, 14, 16);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`${subsidiary} | ${dateStart} - ${dateEnd}`, 14, 23);
+
+    const headers = Object.keys(previewData.data[0]);
+    autoTable(doc, {
+      startY: 30,
+      head: [headers],
+      body: previewData.data.map((row: any) => headers.map(h => row[h])),
+    });
+
+    doc.save(`${exportFileName()}.pdf`);
+    logActivity({ actionType: 'EXPORT_REPORT', entityType: 'system', details: { reportType, subsidiary, format: 'PDF' } });
+  };
+
+  const handleExportExcel = () => {
+    if (!previewData || !previewData.data.length) return;
+
+    const ws = XLSX.utils.json_to_sheet(previewData.data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, reportType.slice(0, 31));
+    XLSX.writeFile(wb, `${exportFileName()}.xlsx`);
+    logActivity({ actionType: 'EXPORT_REPORT', entityType: 'system', details: { reportType, subsidiary, format: 'Excel' } });
   };
 
   return (
@@ -203,12 +239,13 @@ export default function Reports() {
                 </div>
               </div>
 
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={generatePreview}
-                className="mt-2 bg-primary text-on-primary font-medium text-sm py-2.5 px-4 rounded-lg hover:opacity-90 transition-opacity w-full flex justify-center items-center gap-2"
+                disabled={generating}
+                className="mt-2 bg-primary text-on-primary font-medium text-sm py-2.5 px-4 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed w-full flex justify-center items-center gap-2"
               >
-                <Play className="h-4 w-4 fill-current" /> Generate Preview
+                <Play className="h-4 w-4 fill-current" /> {generating ? 'Generating...' : 'Generate Preview'}
               </button>
             </form>
           </div>
@@ -216,10 +253,10 @@ export default function Reports() {
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-on-surface mb-4">Export Options</h3>
             <div className="flex flex-col gap-3">
-              <button onClick={() => handleExport('PDF')} type="button" className="bg-[#0F172A] text-white font-medium text-sm py-2.5 px-4 rounded-lg hover:opacity-90 transition-opacity w-full flex justify-center items-center gap-2 shadow-sm">
+              <button onClick={handleExportPDF} type="button" disabled={!previewData} className="bg-[#0F172A] text-white font-medium text-sm py-2.5 px-4 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed w-full flex justify-center items-center gap-2 shadow-sm">
                 <Download className="h-4 w-4" /> Download as PDF
               </button>
-              <button onClick={() => handleExport('Excel')} type="button" className="bg-surface-container-lowest border border-outline text-primary font-medium text-sm py-2.5 px-4 rounded-lg hover:bg-surface-container-low transition-colors w-full flex justify-center items-center gap-2">
+              <button onClick={handleExportExcel} type="button" disabled={!previewData} className="bg-surface-container-lowest border border-outline text-primary font-medium text-sm py-2.5 px-4 rounded-lg hover:bg-surface-container-low transition-colors disabled:opacity-40 disabled:cursor-not-allowed w-full flex justify-center items-center gap-2">
                 <Table2 className="h-4 w-4" /> Export to Excel (.xlsx)
               </button>
             </div>
@@ -294,7 +331,6 @@ export default function Reports() {
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden flex flex-col">
             <div className="p-5 border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
               <h3 className="text-lg font-semibold text-on-surface">Recent Reports</h3>
-              <button className="text-sm font-semibold text-primary hover:underline">View All</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[600px]">
@@ -304,29 +340,62 @@ export default function Reports() {
                     <th className="py-3 px-5 text-xs font-medium text-on-surface-variant">Created By</th>
                     <th className="py-3 px-5 text-xs font-medium text-on-surface-variant">Date</th>
                     <th className="py-3 px-5 text-xs font-medium text-on-surface-variant">Status</th>
+                    <th className="py-3 px-5 text-xs font-medium text-on-surface-variant text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm divide-y divide-outline-variant/40">
-                  {recentReports.length === 0 ? (
+                  {reportHistory.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center text-on-surface-variant">Belum ada report yang dibuat</td>
+                      <td colSpan={5} className="py-8 text-center text-on-surface-variant">Belum ada report yang dibuat</td>
                     </tr>
                   ) : (
-                    recentReports.map(report => (
+                    reportHistory.map(report => (
                       <tr key={report.id} className="hover:bg-surface-container-lowest/50 transition-colors">
-                        <td className="py-3 px-5 font-medium text-on-surface">{report.name}</td>
-                        <td className="py-3 px-5 text-on-surface-variant">{report.createdBy}</td>
-                        <td className="py-3 px-5 text-on-surface-variant">{report.date}</td>
+                        <td className="py-3 px-5 font-medium text-on-surface">{report.reportType} - {report.subsidiary}</td>
+                        <td className="py-3 px-5 text-on-surface-variant">{report.userName}</td>
+                        <td className="py-3 px-5 text-on-surface-variant">{new Date(report.createdAt).toLocaleDateString()}</td>
                         <td className="py-3 px-5">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
                             {report.status}
                           </span>
+                        </td>
+                        <td className="py-3 px-5 text-right">
+                          <button
+                            onClick={() => handleDeleteReport(report.id)}
+                            className="p-1.5 rounded text-on-surface-variant hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Delete Report"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="p-3 border-t border-outline-variant bg-surface-container flex items-center justify-between text-sm">
+              <span className="text-on-surface-variant">Showing {reportHistory.length} of {totalCount} reports</span>
+              <div className="flex items-center gap-1 text-sm font-medium">
+                <button
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                  className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <span className="px-3 py-1 rounded bg-surface-container-high text-on-surface font-semibold text-xs">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  disabled={page === totalPages}
+                  className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
