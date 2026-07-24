@@ -17,6 +17,22 @@ export function formatCurrency(value: string | number | null | undefined): strin
   }).format(numeric);
 }
 
+/** Formats a Date as "Hari, tanggal Bulan tahun · HH:mm" in Indonesian. */
+export function formatLastUpdate(date: Date): string {
+  const datePart = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date).replace('.', ':');
+  return `${datePart} · ${timePart}`;
+}
+
 /** Full months elapsed from `from` to `to`, floored at 0. */
 export function monthsBetween(from: Date, to: Date): number {
   if (to <= from) return 0;

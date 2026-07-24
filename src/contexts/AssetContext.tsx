@@ -25,6 +25,7 @@ interface AssetContextType {
   assets: Asset[];
   loading: boolean;
   error: string | null;
+  lastFetchedAt: Date | null;
   subsidiaries: string[];
   categories1: string[];
   categories2: string[];
@@ -96,6 +97,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
   const [subsidiaries, setSubsidiaries] = useState<string[]>([]);
   const [categories1, setCategories1] = useState<string[]>([]);
   const [categories2, setCategories2] = useState<string[]>([]);
@@ -135,6 +137,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       if (!cat1Res.error) setCategories1([...new Set((cat1Res.data ?? []).map(r => r.name))]);
       if (!cat2Res.error) setCategories2([...new Set((cat2Res.data ?? []).map(r => r.name))]);
 
+      setLastFetchedAt(new Date());
       setLoading(false);
     };
     fetchAll();
@@ -183,6 +186,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
 
     if (error) { setError(error.message); return; }
     setAssets(prev => [fromDb(data), ...prev]);
+    setLastFetchedAt(new Date());
     if (!skipLog) {
       logActivity({ actionType: 'ADD_ASSET', entityType: 'asset', entityId: data.id, details: { assetName: newAssetData.assetDescription, category: newAssetData.categorySegment1 } });
     }
@@ -202,6 +206,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
 
     if (error) { setError(error.message); return; }
     setAssets(prev => prev.map(a => a.id === id ? fromDb(data) : a));
+    setLastFetchedAt(new Date());
     logActivity({ actionType: 'UPDATE_ASSET', entityType: 'asset', entityId: id, details: { assetName: updatedData.assetDescription } });
   };
 
@@ -210,6 +215,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.from('assets').delete().eq('id', id);
     if (error) { setError(error.message); return; }
     setAssets(prev => prev.filter(a => a.id !== id));
+    setLastFetchedAt(new Date());
     logActivity({ actionType: 'DELETE_ASSET', entityType: 'asset', details: { assetName: target?.assetDescription ?? '' } });
   };
 
@@ -232,6 +238,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       onProgress?.(processed, failed);
     }
     if (deletedCount > 0) {
+      setLastFetchedAt(new Date());
       logActivity({ actionType: 'BULK_DELETE', entityType: 'asset', details: { count: deletedCount } });
     }
   };
@@ -242,7 +249,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
 
   return (
     <AssetContext.Provider value={{
-      assets, loading, error,
+      assets, loading, error, lastFetchedAt,
       subsidiaries, categories1, categories2,
       addAsset, updateAsset, deleteAsset, deleteMultipleAssets, deleteAllAssets,
       addSubsidiary, deleteSubsidiary, addCategory1, deleteCategory1, addCategory2, deleteCategory2,

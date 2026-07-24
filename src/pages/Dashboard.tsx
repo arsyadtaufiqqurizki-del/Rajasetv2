@@ -4,12 +4,12 @@ import {
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid 
 } from 'recharts';
 import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp, Download, Plus, X, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn, formatCurrency, formatLastUpdate } from '../lib/utils';
 
 import { useAsset } from '../contexts/AssetContext';
 
 export default function Dashboard() {
-  const { assets, subsidiaries, categories1 } = useAsset();
+  const { assets, subsidiaries, categories1, lastFetchedAt } = useAsset();
 
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [currentPage, setCurrentPage] = useState(1);
@@ -188,8 +188,15 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col gap-6 w-full relative">
 
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight text-primary">Overview Dashboard</h2>
+      <div className="mb-2 flex flex-col">
+        <div className="flex items-center justify-between">
+          <h2 className="text-3xl font-bold tracking-tight text-primary">Overview Dashboard</h2>
+        </div>
+        {lastFetchedAt && (
+          <span className="text-xs text-on-surface-variant mt-1">
+            Terakhir diperbarui: {formatLastUpdate(lastFetchedAt)}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
