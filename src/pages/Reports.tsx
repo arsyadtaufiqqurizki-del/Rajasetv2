@@ -320,6 +320,8 @@ export default function Reports() {
       doc.setTextColor(120);
       doc.text(`${detailData.length} record(s)`, 14, 22);
 
+      const varianceColIndex = detailColumns.findIndex(c => c.key === 'variance');
+
       autoTable(doc, {
         startY: 28,
         head: [detailColumns.map(c => c.label)],
@@ -330,8 +332,48 @@ export default function Reports() {
           })
         ),
         styles: { fontSize: 8 },
+        didParseCell: (data) => {
+          if (varianceColIndex === -1 || data.section !== 'body' || data.column.index !== varianceColIndex) return;
+          const variance = detailData[data.row.index]?.variance;
+          if (typeof variance === 'number' && variance > 0) {
+            data.cell.styles.textColor = [220, 38, 38];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        },
       });
     }
+
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const approvalBlockHeight = 40;
+    let approvalY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 20;
+    if (approvalY + approvalBlockHeight > pageHeight - 15) {
+      doc.addPage();
+      approvalY = 20;
+    }
+
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text('Sign-off', 14, approvalY - 8);
+
+    const marginX = 14;
+    const colWidth = (pageWidth - marginX * 2) / 3;
+    (['Prepared by', 'Reviewed by', 'Approved by'] as const).forEach((label, idx) => {
+      const x = marginX + idx * colWidth;
+      doc.setFontSize(9);
+      doc.setTextColor(30);
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, x, approvalY);
+      doc.setFont('helvetica', 'normal');
+
+      doc.setDrawColor(150);
+      doc.line(x, approvalY + 14, x + colWidth - 12, approvalY + 14);
+
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text('Name: _______________________', x, approvalY + 20);
+      doc.text('Date: _______________________', x, approvalY + 26);
+    });
 
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
