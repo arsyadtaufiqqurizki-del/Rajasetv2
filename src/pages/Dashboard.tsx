@@ -3,17 +3,36 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid 
 } from 'recharts';
-import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp, Download, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp, Download, Plus, X, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 
 import { useAsset } from '../contexts/AssetContext';
 
 export default function Dashboard() {
-  const { assets } = useAsset();
+  const { assets, subsidiaries, categories1 } = useAsset();
 
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const [filterSubsidiary, setFilterSubsidiary] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  const uniqueStatuses = useMemo(() => Array.from(new Set(assets.map(a => a.status).filter(Boolean))), [assets]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterSubsidiary, filterCategory, filterStatus, debouncedSearchQuery]);
 
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth();
@@ -140,10 +159,23 @@ export default function Dashboard() {
     value: trendDataMap[index] || 0
   }));
 
+  const filteredAssets = useMemo(() => {
+    return assets.filter(asset => {
+      const matchSubsidiary = filterSubsidiary ? asset.subsidiary === filterSubsidiary : true;
+      const matchCategory = filterCategory ? asset.categorySegment1 === filterCategory : true;
+      const matchStatus = filterStatus ? asset.status === filterStatus : true;
+      const matchSearch = debouncedSearchQuery
+        ? asset.assetDescription.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          asset.assetNumber.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+        : true;
+      return matchSubsidiary && matchCategory && matchStatus && matchSearch;
+    });
+  }, [assets, filterSubsidiary, filterCategory, filterStatus, debouncedSearchQuery]);
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentAssets = assets.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(assets.length / itemsPerPage);
+  const currentAssets = filteredAssets.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.max(1, Math.ceil(filteredAssets.length / itemsPerPage));
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -301,8 +333,21 @@ export default function Dashboard() {
             <LineChart data={trendData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0e3e5" />
               <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#76777d', fontSize: 12 }} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#76777d', fontSize: 12 }} />
-              <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#76777d', fontSize: 12 }}
+                tickFormatter={(value: number) =>
+                  new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+                }
+              />
+              <Tooltip
+                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                formatter={(value: number) => [
+                  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value),
+                  'Nilai Pembelian'
+                ]}
+              />
               <Line type="monotone" dataKey="value" stroke="#0F172A" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -319,6 +364,66 @@ export default function Dashboard() {
              <button className="text-primary text-sm font-medium hover:underline px-2">View All</button>
           </div>
         </div>
+        <div className="p-4 border-b border-outline-variant bg-surface-container-lowest flex flex-wrap gap-4 items-center">
+          <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
+            <Filter className="h-4 w-4" /> Filters
+          </span>
+          <div className="flex-1 flex flex-wrap gap-2.5">
+            <div className="relative min-w-[200px] flex-1 sm:flex-none">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-on-surface-variant" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search by ID or Description..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+              />
+            </div>
+            <select
+              value={filterSubsidiary}
+              onChange={(e) => setFilterSubsidiary(e.target.value)}
+              className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+            >
+              <option value="">All Subsidiaries</option>
+              {subsidiaries.map(sub => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+            >
+              <option value="">All Categories</option>
+              {categories1.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+            >
+              <option value="">All Statuses</option>
+              {uniqueStatuses.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => {
+              setFilterSubsidiary("");
+              setFilterCategory("");
+              setFilterStatus("");
+              setSearchQuery("");
+            }}
+            className="text-sm font-medium text-secondary hover:text-primary transition-colors"
+          >
+            Clear Filters
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
@@ -326,7 +431,7 @@ export default function Dashboard() {
                 <th className="p-3 pl-5">Asset Book</th>
                 <th className="p-3">Subsidiaries</th>
                 <th className="p-3">Asset Number</th>
-                <th className="p-3">Asset Description</th>
+                <th className="p-3 min-w-[300px]">Asset Description</th>
                 <th className="p-3 text-right">Asset Cost</th>
                 <th className="p-3">Date Place in Service</th>
                 <th className="p-3">Asset Units</th>
@@ -341,12 +446,25 @@ export default function Dashboard() {
             <tbody className="text-sm divide-y divide-outline-variant/50">
               {currentAssets.map((asset, i) => (
                 <tr key={i} className="hover:bg-surface-container-low transition-colors">
-                  <td className="p-3 pl-5 font-mono text-secondary text-xs">{asset.assetBook || asset.id}</td>
+                  <td className="p-3 pl-5 font-mono text-secondary text-xs">
+                    {(() => {
+                      const bookId = asset.assetBook || asset.id;
+                      return bookId.length > 5 ? (
+                        <span title={bookId}>{bookId.slice(0, 5)}&hellip;</span>
+                      ) : (
+                        bookId
+                      );
+                    })()}
+                  </td>
                   <td className="p-3 text-on-surface text-xs">{asset.subsidiary}</td>
                   <td className="p-3 font-mono text-on-surface text-xs">{asset.assetNumber}</td>
-                  <td className="p-3 text-on-surface font-semibold">{asset.assetDescription}</td>
+                  <td className="p-3 text-on-surface font-semibold min-w-[300px] max-w-[300px]">
+                    <span className="block truncate" title={asset.assetDescription}>
+                      {asset.assetDescription}
+                    </span>
+                  </td>
                   <td className="p-3 text-on-surface-variant text-right font-mono tabular-nums">{formatCurrency(asset.assetCost)}</td>
-                  <td className="p-3 text-on-surface font-mono text-xs">{asset.datePlaceInService}</td>
+                  <td className="p-3 text-on-surface font-mono text-xs whitespace-nowrap">{asset.datePlaceInService}</td>
                   <td className="p-3 text-on-surface-variant">{asset.assetUnits}</td>
                   <td className="p-3 text-on-surface">{asset.categorySegment1}</td>
                   <td className="p-3 text-on-surface">{asset.categorySegment2}</td>
@@ -366,7 +484,7 @@ export default function Dashboard() {
                   </td>
                 </tr>
               ))}
-              {assets.length === 0 && (
+              {filteredAssets.length === 0 && (
                 <tr>
                   <td colSpan={13} className="py-8 text-center text-on-surface-variant">Belum ada data asset</td>
                 </tr>
@@ -374,10 +492,10 @@ export default function Dashboard() {
             </tbody>
           </table>
         </div>
-        {assets.length > 0 && (
+        {filteredAssets.length > 0 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-outline-variant bg-surface-container-lowest">
             <div className="text-sm text-on-surface-variant">
-              Showing <span className="font-medium text-on-surface">{indexOfFirstItem + 1}</span> to <span className="font-medium text-on-surface">{Math.min(indexOfLastItem, assets.length)}</span> of <span className="font-medium text-on-surface">{assets.length}</span> results
+              Showing <span className="font-medium text-on-surface">{indexOfFirstItem + 1}</span> to <span className="font-medium text-on-surface">{Math.min(indexOfLastItem, filteredAssets.length)}</span> of <span className="font-medium text-on-surface">{filteredAssets.length}</span> results
             </div>
             <div className="flex items-center gap-2">
               <button 
