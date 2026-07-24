@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ChevronRight, ChevronLeft, Play, Download, Table2, CheckCircle2, Trash2 } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import { useMaintenance } from '../contexts/MaintenanceContext';
@@ -7,16 +7,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line
 } from 'recharts';
-import { cn } from '../lib/utils';
+import { cn, monthsBetween, getQuartersInRange } from '../lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
 import { logActivity } from '../lib/activityLogger';
 
 export default function Reports() {
   const { assets, subsidiaries } = useAsset();
   const { records } = useMaintenance();
   const { reportHistory, page, totalPages, totalCount, setPage, saveReport, deleteReport } = useReport();
+  const chartRef = useRef<HTMLDivElement>(null);
 
   const [reportType, setReportType] = useState('Asset Valuation Summary');
   const [subsidiary, setSubsidiary] = useState('All Divisions');
@@ -25,6 +27,10 @@ export default function Reports() {
 
   const [previewData, setPreviewData] = useState<any>(null);
   const [generating, setGenerating] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 
   const generatePreview = async () => {
     const start = new Date(dateStart);
@@ -49,6 +55,8 @@ export default function Reports() {
         return acc;
       }, {});
 
+      const totalValue = Object.values(grouped).reduce((sum: number, v: any) => sum + v, 0);
+
       generated = {
         type: 'bar',
         title: 'Asset Valuation by Category',
@@ -59,28 +67,50 @@ export default function Reports() {
           if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
           if (val >= 1000) return `$${(val / 1000).toFixed(1)}K`;
           return `$${val}`;
-        }
+        },
+        summary: [
+          { label: 'Total Asset Value', value: formatCurrency(totalValue) },
+          { label: 'Total Assets', value: filteredAssets.length.toLocaleString() },
+          { label: 'Categories', value: Object.keys(grouped).length.toLocaleString() },
+          { label: 'Avg Value / Asset', value: formatCurrency(filteredAssets.length ? totalValue / filteredAssets.length : 0) },
+        ],
+        detailColumns: [
+          { key: 'assetNumber', label: 'Asset Number' },
+          { key: 'description', label: 'Description' },
+          { key: 'category', label: 'Category' },
+          { key: 'subsidiary', label: 'Subsidiary' },
+          { key: 'acquisitionDate', label: 'Acquisition Date' },
+          { key: 'cost', label: 'Cost', currency: true },
+        ],
+        detailData: filteredAssets.map(a => ({
+          assetNumber: a.assetNumber,
+          description: a.assetDescription,
+          category: a.categorySegment1 || 'Uncategorized',
+          subsidiary: a.subsidiary,
+          acquisitionDate: a.datePlaceInService || '-',
+          cost: parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0,
+        })),
       };
     } else if (reportType === 'Depreciation Schedule') {
       const filteredAssets = assets.filter(filterBySubsidiary);
-      
-      const data = [
-        { name: 'Q1', value: 0 },
-        { name: 'Q2', value: 0 },
-        { name: 'Q3', value: 0 },
-        { name: 'Q4', value: 0 },
-      ];
-      
-      filteredAssets.forEach(a => {
-        const cost = parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0;
-        const life = parseInt(a.lifeInMonths) || 60;
-        const depPerQuarter = life > 0 ? (cost / life) * 3 : 0;
-        // Simple mock to create a trend
-        data[0].value += cost;
-        data[1].value += Math.max(0, cost - depPerQuarter);
-        data[2].value += Math.max(0, cost - depPerQuarter * 2);
-        data[3].value += Math.max(0, cost - depPerQuarter * 3);
+
+      const quarters = getQuartersInRange(start, end);
+
+      const data = quarters.map(q => {
+        const totalValue = filteredAssets.reduce((sum, a) => {
+          const cost = parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0;
+          const life = parseInt(a.lifeInMonths) || 60;
+          const placedInService = a.datePlaceInService ? new Date(a.datePlaceInService) : null;
+          if (!placedInService) return sum + cost;
+          const ageMonths = monthsBetween(placedInService, q.endDate);
+          const remaining = life > 0 ? Math.max(0, cost * (1 - Math.min(ageMonths, life) / life)) : 0;
+          return sum + remaining;
+        }, 0);
+        return { name: q.label, value: totalValue };
       });
+
+      const totalOriginalCost = filteredAssets.reduce((sum, a) => sum + (parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0), 0);
+      const netBookValue = data.length ? data[data.length - 1].value : totalOriginalCost;
 
       generated = {
         type: 'line',
@@ -92,7 +122,36 @@ export default function Reports() {
           if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
           if (val >= 1000) return `$${(val / 1000).toFixed(1)}K`;
           return `$${val}`;
-        }
+        },
+        summary: [
+          { label: 'Total Original Cost', value: formatCurrency(totalOriginalCost) },
+          { label: `Net Book Value (${quarters[quarters.length - 1]?.label ?? 'End'})`, value: formatCurrency(netBookValue) },
+          { label: 'Total Depreciation', value: formatCurrency(totalOriginalCost - netBookValue) },
+          { label: 'Total Assets', value: filteredAssets.length.toLocaleString() },
+        ],
+        detailColumns: [
+          { key: 'assetNumber', label: 'Asset Number' },
+          { key: 'description', label: 'Description' },
+          { key: 'cost', label: 'Cost', currency: true },
+          { key: 'accumulatedDepreciation', label: 'Accumulated Depreciation', currency: true },
+          { key: 'netBookValue', label: 'Net Book Value', currency: true },
+          { key: 'remainingLifeMonths', label: 'Remaining Life (Months)' },
+        ],
+        detailData: filteredAssets.map(a => {
+          const cost = parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0;
+          const life = parseInt(a.lifeInMonths) || 60;
+          const placedInService = a.datePlaceInService ? new Date(a.datePlaceInService) : null;
+          const ageMonths = placedInService ? monthsBetween(placedInService, end) : 0;
+          const netBookValueAtEnd = placedInService ? Math.max(0, cost * (1 - Math.min(ageMonths, life) / life)) : cost;
+          return {
+            assetNumber: a.assetNumber,
+            description: a.assetDescription,
+            cost,
+            accumulatedDepreciation: cost - netBookValueAtEnd,
+            netBookValue: netBookValueAtEnd,
+            remainingLifeMonths: Math.max(0, life - Math.min(ageMonths, life)),
+          };
+        }),
       };
     } else if (reportType === 'Maintenance Cost Analysis') {
       const filteredRecords = records.filter(filterBySubsidiary).filter(r => {
@@ -112,6 +171,12 @@ export default function Reports() {
         return acc;
       }, {});
 
+      const totals = Object.values(grouped).reduce((acc: any, g: any) => {
+        acc.estimated += g.estimated;
+        acc.actual += g.actual;
+        return acc;
+      }, { estimated: 0, actual: 0 });
+
       generated = {
         type: 'composed',
         title: 'Estimated vs Actual Maintenance Costs',
@@ -120,7 +185,35 @@ export default function Reports() {
           if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
           if (val >= 1000) return `$${(val / 1000).toFixed(1)}K`;
           return `$${val}`;
-        }
+        },
+        summary: [
+          { label: 'Total Estimated', value: formatCurrency(totals.estimated) },
+          { label: 'Total Actual', value: formatCurrency(totals.actual) },
+          { label: 'Variance', value: formatCurrency(totals.actual - totals.estimated) },
+          { label: 'Records', value: filteredRecords.length.toLocaleString() },
+        ],
+        detailColumns: [
+          { key: 'assetNumber', label: 'Asset Number' },
+          { key: 'description', label: 'Description' },
+          { key: 'serviceType', label: 'Service Type' },
+          { key: 'scheduledDate', label: 'Scheduled Date' },
+          { key: 'estimated', label: 'Estimated Cost', currency: true },
+          { key: 'actual', label: 'Actual Cost', currency: true },
+          { key: 'variance', label: 'Variance', currency: true },
+        ],
+        detailData: filteredRecords.map(r => {
+          const estimated = parseFloat(r.estimateCost.replace(/[^0-9.-]+/g,"")) || 0;
+          const actual = parseFloat(r.actualCost.replace(/[^0-9.-]+/g,"")) || 0;
+          return {
+            assetNumber: r.assetNumber,
+            description: r.assetDescription,
+            serviceType: r.serviceType || 'General',
+            scheduledDate: r.scheduledDate || '-',
+            estimated,
+            actual,
+            variance: actual - estimated,
+          };
+        }),
       };
     }
 
@@ -148,8 +241,25 @@ export default function Reports() {
     return value;
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!previewData || !previewData.data.length) return;
+
+    const headers = Object.keys(previewData.data[0]);
+    const numericHeaders = headers.filter(h => typeof previewData.data[0][h] === 'number');
+
+    const formatCell = (header: string, value: unknown) => {
+      const sanitized = sanitizeForSpreadsheet(value);
+      return numericHeaders.includes(header) && typeof sanitized === 'number'
+        ? formatCurrency(sanitized)
+        : sanitized;
+    };
+
+    const totalsRow = headers.map((header, idx) => {
+      if (idx === 0) return 'Total';
+      if (!numericHeaders.includes(header)) return '';
+      const sum = previewData.data.reduce((s: number, row: any) => s + (Number(row[header]) || 0), 0);
+      return formatCurrency(sum);
+    });
 
     const doc = new jsPDF();
     doc.setFontSize(14);
@@ -157,13 +267,83 @@ export default function Reports() {
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`${subsidiary} | ${dateStart} - ${dateEnd}`, 14, 23);
+    const generatedBy = reportHistory[0]?.userName ?? 'Unknown User';
+    doc.text(`Generated by ${generatedBy} on ${new Date().toLocaleString()}`, 14, 28);
 
-    const headers = Object.keys(previewData.data[0]);
+    const summary: { label: string; value: string }[] = previewData.summary ?? [];
+    let cursorY = 34;
+    if (summary.length) {
+      const boxWidth = 45;
+      const boxGap = 3;
+      const summaryY = 40;
+      summary.forEach((item, idx) => {
+        const x = 14 + idx * (boxWidth + boxGap);
+        doc.setFontSize(7.5);
+        doc.setTextColor(120);
+        doc.text(item.label, x, summaryY);
+        doc.setFontSize(11);
+        doc.setTextColor(30);
+        doc.text(item.value, x, summaryY + 6);
+      });
+      cursorY = 54;
+    }
+
+    setExportingPdf(true);
+    try {
+      if (chartRef.current) {
+        const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff', scale: 2 });
+        const imgWidth = 180;
+        const imgHeight = (canvas.height / canvas.width) * imgWidth;
+        doc.addImage(canvas.toDataURL('image/png'), 'PNG', 14, cursorY, imgWidth, imgHeight);
+        cursorY += imgHeight + 10;
+      }
+    } finally {
+      setExportingPdf(false);
+    }
+
     autoTable(doc, {
-      startY: 30,
+      startY: cursorY,
       head: [headers],
-      body: previewData.data.map((row: any) => headers.map(h => sanitizeForSpreadsheet(row[h]))),
+      body: previewData.data.map((row: any) => headers.map(h => formatCell(h, row[h]))),
+      foot: [totalsRow],
+      footStyles: { fontStyle: 'bold', fillColor: [241, 245, 249] },
     });
+
+    const detailColumns: { key: string; label: string; currency?: boolean }[] = previewData.detailColumns ?? [];
+    const detailData: Record<string, unknown>[] = previewData.detailData ?? [];
+    if (detailColumns.length && detailData.length) {
+      doc.addPage();
+      doc.setFontSize(12);
+      doc.setTextColor(30);
+      doc.text('Detail Records', 14, 16);
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      doc.text(`${detailData.length} record(s)`, 14, 22);
+
+      autoTable(doc, {
+        startY: 28,
+        head: [detailColumns.map(c => c.label)],
+        body: detailData.map(row =>
+          detailColumns.map(c => {
+            const value = row[c.key];
+            return c.currency && typeof value === 'number' ? formatCurrency(value) : String(value ?? '');
+          })
+        ),
+        styles: { fontSize: 8 },
+      });
+    }
+
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        doc.internal.pageSize.getWidth() - 30,
+        doc.internal.pageSize.getHeight() - 10
+      );
+    }
 
     doc.save(`${exportFileName()}.pdf`);
     logActivity({ actionType: 'EXPORT_REPORT', entityType: 'system', details: { reportType, subsidiary, format: 'PDF' } });
@@ -264,8 +444,8 @@ export default function Reports() {
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-on-surface mb-4">Export Options</h3>
             <div className="flex flex-col gap-3">
-              <button onClick={handleExportPDF} type="button" disabled={!previewData} className="bg-[#0F172A] text-white font-medium text-sm py-2.5 px-4 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed w-full flex justify-center items-center gap-2 shadow-sm">
-                <Download className="h-4 w-4" /> Download as PDF
+              <button onClick={handleExportPDF} type="button" disabled={!previewData || exportingPdf} className="bg-[#0F172A] text-white font-medium text-sm py-2.5 px-4 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed w-full flex justify-center items-center gap-2 shadow-sm">
+                <Download className="h-4 w-4" /> {exportingPdf ? 'Rendering chart...' : 'Download as PDF'}
               </button>
               <button onClick={handleExportExcel} type="button" disabled={!previewData} className="bg-surface-container-lowest border border-outline text-primary font-medium text-sm py-2.5 px-4 rounded-lg hover:bg-surface-container-low transition-colors disabled:opacity-40 disabled:cursor-not-allowed w-full flex justify-center items-center gap-2">
                 <Table2 className="h-4 w-4" /> Export to Excel (.xlsx)
@@ -288,7 +468,7 @@ export default function Reports() {
               )}
             </div>
             
-            <div className="w-full h-[350px] relative rounded-lg overflow-hidden flex flex-col items-center justify-center">
+            <div ref={chartRef} className="w-full h-[350px] relative rounded-lg overflow-hidden flex flex-col items-center justify-center bg-white">
                {!previewData ? (
                  <div className="absolute inset-0 bg-surface border border-outline-variant/50 rounded-lg flex flex-col items-center justify-center p-6">
                    <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(#000 1px, transparent 1px)", backgroundSize: "16px 16px" }}></div>
