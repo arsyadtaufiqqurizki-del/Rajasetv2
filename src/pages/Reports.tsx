@@ -141,6 +141,13 @@ export default function Reports() {
 
   const exportFileName = () => `${reportType.replace(/\s+/g, '_')}_${dateStart}_to_${dateEnd}`;
 
+  const sanitizeForSpreadsheet = (value: unknown): unknown => {
+    if (typeof value === 'string' && /^[=+\-@]/.test(value)) {
+      return `'${value}`;
+    }
+    return value;
+  };
+
   const handleExportPDF = () => {
     if (!previewData || !previewData.data.length) return;
 
@@ -155,7 +162,7 @@ export default function Reports() {
     autoTable(doc, {
       startY: 30,
       head: [headers],
-      body: previewData.data.map((row: any) => headers.map(h => row[h])),
+      body: previewData.data.map((row: any) => headers.map(h => sanitizeForSpreadsheet(row[h]))),
     });
 
     doc.save(`${exportFileName()}.pdf`);
@@ -165,7 +172,11 @@ export default function Reports() {
   const handleExportExcel = () => {
     if (!previewData || !previewData.data.length) return;
 
-    const ws = XLSX.utils.json_to_sheet(previewData.data);
+    const sanitizedData = previewData.data.map((row: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(row).map(([key, value]) => [key, sanitizeForSpreadsheet(value)]))
+    );
+
+    const ws = XLSX.utils.json_to_sheet(sanitizedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, reportType.slice(0, 31));
     XLSX.writeFile(wb, `${exportFileName()}.xlsx`);
