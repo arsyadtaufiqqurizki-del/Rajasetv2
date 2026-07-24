@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Aplikasi web React untuk manajemen aset perusahaan "Perusahaan Raja". Sistem ini mengelola inventaris aset, pelacakan pemeliharaan (maintenance), reklasifikasi aset, pelaporan, dan activity log — semua data persisten di **Supabase** (Postgres + Auth + Realtime + `pg_cron`). Ada juga AI Assistant yang terhubung ke server chat terpisah (`server/`).
+Aplikasi web React untuk manajemen aset perusahaan "Perusahaan Raja". Sistem ini mengelola inventaris aset, pelacakan pemeliharaan (maintenance), reklasifikasi aset, pelaporan (dengan riwayat tersimpan & export PDF/Excel), dan activity log — semua data persisten di **Supabase** (Postgres + Auth + Realtime + `pg_cron`). Ada juga AI Assistant yang terhubung ke server chat terpisah (`server/`).
 
 ## Tech Stack
 
@@ -15,6 +15,8 @@ Aplikasi web React untuk manajemen aset perusahaan "Perusahaan Raja". Sistem ini
 - **Animation**: motion (framer-motion)
 - **Charts**: recharts
 - **CSV**: papaparse
+- **Excel export**: xlsx
+- **PDF export**: jspdf + jspdf-autotable, chart-to-image via html2canvas
 - **Date**: date-fns
 - **AI Assistant backend**: standalone Node server in `server/` (see below)
 
@@ -53,9 +55,10 @@ npm run clean      # Remove dist/ and server.js
 │   │   └── useSystemAlerts.ts    # Computes overdue-maintenance / broken-asset alerts
 │   ├── contexts/
 │   │   ├── AuthContext.tsx        # Supabase Auth (email/password), session-based
-│   │   ├── AssetContext.tsx       # Asset CRUD (Supabase `assets` table) + master data
+│   │   ├── AssetContext.tsx       # Asset CRUD (Supabase `assets` table) + master data + `lastFetchedAt`
 │   │   ├── MaintenanceContext.tsx # Maintenance CRUD (Supabase `maintenance_records` table)
-│   │   └── ReclassificationContext.tsx # Reclassification CRUD (Supabase `asset_reclassifications` table)
+│   │   ├── ReclassificationContext.tsx # Reclassification CRUD (Supabase `asset_reclassifications` table)
+│   │   └── ReportContext.tsx      # Report history CRUD (Supabase `report_history` table), server-side pagination
 │   ├── components/
 │   │   ├── Layout.tsx            # Sidebar + header + outlet
 │   │   ├── NotificationBell.tsx  # Bell icon, activity feed + system alerts panel
@@ -74,7 +77,7 @@ npm run clean      # Remove dist/ and server.js
 │       ├── Maintenance.tsx       # Maintenance records & schedule
 │       ├── Reclassification.tsx  # Reclassification table with CRUD, verify, CSV import/export
 │       ├── MasterData.tsx        # Manage subsidiaries & categories
-│       ├── Reports.tsx           # Report generation & preview
+│       ├── Reports.tsx           # Report configuration, live chart preview, PDF/Excel export, report history table
 │       ├── AIAssistant.tsx       # Chat UI, calls server/ backend for real LLM answers
 │       ├── Guide.tsx             # FAQ / user guide
 │       └── Settings.tsx          # Profile, config, notifications, security (UI-only, not persisted)
@@ -84,14 +87,17 @@ npm run clean      # Remove dist/ and server.js
 └── supabase/migrations/
     ├── 20260701000000_create_activity_logs.sql        # activity_logs table + RLS
     ├── 20260720000000_create_asset_reclassifications.sql # asset_reclassifications table + RLS
-    └── 20260721000000_purge_old_activity_logs.sql      # pg_cron job: purge activity_logs > 3 months
+    ├── 20260721000000_purge_old_activity_logs.sql      # pg_cron job: purge activity_logs > 3 months
+    ├── 20260722000000_add_remarks_to_asset_reclassifications.sql # adds `remarks` TEXT column
+    ├── 20260724000000_create_report_history.sql        # report_history table + RLS (select/insert)
+    └── 20260724010000_add_delete_policy_to_report_history.sql # RLS delete policy for report_history
 ```
 
 ## Architecture
 
 ### State Management (Supabase-backed)
 
-Semua data utama (assets, maintenance_records, asset_reclassifications, subsidiaries, categories, activity_logs, notification_reads) disimpan di **Supabase Postgres**, diakses lewat React Context yang fetch on-mount dan menulis langsung ke Supabase. Data persisten antar sesi/refresh.
+Semua data utama (assets, maintenance_records, asset_reclassifications, report_history, subsidiaries, categories, activity_logs, notification_reads) disimpan di **Supabase Postgres**, diakses lewat React Context yang fetch on-mount dan menulis langsung ke Supabase. Data persisten antar sesi/refresh.
 
 **AuthContext** (`src/contexts/AuthContext.tsx`)
 - `isAuthenticated`, `loading`: boolean, dari `supabase.auth.getSession()` + `onAuthStateChange`
@@ -100,6 +106,7 @@ Semua data utama (assets, maintenance_records, asset_reclassifications, subsidia
 
 **AssetContext** (`src/contexts/AssetContext.tsx`)
 - `assets`: Asset[] — fetched dari tabel `assets` (chunked fetch, 1000 rows/page, untuk lewati limit default Supabase)
+- `lastFetchedAt`: Date | null — timestamp update terakhir (initial fetch + setiap CRUD sukses); dipakai Dashboard untuk menampilkan "Terakhir diperbarui"
 - `subsidiaries`, `categories1`, `categories2`: string[] — dari tabel `subsidiaries`, `category_segments_1`, `category_segments_2`
 - CRUD: `addAsset`, `updateAsset`, `deleteAsset`, `deleteMultipleAssets` (batched 100), `deleteAllAssets`
 - Master data: `addSubsidiary`, `deleteSubsidiary`, `addCategory1`, `deleteCategory1`, `addCategory2`, `deleteCategory2` (upsert/delete langsung ke Supabase)
@@ -117,8 +124,16 @@ Semua data utama (assets, maintenance_records, asset_reclassifications, subsidia
 - `reclassifications`: Reclassification[] — fetched chunked (1000 rows/page) dari tabel `asset_reclassifications`
 - CRUD: `addReclassification(item, skipLog?)`, `updateReclassification`, `deleteReclassification`
 - `verifyReclassification(id, verified)`: set `verified`/`verification_date`/`verified_by` (nama dari `user_metadata.full_name` atau email)
+- `remarks`: string — catatan tambahan bebas per temuan reklasifikasi (kolom `remarks` di `asset_reclassifications`, ditambah lewat migration terpisah)
 - Modal state: `isAddModalOpen`, `isEditModalOpen`, `editingReclassification`, `isVerifyModalOpen`, `verifyingReclassification`
 - Setiap mutasi (kecuali saat `skipLog=true`) memanggil `logActivity()` dengan actionType `ADD_RECLASSIFICATION`/`UPDATE_RECLASSIFICATION`/`DELETE_RECLASSIFICATION`/`VERIFY_RECLASSIFICATION`
+
+**ReportContext** (`src/contexts/ReportContext.tsx`)
+- `reportHistory`: ReportRecord[] — halaman saat ini dari tabel `report_history`, server-side pagination (`PAGE_SIZE = 5`) via `.range()` + `count: 'exact'`
+- `page`, `totalPages`, `totalCount`, `setPage`
+- `saveReport({ reportType, subsidiary, dateStart, dateEnd, reportData })`: insert row baru (reportData disimpan sebagai JSONB berisi chart data + summary + detail records), lalu reset ke halaman 1; memanggil `logActivity()` dengan actionType `GENERATE_REPORT`
+- `deleteReport(id)`: hapus row; mundur satu halaman otomatis jika menghapus item terakhir di halaman non-pertama
+- `userName` per report diambil dari `user_metadata.full_name` atau email user yang generate
 
 ### Activity Log & Notifications
 
@@ -126,7 +141,7 @@ Sistem notifikasi bell (`NotificationBell.tsx`) menggabungkan dua sumber:
 1. **Activity log** (`useActivityLog.ts`) — 20 log terbaru dari tabel `activity_logs`, live update via Supabase Realtime (`postgres_changes` INSERT). Unread count dihitung dari `notification_reads.last_read_at` per user.
 2. **System alerts** (`useSystemAlerts.ts`) — dihitung on-demand saat panel dibuka: maintenance overdue (status = 'Overdue') dan aset rusak (>10% dari total).
 
-`logActivity()` (`src/lib/activityLogger.ts`) dipanggil dari context CRUD methods dan dari `Inventory.tsx`/`Reclassification.tsx` (untuk `IMPORT_CSV`, sekali per operasi import — bukan per baris). Action types: `IMPORT_CSV`, `ADD_ASSET`, `UPDATE_ASSET`, `DELETE_ASSET`, `BULK_DELETE`, `ADD_MAINTENANCE`, `UPDATE_MAINTENANCE`, `ADD_RECLASSIFICATION`, `UPDATE_RECLASSIFICATION`, `DELETE_RECLASSIFICATION`, `VERIFY_RECLASSIFICATION`.
+`logActivity()` (`src/lib/activityLogger.ts`) dipanggil dari context CRUD methods dan dari `Inventory.tsx`/`Reclassification.tsx` (untuk `IMPORT_CSV`, sekali per operasi import — bukan per baris). Action types: `IMPORT_CSV`, `ADD_ASSET`, `UPDATE_ASSET`, `DELETE_ASSET`, `BULK_DELETE`, `ADD_MAINTENANCE`, `UPDATE_MAINTENANCE`, `ADD_RECLASSIFICATION`, `UPDATE_RECLASSIFICATION`, `DELETE_RECLASSIFICATION`, `VERIFY_RECLASSIFICATION`, `GENERATE_REPORT`, `EXPORT_REPORT` (dipanggil langsung dari `Reports.tsx` saat generate/export PDF/Excel, bukan dari context).
 
 `addAsset`/`addReclassification` menerima parameter opsional `skipLog` (default `false`) — dipakai saat CSV bulk import memanggil CRUD per baris, agar tidak membanjiri `activity_logs` dengan satu row per baris; import CSV tetap mencatat satu log agregat (`total`/`success`/`failed`) di akhir.
 
@@ -137,6 +152,20 @@ RLS: semua authenticated user bisa `SELECT activity_logs`; insert hanya untuk `u
 ### AI Assistant
 
 `AIAssistant.tsx` bukan simulasi — ia POST ke `${VITE_AI_SERVER_URL}/chat` (server terpisah di `server/index.js`). Server itu fetch data `assets` + `maintenance_records` langsung dari Supabase (pakai `SUPABASE_URL`/`SUPABASE_ANON_KEY` di env server, bukan `VITE_`-prefixed), susun system prompt berisi ringkasan + seluruh data, lalu forward ke endpoint Anthropic-compatible (`MIMO_BASE_URL`, model dari `MIMO_MODEL`, key dari `MIMO_API_KEY`). Chat history & pesan disimpan di `localStorage` browser (bukan Supabase) dengan sliding-window trim (`MAX_MESSAGES = 21`, `MAX_HISTORY = 20`).
+
+### Reports
+
+`Reports.tsx` menghitung 3 jenis report langsung di client dari data `AssetContext`/`MaintenanceContext` yang sudah ter-load (tidak ada query Supabase khusus report):
+- **Asset Valuation Summary** (bar chart): total nilai aset per `categorySegment1`, difilter subsidiary + `datePlaceInService` dalam rentang tanggal
+- **Depreciation Schedule** (line chart): nilai buku per kuartal (`getQuartersInRange`) pakai depresiasi garis-lurus (`monthsBetween` vs `lifeInMonths`)
+- **Maintenance Cost Analysis** (composed bar chart): estimated vs actual cost per `serviceType`, dari `maintenance_records` difilter `scheduledDate` dalam rentang
+
+Setiap `generatePreview()` yang sukses otomatis memanggil `saveReport()` (ReportContext) — jadi tiap generate preview membuat 1 row baru di `report_history`, bukan cuma saat export. Tabel "Recent Reports" di bawah preview menampilkan `reportHistory` dengan pagination server-side dan tombol delete (`deleteReport`, ada confirm dialog `window.confirm`).
+
+**Export**:
+- **PDF** (`handleExportPDF`, via `jsPDF` + `jspdf-autotable`): render header (judul, subsidiary, rentang tanggal, generated-by), summary stat boxes, chart di-capture jadi PNG lewat `html2canvas` (ref `chartRef`) lalu di-`addImage`, tabel data utama dengan baris total, halaman kedua "Detail Records" per-asset dengan highlight merah pada kolom `variance` yang positif (over-budget, khusus Maintenance Cost Analysis), lalu blok sign-off ("Prepared by" / "Reviewed by" / "Approved by") dan page numbering di footer tiap halaman.
+- **Excel** (`handleExportExcel`, via `xlsx`): export `previewData.data` (bukan detail records) ke satu sheet.
+- Kedua export memanggil `sanitizeForSpreadsheet()` (prefix `'` pada value yang diawali `=`/`+`/`-`/`@`) untuk cegah formula injection, lalu `logActivity()` dengan actionType `EXPORT_REPORT` (`format: 'PDF'|'Excel'`).
 
 ### Data Schemas
 
@@ -190,6 +219,19 @@ RLS: semua authenticated user bisa `SELECT activity_logs`; insert hanya untuk `u
 | verificationDate | string | Tanggal diverifikasi (kosong jika belum) |
 | verifiedBy | string | Nama/email verifikator |
 | createdAt | string | Timestamp dibuat |
+| remarks | string | Catatan tambahan bebas (kolom `remarks`, ditambah via migration `20260722000000`) |
+
+**ReportRecord** (tabel `report_history`):
+| Field | Type | Description |
+|---|---|---|
+| id | string (UUID) | Primary key |
+| userName | string | Nama/email user yang generate report |
+| reportType | string | 'Asset Valuation Summary' \| 'Depreciation Schedule' \| 'Maintenance Cost Analysis' |
+| subsidiary | string | 'All Divisions' atau nama subsidiary spesifik |
+| dateStart / dateEnd | string | Rentang tanggal report (DATE di Supabase) |
+| reportData | any (JSONB) | Payload lengkap: chart data, `summary[]`, `detailColumns[]`, `detailData[]` |
+| status | string | Default `'Generated'` |
+| createdAt | string | Timestamp dibuat |
 
 ### Routing
 
@@ -198,12 +240,12 @@ Semua halaman dilindungi oleh `PrivateRoute` (kecuali `/login`). Redirect ke `/l
 | Route | Page | Description |
 |---|---|---|
 | `/login` | Login | Supabase email/password login |
-| `/` | Dashboard | KPI cards, charts, recent assets table |
+| `/` | Dashboard | KPI cards, charts, filterable/searchable assets table with "last updated" timestamp |
 | `/inventory` | Inventory | Full asset CRUD, CSV import/export, filters |
 | `/maintenance` | Maintenance | Maintenance CRUD, schedule, filters |
 | `/reclassification` | Reclassification | Reclassification CRUD, verify, CSV import/export |
 | `/master-data` | MasterData | Manage subsidiaries & categories |
-| `/reports` | Reports | Report generation with charts |
+| `/reports` | Reports | Report config + live chart preview, PDF/Excel export, saved report history with pagination |
 | `/ai-assistant` | AIAssistant | Chat UI, calls real LLM backend (`server/`) |
 | `/guide` | Guide | FAQ accordion |
 | `/settings` | Settings | Profile, config, notifications, security — UI state only, not persisted |
@@ -223,13 +265,15 @@ Semua halaman dilindungi oleh `PrivateRoute` (kecuali `/login`). Redirect ke `/l
 
 1. **Modal-based CRUD**: Asset dan Maintenance menggunakan modal untuk add/edit
 2. **AutocompleteInput**: Komponen reusable yang terhubung ke master data untuk input konsisten
-3. **Debounce Search**: Inventory dan Maintenance menggunakan debounce 300ms pada pencarian
+3. **Debounce Search**: Inventory, Maintenance, dan Dashboard menggunakan debounce 300ms pada pencarian
 4. **Pagination**: Client-side pagination (10 items per page) pada Inventory, Maintenance, dan Dashboard
 5. **CSV Import/Export**: Menggunakan papaparse, max 5000 rows per import, invalid rows di-skip dan bisa didownload terpisah (berlaku untuk Inventory & Reclassification)
 6. **CSV Injection Prevention**: `Reclassification.tsx` punya `sanitizeCsvField()` — field yang diawali `=`, `+`, `-`, `@`, tab, atau CR di-prefix `'` sebelum di-export agar tidak dieksekusi sebagai formula oleh Excel/Sheets. Helper ini lokal per file, belum diekstrak jadi util bersama; `Inventory.tsx` export CSV **belum** memakainya.
 7. **Cost Formatting**: Input cost di-format dengan Intl.NumberFormat (comma separators)
 8. **Chunked/Batched Supabase calls**: fetch assets/reclassifications per 1000 rows, delete multiple per batch 100 — untuk hindari limit Supabase
-9. **Activity logging**: setiap mutasi data penting (add/edit/delete asset, maintenance, reclassification, import CSV) memanggil `logActivity()`. CSV bulk import memakai `skipLog=true` pada tiap row lalu satu `logActivity()` agregat di akhir, supaya `activity_logs` tidak banjir per baris.
+9. **Activity logging**: setiap mutasi data penting (add/edit/delete asset, maintenance, reclassification, import CSV, generate/export report) memanggil `logActivity()`. CSV bulk import memakai `skipLog=true` pada tiap row lalu satu `logActivity()` agregat di akhir, supaya `activity_logs` tidak banjir per baris.
+10. **PDF/Excel export**: pola di `Reports.tsx` — capture chart via `html2canvas` (ref ke container), gabung dengan tabel `jspdf-autotable` (custom `didParseCell` untuk conditional styling seperti highlight over-budget), lalu `xlsx` untuk sheet mentah. Semua field string di-`sanitizeForSpreadsheet()` dulu untuk cegah formula injection sebelum ditulis ke PDF/Excel.
+11. **"Last updated" tracking**: `AssetContext` menyimpan `lastFetchedAt` (Date), di-set ulang di initial fetch dan tiap CRUD sukses; dipakai `Dashboard.tsx` via `formatLastUpdate()` (`src/lib/utils.ts`) untuk menampilkan timestamp format Indonesia ("Hari, tanggal Bulan tahun · HH:mm").
 
 ## Environment Variables
 
@@ -261,7 +305,7 @@ PORT                       # default 8080
 
 ## Improvement Roadmap
 
-Lihat `asset inventory improve.md` untuk rencana peningkatan (status: pagination/debounce/memoization sudah selesai; audit trail via activity log sudah ada lengkap dengan retention policy 3 bulan via `pg_cron`; fitur reklasifikasi aset sudah selesai). Sisa yang belum dikerjakan:
+Lihat `asset inventory improve.md` untuk rencana peningkatan (status: pagination/debounce/memoization sudah selesai; audit trail via activity log sudah ada lengkap dengan retention policy 3 bulan via `pg_cron`; fitur reklasifikasi aset sudah selesai; fitur Reports — riwayat tersimpan di database, export PDF/Excel, chart image + detail table + sign-off block di PDF — sudah selesai, lihat `reports implementation.md`). Sisa yang belum dikerjakan:
 - Advanced filtering & multi-sorting (multi-kriteria + sort per kolom)
 - Bulk actions selain delete (bulk update status, bulk export)
 - Image upload untuk aset
