@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp, BookOpen, Wrench, Archive, Sparkles, LayoutDashboard } from "lucide-react";
+import { ChevronDown, ChevronUp, BookOpen, Wrench, Archive, Sparkles, LayoutDashboard, ClipboardCheck, Database, BarChart2, Settings } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const GUIDE_CONTENT = [
@@ -14,7 +14,11 @@ const GUIDE_CONTENT = [
       },
       {
         question: "How do I navigate the dashboard?",
-        answer: "The dashboard provides a high-level overview of total assets, active maintenance, and recent activities. Use the sidebar on the left to access detailed sections like Asset Inventory, Maintenance records, and Reports."
+        answer: "The dashboard provides a high-level overview of total assets, asset cost, and broken assets, plus charts for subsidiary valuation, category breakdown, and annual purchase trends. Use the sidebar on the left to access every section: Dashboard, Asset Inventory, Maintenance, Reclassification, Master Data, Reports, AI Assistant, and Settings."
+      },
+      {
+        question: "What does the 'Terakhir diperbarui' (last updated) timestamp on the Dashboard mean?",
+        answer: "It shows when asset data was last fetched or changed — including every add, edit, delete, or bulk delete you or your teammates perform. It updates automatically after each successful change, so you always know how fresh the numbers are."
       }
     ]
   },
@@ -41,7 +45,7 @@ const GUIDE_CONTENT = [
       },
       {
         question: "How do I export my asset data?",
-        answer: "On the Asset Inventory page, apply any desired filters, then click the 'Export CSV' button at the top right. This will download the currently visible assets into a CSV file, which you can use for offline reporting or as a template for future imports."
+        answer: "On the Asset Inventory page, apply any desired filters, then click the 'Export CSV' button at the top right. This will download the currently visible assets into a CSV file, which you can use for offline reporting or as a template for future imports. Any cell value that starts with a formula character (=, +, -, @) is automatically sanitized so the file can't be used to inject formulas when opened in Excel."
       }
     ]
   },
@@ -61,17 +65,105 @@ const GUIDE_CONTENT = [
     ]
   },
   {
+    id: "reclassification",
+    title: "Reclassification",
+    icon: ClipboardCheck,
+    content: [
+      {
+        question: "What is the Reclassification page for?",
+        answer: "It's where you record physical audit findings — asset category, description, location, unit, ownership, and remarks — whenever what you find on the ground differs from what's in the system."
+      },
+      {
+        question: "How do I verify a reclassification item?",
+        answer: "Click the Verified/Unverified badge on a row to open the verification dialog. Confirming it stamps the item with the verification date and the name of the verifying user."
+      },
+      {
+        question: "Can I import or export reclassification data?",
+        answer: "Yes, the same way as Asset Inventory: download the template, import up to 5000 rows with a progress modal and a downloadable report of any invalid rows, or export the current list to CSV."
+      },
+      {
+        question: "How do I delete multiple items at once?",
+        answer: "Select the items with the checkboxes, click Bulk Delete, and type \"DELETE\" to confirm. A progress modal shows the deletion status."
+      },
+      {
+        question: "What filters are available?",
+        answer: "You can filter by category, verification status, and ownership, or use the search box, alongside stat cards showing Total, Verified, Unverified, and Needs Review counts."
+      }
+    ]
+  },
+  {
+    id: "master-data",
+    title: "Master Data",
+    icon: Database,
+    content: [
+      {
+        question: "What is Master Data used for?",
+        answer: "It manages the dropdown lists used throughout the app — Subsidiaries, Category Segment 1, and Category Segment 2 — so asset, maintenance, and reclassification forms stay consistent."
+      },
+      {
+        question: "How do I add or remove an entry?",
+        answer: "Use the add form above each list to create a new entry. To remove one, hover over an existing entry and click the trash icon that appears."
+      }
+    ]
+  },
+  {
+    id: "reports",
+    title: "Reports",
+    icon: BarChart2,
+    content: [
+      {
+        question: "What report types are available?",
+        answer: "Asset Valuation Summary, Depreciation Schedule (true straight-line, quarter-aware), and Maintenance Cost Analysis (estimated vs. actual cost)."
+      },
+      {
+        question: "How do I generate a report?",
+        answer: "Set your filters (subsidiary/division and date range), then click 'Generate Preview'. This renders a live chart and automatically saves the report to your report history."
+      },
+      {
+        question: "What export formats does Reports support?",
+        answer: "PDF and Excel (.xlsx). The PDF includes the chart as an embedded image, a summary and main data table with totals, a separate detail-records page per asset with over-budget or variance rows highlighted in red, page numbers, and a signature block (Prepared by / Reviewed by / Approved by)."
+      },
+      {
+        question: "Are exported files safe from formula injection?",
+        answer: "Yes, any cell value starting with =, +, -, or @ is automatically sanitized in both the PDF and Excel exports."
+      },
+      {
+        question: "Can I revisit or delete past reports?",
+        answer: "Yes, the Recent Reports table lists your report history with pagination, and each row can be deleted individually."
+      }
+    ]
+  },
+  {
     id: "ai-assistant",
-    title: "AI Features",
+    title: "AI Assistant",
     icon: Sparkles,
     content: [
       {
         question: "How can the AI Assistant help me?",
-        answer: "The AI Assistant is designed to analyze your asset data and provide actionable insights. You can ask it to predict maintenance needs, summarize recent activities, or generate custom reports."
+        answer: "Ask it questions about your asset and maintenance data in natural language through the chat interface. Quick-suggestion chips are provided for common questions to get you started."
+      },
+      {
+        question: "Does the AI Assistant remember our conversation?",
+        answer: "Chat history is saved in your browser (up to 21 messages) and the last 10 exchanges are used as context for follow-up questions. Click 'Hapus Chat' to clear the conversation."
       },
       {
         question: "Is my data secure with the AI?",
         answer: "Yes, all data processed by the AI Assistant is handled securely and is only utilized within the context of your company's asset management workspace."
+      }
+    ]
+  },
+  {
+    id: "settings",
+    title: "Settings & Notifications",
+    icon: Settings,
+    content: [
+      {
+        question: "What can I change in Settings?",
+        answer: "The Profile tab lets you update your name and email (email changes require confirmation). The Security tab lets you change your password by re-entering your current one; Two-Factor Authentication is shown but marked 'Coming soon'. System Configuration (language, timezone, currency, rows per page) and Notifications (alert toggles) are visible but not yet saved permanently — treat them as preview features for now."
+      },
+      {
+        question: "What does the bell icon in the header show?",
+        answer: "It combines System Alerts with recent Activity Log entries — CSV imports, asset additions/edits/deletions, bulk deletes, and maintenance updates — with an unread count badge that clears when you open the dropdown."
       }
     ]
   }
