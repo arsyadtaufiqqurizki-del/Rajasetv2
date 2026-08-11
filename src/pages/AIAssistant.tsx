@@ -66,6 +66,7 @@ export default function AIAssistant() {
     "Mengambil data inventaris...",
     "Menganalisis data aset...",
     "Menyusun laporan...",
+    "Masih diproses, mohon tunggu sebentar...",
   ];
 
   useEffect(() => {

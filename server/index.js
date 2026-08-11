@@ -23,6 +23,65 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+function toCsv(rows, columns) {
+  const escape = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = rows.map(r => columns.map(c => escape(r[c])).join(','));
+  return [columns.join(','), ...lines].join('\n');
+}
+
+function assetYear(a) {
+  if (!a.date_place_in_service) return null;
+  const y = new Date(a.date_place_in_service).getFullYear();
+  return Number.isNaN(y) ? null : y;
+}
+
+function computeAssetAggregates(assets) {
+  const maxCostByYear = new Map();
+  for (const a of assets) {
+    const year = assetYear(a);
+    if (!year) continue;
+    const cost = Number(a.asset_cost) || 0;
+    const current = maxCostByYear.get(year);
+    if (!current || cost > current.biaya) {
+      maxCostByYear.set(year, {
+        tahun: year, no: a.asset_number, deskripsi: a.asset_description,
+        subsidiary: a.subsidiary, biaya: cost,
+      });
+    }
+  }
+
+  const top10ByCost = [...assets]
+    .sort((a, b) => (Number(b.asset_cost) || 0) - (Number(a.asset_cost) || 0))
+    .slice(0, 10)
+    .map(a => ({
+      no: a.asset_number, deskripsi: a.asset_description, subsidiary: a.subsidiary,
+      biaya: Number(a.asset_cost) || 0, tahun: assetYear(a),
+    }));
+
+  const groupBy = (key) => {
+    const groups = new Map();
+    for (const a of assets) {
+      const k = a[key] || 'Unknown';
+      const g = groups.get(k) || { count: 0, totalBiaya: 0 };
+      g.count += 1;
+      g.totalBiaya += Number(a.asset_cost) || 0;
+      groups.set(k, g);
+    }
+    return Object.fromEntries(groups);
+  };
+
+  return {
+    maxCostByYear: [...maxCostByYear.values()].sort((a, b) => a.tahun - b.tahun),
+    top10ByCost,
+    bySubsidiary: groupBy('subsidiary'),
+    byCategory: groupBy('category_segment1'),
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   setCors(res);
 
@@ -60,28 +119,53 @@ const server = http.createServer(async (req, res) => {
         const pendingMaint = maintenance.filter(m => m.status?.toLowerCase() === 'pending').length;
         const doneMaint = maintenance.filter(m => m.status?.toLowerCase() === 'done').length;
 
+        const agg = computeAssetAggregates(assets);
+
+        const assetsCsv = toCsv(
+          assets.map(a => ({
+            no: a.asset_number, deskripsi: a.asset_description,
+            kategori1: a.category_segment1, kategori2: a.category_segment2,
+            subsidiary: a.subsidiary, status: a.status,
+            biaya: a.asset_cost, unit: a.asset_units,
+            tgl_pakai: a.date_place_in_service,
+          })),
+          ['no', 'deskripsi', 'kategori1', 'kategori2', 'subsidiary', 'status', 'biaya', 'unit', 'tgl_pakai']
+        );
+
+        const maintenanceCsv = toCsv(
+          maintenance.map(m => ({
+            no: m.asset_number, deskripsi: m.asset_description,
+            service: m.service_type, status: m.status,
+            jadwal: m.scheduled_date, estimasi: m.estimate_cost, aktual: m.actual_cost,
+          })),
+          ['no', 'deskripsi', 'service', 'status', 'jadwal', 'estimasi', 'aktual']
+        );
+
         const systemPrompt = `Kamu adalah asisten AI untuk dashboard manajemen aset perusahaan Raja.
 Jawab pertanyaan user berdasarkan data berikut. Jawab dalam Bahasa Indonesia, ringkas dan akurat.
+Untuk pertanyaan soal nilai tertinggi/terendah/top-N, PRIORITASKAN angka dari bagian "AGREGAT" di bawah (sudah dihitung akurat) daripada menghitung ulang dari data mentah.
 
 === RINGKASAN ===
 Total Aset: ${totalAssets} | Aktif: ${activeAssets} | Rusak: ${brokenAssets} | Dalam Maintenance: ${inMaintenance}
 Total Maintenance: ${maintenance.length} | Pending: ${pendingMaint} | Selesai: ${doneMaint}
 
-=== DATA ASET ===
-${JSON.stringify(assets.map(a => ({
-  no: a.asset_number, deskripsi: a.asset_description,
-  kategori1: a.category_segment1, kategori2: a.category_segment2,
-  subsidiary: a.subsidiary, status: a.status,
-  biaya: a.asset_cost, unit: a.asset_units,
-  tgl_pakai: a.date_place_in_service,
-})))}
+=== AGREGAT: ASET BIAYA TERTINGGI PER TAHUN (date_place_in_service) ===
+${JSON.stringify(agg.maxCostByYear)}
 
-=== DATA MAINTENANCE ===
-${JSON.stringify(maintenance.map(m => ({
-  no: m.asset_number, deskripsi: m.asset_description,
-  service: m.service_type, status: m.status,
-  jadwal: m.scheduled_date, estimasi: m.estimate_cost, aktual: m.actual_cost,
-})))}`;
+=== AGREGAT: TOP 10 ASET TERMAHAL (keseluruhan) ===
+${JSON.stringify(agg.top10ByCost)}
+
+=== AGREGAT: JUMLAH & TOTAL BIAYA PER SUBSIDIARY ===
+${JSON.stringify(agg.bySubsidiary)}
+
+=== AGREGAT: JUMLAH & TOTAL BIAYA PER KATEGORI ===
+${JSON.stringify(agg.byCategory)}
+
+=== DATA ASET (CSV, mentah, untuk pertanyaan di luar agregat di atas) ===
+${assetsCsv}
+
+=== DATA MAINTENANCE (CSV) ===
+${maintenanceCsv}`;
 
         const mimoRes = await fetch(`${MIMO_BASE_URL}/v1/messages`, {
           method: 'POST',
