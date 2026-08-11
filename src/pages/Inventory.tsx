@@ -124,10 +124,10 @@ export default function Inventory() {
 
   const handleExportCSV = useCallback(() => {
     const dataToExport = filteredAssets.map(asset => ({
-      'Asset Book': asset.assetBook,
-      'Subsidiary': asset.subsidiary,
       'Asset Number': asset.assetNumber,
       'Asset Description': asset.assetDescription,
+      'Asset Book': asset.assetBook,
+      'Subsidiary': asset.subsidiary,
       'Asset Cost': asset.assetCost,
       'Date Place In Service': asset.datePlaceInService,
       'Asset Units': asset.assetUnits,
