@@ -1,52 +1,56 @@
+const http = require('http');
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+const MIMO_API_KEY = process.env.MIMO_API_KEY;
 const MIMO_BASE_URL = 'https://api.xiaomimimo.com/anthropic';
+const MIMO_MODEL = process.env.MIMO_MODEL;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-  });
-}
-
-async function fetchFromSupabase(env, table) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?select=*`, {
+async function fetchFromSupabase(table) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*`, {
     headers: {
-      apikey: env.SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
     },
   });
   if (!res.ok) throw new Error(`Supabase error on ${table}: ${await res.text()}`);
   return res.json();
 }
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+function setCors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
-    }
+const server = http.createServer(async (req, res) => {
+  setCors(res);
 
-    if (request.method === 'GET' && url.pathname === '/health') {
-      return json({ status: 'ok' });
-    }
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    return res.end();
+  }
 
-    if (request.method === 'POST' && url.pathname === '/chat') {
+  if (req.method === 'GET' && req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ status: 'ok' }));
+  }
+
+  if (req.method === 'POST' && req.url === '/chat') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
       try {
-        const { question, history = [] } = await request.json();
+        const { question, history = [] } = JSON.parse(body);
 
         if (!question) {
-          return json({ error: 'question is required' }, 400);
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'question is required' }));
         }
 
         const [assets, maintenance] = await Promise.all([
-          fetchFromSupabase(env, 'assets'),
-          fetchFromSupabase(env, 'maintenance_records'),
+          fetchFromSupabase('assets'),
+          fetchFromSupabase('maintenance_records'),
         ]);
 
         const totalAssets = assets.length;
@@ -83,11 +87,11 @@ ${JSON.stringify(maintenance.map(m => ({
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            'x-api-key': env.MIMO_API_KEY,
+            'x-api-key': MIMO_API_KEY,
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
-            model: env.MIMO_MODEL,
+            model: MIMO_MODEL,
             max_tokens: 1024,
             system: systemPrompt,
             messages: [...history, { role: 'user', content: question }],
@@ -97,19 +101,29 @@ ${JSON.stringify(maintenance.map(m => ({
         if (!mimoRes.ok) {
           const errText = await mimoRes.text();
           console.error('MiMo error:', errText);
-          return json({ error: `MiMo API error: ${errText}` }, 502);
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: `MiMo API error: ${errText}` }));
         }
 
         const data = await mimoRes.json();
         const answer = data.content[0].text;
 
-        return json({ answer });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ answer }));
       } catch (err) {
         console.error('Error:', err);
-        return json({ error: err.message }, 500);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
       }
-    }
+    });
+    return;
+  }
 
-    return json({ error: 'Not found' }, 404);
-  },
-};
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Not found' }));
+});
+
+const PORT = parseInt(process.env.PORT) || 8080;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Raja AI server running on port ${PORT}`);
+});
