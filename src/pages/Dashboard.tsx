@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid 
 } from 'recharts';
-import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp, Download, Plus, X, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react';
+import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp, Plus, X, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react';
 import { cn, formatCurrency, formatLastUpdate } from '../lib/utils';
 
 import { useAsset } from '../contexts/AssetContext';
@@ -364,12 +364,6 @@ export default function Dashboard() {
       <div className="rounded-xl border border-outline-variant bg-surface-container-lowest shadow-sm overflow-hidden flex flex-col mt-2">
         <div className="p-5 border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
           <h3 className="text-lg font-semibold text-primary">Recent Asset Additions</h3>
-          <div className="flex gap-3">
-             <button className="flex items-center gap-2 px-3 py-1.5 border border-outline-variant rounded text-sm font-medium text-on-surface hover:bg-surface-container-low transition-colors">
-                <Download className="h-4 w-4" /> Export CSV
-             </button>
-             <button className="text-primary text-sm font-medium hover:underline px-2">View All</button>
-          </div>
         </div>
         <div className="p-4 border-b border-outline-variant bg-surface-container-lowest flex flex-wrap gap-4 items-center">
           <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
