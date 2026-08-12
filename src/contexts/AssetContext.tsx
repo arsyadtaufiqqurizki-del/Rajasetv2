@@ -127,6 +127,12 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       }
       setAssets(allRows.map(fromDb));
 
+      const latestUpdateMs = allRows.reduce((max, row) => {
+        const t = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+        return t > max ? t : max;
+      }, 0);
+      setLastFetchedAt(latestUpdateMs > 0 ? new Date(latestUpdateMs) : null);
+
       const [subRes, cat1Res, cat2Res] = await Promise.all([
         supabase.from('subsidiaries').select('name').order('name'),
         supabase.from('category_segments_1').select('name').order('name'),
@@ -137,7 +143,6 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       if (!cat1Res.error) setCategories1([...new Set((cat1Res.data ?? []).map(r => r.name))]);
       if (!cat2Res.error) setCategories2([...new Set((cat2Res.data ?? []).map(r => r.name))]);
 
-      setLastFetchedAt(new Date());
       setLoading(false);
     };
     fetchAll();
