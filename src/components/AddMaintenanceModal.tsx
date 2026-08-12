@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, ChevronDown, Search } from 'lucide-react';
+import { X, ChevronDown, Search, Loader2 } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import { useMaintenance } from '../contexts/MaintenanceContext';
 
@@ -14,6 +14,7 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [assetSearch, setAssetSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
@@ -38,6 +39,7 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
       setSelectedAssetId('');
       setAssetSearch('');
       setDropdownOpen(false);
+      setIsSubmitting(false);
       setFormData({
         serviceType: '',
         estimateCost: '',
@@ -62,25 +64,35 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     const asset = assets.find(a => a.id === selectedAssetId);
     if (!asset) return;
 
-    await addRecord({
-      assetBook: asset.assetBook || asset.id,
-      subsidiary: asset.subsidiary,
-      assetNumber: asset.assetNumber,
-      assetDescription: asset.assetDescription,
-      assetUnits: asset.assetUnits,
-      serviceType: formData.serviceType,
-      assetCategorySegment1: asset.categorySegment1,
-      assetCategorySegment2: asset.categorySegment2,
-      estimateCost: formData.estimateCost,
-      actualCost: formData.actualCost,
-      status: formData.status,
-      scheduledDate: formData.scheduledDate
-    });
-
-    onClose();
+    setIsSubmitting(true);
+    try {
+      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
+      await Promise.all([
+        addRecord({
+          assetBook: asset.assetBook || asset.id,
+          subsidiary: asset.subsidiary,
+          assetNumber: asset.assetNumber,
+          assetDescription: asset.assetDescription,
+          assetUnits: asset.assetUnits,
+          serviceType: formData.serviceType,
+          assetCategorySegment1: asset.categorySegment1,
+          assetCategorySegment2: asset.categorySegment2,
+          estimateCost: formData.estimateCost,
+          actualCost: formData.actualCost,
+          status: formData.status,
+          scheduledDate: formData.scheduledDate
+        }),
+        minDelay
+      ]);
+      onClose();
+    } catch (err) {
+      setIsSubmitting(false);
+      throw err;
+    }
   };
 
   const selectedAsset = assets.find(a => a.id === selectedAssetId);
@@ -234,15 +246,24 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-primary text-on-primary px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+              disabled={isSubmitting}
+              className="bg-primary text-on-primary px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[130px]"
             >
-              Save Record
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Record'
+              )}
             </button>
           </div>
         </form>

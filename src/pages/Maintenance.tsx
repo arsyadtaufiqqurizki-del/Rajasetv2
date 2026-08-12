@@ -1,16 +1,19 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Settings as SettingsIcon, AlertTriangle, CircleDollarSign, CalendarDays, ArrowRight, MoreVertical, Edit, Trash2, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings as SettingsIcon, AlertTriangle, CircleDollarSign, CalendarDays, ArrowRight, MoreVertical, Edit, Trash2, Filter, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useMaintenance } from '../contexts/MaintenanceContext';
 import AddMaintenanceModal from '../components/AddMaintenanceModal';
 import EditMaintenanceModal from '../components/EditMaintenanceModal';
+import MaintenanceCalendarModal from '../components/MaintenanceCalendarModal';
 
 export default function Maintenance() {
   const { records, deleteRecord } = useMaintenance();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [filterSubsidiary, setFilterSubsidiary] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -75,10 +78,15 @@ export default function Maintenance() {
     setIsEditModalOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (recordToDelete) {
-      deleteRecord(recordToDelete);
+  const confirmDelete = async () => {
+    if (!recordToDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
+      await Promise.all([deleteRecord(recordToDelete), minDelay]);
       setRecordToDelete(null);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -98,13 +106,19 @@ export default function Maintenance() {
   return (
     <div className="flex flex-col gap-6 w-full">
       <AddMaintenanceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      <EditMaintenanceModal 
-        isOpen={isEditModalOpen} 
+      <EditMaintenanceModal
+        isOpen={isEditModalOpen}
         onClose={() => {
           setIsEditModalOpen(false);
           setEditingRecordId(null);
-        }} 
-        recordId={editingRecordId} 
+        }}
+        recordId={editingRecordId}
+      />
+      <MaintenanceCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        records={records}
+        onSelectRecord={handleEdit}
       />
 
       {recordToDelete && (
@@ -117,15 +131,24 @@ export default function Maintenance() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setRecordToDelete(null)}
-                className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors"
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="bg-error text-on-error px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                disabled={isDeleting}
+                className="bg-error text-on-error px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[100px]"
               >
-                Delete
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </button>
             </div>
           </div>
@@ -409,7 +432,12 @@ export default function Maintenance() {
             )}
           </div>
           <div className="p-3 border-t border-outline-variant text-center mt-auto">
-            <button className="text-sm font-semibold text-primary hover:underline py-1 w-full">View Full Calendar</button>
+            <button
+              onClick={() => setIsCalendarModalOpen(true)}
+              className="text-sm font-semibold text-primary hover:underline py-1 w-full"
+            >
+              View Full Calendar
+            </button>
           </div>
         </div>
       </div>

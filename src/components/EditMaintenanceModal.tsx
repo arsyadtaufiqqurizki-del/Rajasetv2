@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { useMaintenance, MaintenanceRecord } from '../contexts/MaintenanceContext';
 
 interface EditMaintenanceModalProps {
@@ -10,7 +10,8 @@ interface EditMaintenanceModalProps {
 
 export default function EditMaintenanceModal({ isOpen, onClose, recordId }: EditMaintenanceModalProps) {
   const { records, updateRecord } = useMaintenance();
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     serviceType: '',
     estimateCost: '',
@@ -30,6 +31,7 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
         status: recordToEdit.status || 'Pending',
         scheduledDate: recordToEdit.scheduledDate || new Date().toISOString().split('T')[0]
       });
+      setIsSubmitting(false);
     }
   }, [isOpen, recordToEdit]);
 
@@ -37,18 +39,27 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recordId) return;
+    if (!recordId || isSubmitting) return;
 
-    await updateRecord(recordId, {
-      ...recordToEdit,
-      serviceType: formData.serviceType,
-      estimateCost: formData.estimateCost,
-      actualCost: formData.actualCost,
-      status: formData.status,
-      scheduledDate: formData.scheduledDate
-    });
-
-    onClose();
+    setIsSubmitting(true);
+    try {
+      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
+      await Promise.all([
+        updateRecord(recordId, {
+          ...recordToEdit,
+          serviceType: formData.serviceType,
+          estimateCost: formData.estimateCost,
+          actualCost: formData.actualCost,
+          status: formData.status,
+          scheduledDate: formData.scheduledDate
+        }),
+        minDelay
+      ]);
+      onClose();
+    } catch (err) {
+      setIsSubmitting(false);
+      throw err;
+    }
   };
 
   return (
@@ -131,15 +142,24 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-primary text-on-primary px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+              disabled={isSubmitting}
+              className="bg-primary text-on-primary px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]"
             >
-              Save Changes
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
             </button>
           </div>
         </form>

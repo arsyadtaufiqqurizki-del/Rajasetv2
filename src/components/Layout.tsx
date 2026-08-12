@@ -58,7 +58,7 @@ export default function Layout() {
         mobileMenuOpen ? "flex translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col gap-2 border-b border-outline-variant/30 p-6">
-          <h1 className="text-xl font-bold text-primary tracking-tight">Perusahaan Raja</h1>
+          <h1 className="text-xl font-bold text-primary tracking-tight">RAJA</h1>
           <p className="text-xs font-medium text-on-surface-variant">Asset Management</p>
         </div>
 
