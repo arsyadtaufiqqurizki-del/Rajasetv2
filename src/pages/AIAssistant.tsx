@@ -7,7 +7,8 @@ const STORAGE_KEY_MESSAGES = "ai_assistant_messages";
 const STORAGE_KEY_HISTORY = "ai_assistant_history";
 const STORAGE_KEY_TRIMMED = "ai_assistant_trimmed";
 const MAX_MESSAGES = 21; // 1 welcome + 20 chat
-const MAX_HISTORY = 20;  // 10 pasang user-AI
+const MAX_HISTORY = 20;  // 10 pasang user-AI (disimpan untuk tampilan/localStorage)
+const HISTORY_SEND_LIMIT = 8; // 4 pasang terakhir yang benar-benar dikirim ke model
 
 type Message = {
   id: string;
@@ -61,6 +62,11 @@ export default function AIAssistant() {
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [wasTrimmed, setWasTrimmed] = useState(() => localStorage.getItem(STORAGE_KEY_TRIMMED) === "true");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => abortControllerRef.current?.abort();
+  }, []);
 
   const loadingSteps = [
     "Mengambil data inventaris...",
@@ -127,44 +133,79 @@ export default function AIAssistant() {
     setIsTyping(true);
     setError(null);
 
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    let aiMessageId: string | null = null;
+    let fullText = "";
+
     try {
       const response = await fetch(`${CLOUD_RUN_URL}/chat`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question, history }),
+        body: JSON.stringify({ question, history: history.slice(-HISTORY_SEND_LIMIT) }),
+        signal: controller.signal,
       });
 
-      const text = await response.text();
       if (!response.ok) {
+        const text = await response.text();
         let errMsg = "Server error";
         try { errMsg = JSON.parse(text).error || errMsg; } catch {}
         throw new Error(errMsg);
       }
 
-      const data = JSON.parse(text);
+      if (!response.body) throw new Error("Streaming tidak didukung oleh browser ini.");
 
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "ai",
-        content: data.answer,
-        timestamp: new Date()
-      };
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunkText = decoder.decode(value, { stream: true });
+        if (!chunkText) continue;
+        fullText += chunkText;
+
+        if (aiMessageId === null) {
+          aiMessageId = (Date.now() + 1).toString();
+          setIsTyping(false);
+          const newId = aiMessageId;
+          const snapshot = fullText;
+          setMessages((prev) => [...prev, { id: newId, role: "ai", content: snapshot, timestamp: new Date() }]);
+        } else {
+          const currentId = aiMessageId;
+          const snapshot = fullText;
+          setMessages((prev) => prev.map((m) => (m.id === currentId ? { ...m, content: snapshot } : m)));
+        }
+      }
+
+      if (!fullText) {
+        throw new Error("Server tidak mengembalikan jawaban.");
+      }
 
       setMessages((prev) => {
-        const updated = [...prev, aiMessage];
-        if (updated.length > MAX_MESSAGES) {
-          setWasTrimmed(true);
-          return [updated[0], ...updated.slice(-(MAX_MESSAGES - 1))];
-        }
-        return updated;
+        if (prev.length <= MAX_MESSAGES) return prev;
+        setWasTrimmed(true);
+        return [prev[0], ...prev.slice(-(MAX_MESSAGES - 1))];
       });
       setHistory((prev) => {
-        const updated = [...prev, { role: "user" as const, content: question }, { role: "assistant" as const, content: data.answer }];
+        const updated = [...prev, { role: "user" as const, content: question }, { role: "assistant" as const, content: fullText }];
         return updated.slice(-MAX_HISTORY);
       });
     } catch (err: any) {
-      setError(err.message || "Gagal menghubungi server AI.");
+      if (err.name !== "AbortError") {
+        setError(err.message || "Gagal menghubungi server AI.");
+        if (aiMessageId) {
+          const failedId = aiMessageId;
+          setMessages((prev) => prev.filter((m) => m.id !== failedId));
+        }
+      }
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setIsTyping(false);
     }
   };
