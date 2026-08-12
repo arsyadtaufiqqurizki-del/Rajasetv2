@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Sparkles, Trash2 } from "lucide-react";
+import { Send, Bot, User, Sparkles, Trash2, Database, MessageCircle } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const CLOUD_RUN_URL = import.meta.env.VITE_AI_SERVER_URL;
 const STORAGE_KEY_MESSAGES = "ai_assistant_messages";
 const STORAGE_KEY_HISTORY = "ai_assistant_history";
 const STORAGE_KEY_TRIMMED = "ai_assistant_trimmed";
+const STORAGE_KEY_MODE = "ai_assistant_mode";
 const MAX_MESSAGES = 21; // 1 welcome + 20 chat
 const MAX_HISTORY = 20;  // 10 pasang user-AI (disimpan untuk tampilan/localStorage)
 const HISTORY_SEND_LIMIT = 8; // 4 pasang terakhir yang benar-benar dikirim ke model
@@ -61,6 +62,7 @@ export default function AIAssistant() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [wasTrimmed, setWasTrimmed] = useState(() => localStorage.getItem(STORAGE_KEY_TRIMMED) === "true");
+  const [mode, setMode] = useState<"data" | "chat">(() => (localStorage.getItem(STORAGE_KEY_MODE) === "chat" ? "chat" : "data"));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -94,6 +96,10 @@ export default function AIAssistant() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_TRIMMED, String(wasTrimmed));
   }, [wasTrimmed]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_MODE, mode);
+  }, [mode]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -144,7 +150,7 @@ export default function AIAssistant() {
       const response = await fetch(`${CLOUD_RUN_URL}/chat`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question, history: history.slice(-HISTORY_SEND_LIMIT) }),
+        body: JSON.stringify({ question, history: history.slice(-HISTORY_SEND_LIMIT), mode }),
         signal: controller.signal,
       });
 
@@ -340,7 +346,35 @@ export default function AIAssistant() {
         </div>
         <div className="flex-1">
           <h2 className="font-semibold text-on-surface">Data Assistant</h2>
-          <p className="text-xs text-on-surface-variant">Tanya seputar data inventaris & maintenance</p>
+          <p className="text-xs text-on-surface-variant">
+            {mode === "data" ? "Tanya seputar data inventaris & maintenance" : "Ngobrol santai, tanpa akses data aset"}
+          </p>
+        </div>
+        <div className="flex items-center rounded-full border border-outline-variant bg-surface p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => setMode("data")}
+            disabled={isTyping}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+              mode === "data" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
+            )}
+          >
+            <Database className="h-3.5 w-3.5" />
+            Data
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("chat")}
+            disabled={isTyping}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+              mode === "chat" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
+            )}
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Chat
+          </button>
         </div>
         <button
           onClick={() => setShowConfirmClear(true)}

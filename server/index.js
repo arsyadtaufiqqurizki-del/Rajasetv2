@@ -136,43 +136,50 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', async () => {
       try {
-        const { question, history = [] } = JSON.parse(body);
+        const { question, history = [], mode = 'data' } = JSON.parse(body);
 
         if (!question) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ error: 'question is required' }));
         }
 
-        const { assets, maintenance, agg } = await getAssetData();
+        let systemPrompt;
 
-        const totalAssets = assets.length;
-        const activeAssets = assets.filter(a => a.status?.toLowerCase() === 'active').length;
-        const brokenAssets = assets.filter(a => a.status?.toLowerCase() === 'broken').length;
-        const inMaintenance = assets.filter(a => a.status?.toLowerCase().includes('maintenance')).length;
-        const pendingMaint = maintenance.filter(m => m.status?.toLowerCase() === 'pending').length;
-        const doneMaint = maintenance.filter(m => m.status?.toLowerCase() === 'done').length;
+        if (mode === 'chat') {
+          systemPrompt = `Kamu adalah asisten AI untuk dashboard manajemen aset perusahaan Raja, sedang dalam mode chat biasa.
+Jawab dalam Bahasa Indonesia dengan ramah dan ringkas. Kamu TIDAK punya akses ke data aset/maintenance saat ini.
+Jika user menanyakan hal spesifik soal data aset (jumlah, biaya, status, dsb), sarankan mereka mengaktifkan mode "Data" agar bisa dijawab dengan akurat.`;
+        } else {
+          const { assets, maintenance, agg } = await getAssetData();
 
-        const assetsCsv = toCsv(
-          assets.map(a => ({
-            no: a.asset_number, deskripsi: a.asset_description,
-            kategori1: a.category_segment1, kategori2: a.category_segment2,
-            subsidiary: a.subsidiary, status: a.status,
-            biaya: a.asset_cost, unit: a.asset_units,
-            tgl_pakai: a.date_place_in_service,
-          })),
-          ['no', 'deskripsi', 'kategori1', 'kategori2', 'subsidiary', 'status', 'biaya', 'unit', 'tgl_pakai']
-        );
+          const totalAssets = assets.length;
+          const activeAssets = assets.filter(a => a.status?.toLowerCase() === 'active').length;
+          const brokenAssets = assets.filter(a => a.status?.toLowerCase() === 'broken').length;
+          const inMaintenance = assets.filter(a => a.status?.toLowerCase().includes('maintenance')).length;
+          const pendingMaint = maintenance.filter(m => m.status?.toLowerCase() === 'pending').length;
+          const doneMaint = maintenance.filter(m => m.status?.toLowerCase() === 'done').length;
 
-        const maintenanceCsv = toCsv(
-          maintenance.map(m => ({
-            no: m.asset_number, deskripsi: m.asset_description,
-            service: m.service_type, status: m.status,
-            jadwal: m.scheduled_date, estimasi: m.estimate_cost, aktual: m.actual_cost,
-          })),
-          ['no', 'deskripsi', 'service', 'status', 'jadwal', 'estimasi', 'aktual']
-        );
+          const assetsCsv = toCsv(
+            assets.map(a => ({
+              no: a.asset_number, deskripsi: a.asset_description,
+              kategori1: a.category_segment1, kategori2: a.category_segment2,
+              subsidiary: a.subsidiary, status: a.status,
+              biaya: a.asset_cost, unit: a.asset_units,
+              tgl_pakai: a.date_place_in_service,
+            })),
+            ['no', 'deskripsi', 'kategori1', 'kategori2', 'subsidiary', 'status', 'biaya', 'unit', 'tgl_pakai']
+          );
 
-        const systemPrompt = `Kamu adalah asisten AI untuk dashboard manajemen aset perusahaan Raja.
+          const maintenanceCsv = toCsv(
+            maintenance.map(m => ({
+              no: m.asset_number, deskripsi: m.asset_description,
+              service: m.service_type, status: m.status,
+              jadwal: m.scheduled_date, estimasi: m.estimate_cost, aktual: m.actual_cost,
+            })),
+            ['no', 'deskripsi', 'service', 'status', 'jadwal', 'estimasi', 'aktual']
+          );
+
+          systemPrompt = `Kamu adalah asisten AI untuk dashboard manajemen aset perusahaan Raja.
 Jawab pertanyaan user berdasarkan data berikut. Jawab dalam Bahasa Indonesia, ringkas dan akurat.
 Untuk pertanyaan soal nilai tertinggi/terendah/top-N, PRIORITASKAN angka dari bagian "AGREGAT" di bawah (sudah dihitung akurat) daripada menghitung ulang dari data mentah.
 
@@ -200,6 +207,7 @@ ${assetsCsv}
 
 === DATA MAINTENANCE (CSV) ===
 ${maintenanceCsv}`;
+        }
 
         const mimoRes = await fetch(`${MIMO_BASE_URL}/v1/messages`, {
           method: 'POST',
