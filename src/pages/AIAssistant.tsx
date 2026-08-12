@@ -27,7 +27,7 @@ const defaultMessages: Message[] = [
   {
     id: "1",
     role: "ai",
-    content: "Halo! Saya adalah Asisten AI Anda. Anda bisa menanyakan apa saja seputar data aset, jadwal maintenance, atau laporan kondisi barang di Perusahaan Raja.",
+    content: "Halo! Saya adalah Asisten AI Anda. Anda bisa menanyakan apa saja seputar data aset, jadwal maintenance, atau laporan kondisi barang di Perusahaan Raja. Gunakan mode Data untuk pertanyaan seputar data aset, atau mode Chat untuk ngobrol santai tanpa akses data — bisa diganti lewat tombol di kanan atas.",
     timestamp: new Date()
   }
 ];
@@ -113,7 +113,7 @@ export default function AIAssistant() {
     const fresh: Message[] = [{
       id: Date.now().toString(),
       role: "ai",
-      content: "Halo! Saya adalah Asisten AI Anda. Anda bisa menanyakan apa saja seputar data aset, jadwal maintenance, atau laporan kondisi barang di Perusahaan Raja.",
+      content: "Halo! Saya adalah Asisten AI Anda. Anda bisa menanyakan apa saja seputar data aset, jadwal maintenance, atau laporan kondisi barang di Perusahaan Raja. Gunakan mode Data untuk pertanyaan seputar data aset, atau mode Chat untuk ngobrol santai tanpa akses data — bisa diganti lewat tombol di kanan atas.",
       timestamp: new Date()
     }];
     setMessages(fresh);
