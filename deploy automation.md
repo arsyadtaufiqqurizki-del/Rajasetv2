@@ -41,7 +41,7 @@ Bukan blocking untuk fitur, tapi **quick win** — effort kecil (2 file workflow
 1. ✅ Workload Identity Federation dibuat di GCP project `raja-dashboard-ai` (pool + provider + service account + IAM bindings, dibatasi ke repo ini saja).
 2. ✅ Cloudflare API Token dibuat manual via dashboard (scope Workers Scripts: Edit), disimpan sebagai GitHub Secret.
 3. ✅ `.github/workflows/deploy-backend.yml` dan `.github/workflows/deploy-frontend.yml` ditulis sesuai rencana di atas.
-4. ⏳ Test push kecil ke masing-masing path — commit ini sekaligus jadi test pertama untuk kedua workflow.
+4. ✅ Tervalidasi via push nyata: backend sukses di percobaan pertama (revisi `raja-ai-server-00016-mvg`); frontend awalnya gagal karena `deploy-frontend.yml` pakai Node 20 sementara project butuh Wrangler ^4.112.0 (minimal Node 22) — wrangler-action fallback ke versi 3.90.0 yang gak support config `assets`-only, error "Missing entry-point". Fix: node-version dinaikkan ke 22, deploy sukses. Path filter juga terkonfirmasi: push yang cuma ubah `deploy-frontend.yml` hanya men-trigger workflow frontend.
 5. ✅ Rollback manual didokumentasikan di bawah.
 
 ## Rollback darurat
