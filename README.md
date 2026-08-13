@@ -26,7 +26,7 @@ Skema database dikelola lewat migration di `supabase/migrations/`:
 - `create_report_history` (+ migration `add_delete_policy_to_report_history`) — tabel riwayat laporan yang di-generate dari halaman Reports.
 
 State pada sisi klien dikelola per-domain melalui React Context, masing-masing membungkus query/mutasi Supabase:
-- **`AssetContext.tsx`** — data aset dan master data referensi (subsidiary, kategori 1 & 2), termasuk import/export CSV massal dengan proteksi CSV injection dan timestamp `lastFetchedAt` untuk indikator "terakhir diperbarui".
+- **`AssetContext.tsx`** — data aset dan master data referensi (subsidiary, kategori 1 & 2 — tampil di UI sebagai "Asset Class"/"Location", lihat catatan di `AGENTS.md` § Known Issues), termasuk import/export CSV massal dengan proteksi CSV injection dan timestamp `lastFetchedAt` untuk indikator "terakhir diperbarui".
 - **`MaintenanceContext.tsx`** — jadwal dan riwayat pemeliharaan aset.
 - **`ReclassificationContext.tsx`** — pengajuan dan verifikasi reklasifikasi kategori/subsidiary aset.
 - **`ReportContext.tsx`** — riwayat laporan yang di-generate (paginasi server-side), simpan dan hapus entri `report_history`.

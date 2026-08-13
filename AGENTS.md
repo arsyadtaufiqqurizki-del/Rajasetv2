@@ -107,7 +107,7 @@ Semua data utama (assets, maintenance_records, asset_reclassifications, report_h
 **AssetContext** (`src/contexts/AssetContext.tsx`)
 - `assets`: Asset[] — fetched dari tabel `assets` (chunked fetch, 1000 rows/page, untuk lewati limit default Supabase)
 - `lastFetchedAt`: Date | null — timestamp update terakhir (initial fetch + setiap CRUD sukses); dipakai Dashboard untuk menampilkan "Terakhir diperbarui"
-- `subsidiaries`, `categories1`, `categories2`: string[] — dari tabel `subsidiaries`, `category_segments_1`, `category_segments_2`
+- `subsidiaries`, `categories1`, `categories2`: string[] — dari tabel `subsidiaries`, `category_segments_1`, `category_segments_2` (nama tabel/kolom DB tidak diubah; di UI ditampilkan sebagai "Asset Class"/"Location" — lihat catatan di Known Issues)
 - CRUD: `addAsset`, `updateAsset`, `deleteAsset`, `deleteMultipleAssets` (batched 100), `deleteAllAssets`
 - Master data: `addSubsidiary`, `deleteSubsidiary`, `addCategory1`, `deleteCategory1`, `addCategory2`, `deleteCategory2` (upsert/delete langsung ke Supabase)
 - Modal state: `isAddModalOpen`, `isEditModalOpen`, `editingAsset`
@@ -156,7 +156,7 @@ RLS: semua authenticated user bisa `SELECT activity_logs`; insert hanya untuk `u
 ### Reports
 
 `Reports.tsx` menghitung 3 jenis report langsung di client dari data `AssetContext`/`MaintenanceContext` yang sudah ter-load (tidak ada query Supabase khusus report):
-- **Asset Valuation Summary** (bar chart): total nilai aset per `categorySegment1`, difilter subsidiary + `datePlaceInService` dalam rentang tanggal
+- **Asset Valuation Summary** (bar chart): total nilai aset per `categorySegment1` (label "Asset Class"), difilter subsidiary + `datePlaceInService` dalam rentang tanggal
 - **Depreciation Schedule** (line chart): nilai buku per kuartal (`getQuartersInRange`) pakai depresiasi garis-lurus (`monthsBetween` vs `lifeInMonths`)
 - **Maintenance Cost Analysis** (composed bar chart): estimated vs actual cost per `serviceType`, dari `maintenance_records` difilter `scheduledDate` dalam rentang
 
@@ -180,8 +180,8 @@ Setiap `generatePreview()` yang sukses otomatis memanggil `saveReport()` (Report
 | assetCost | string | Harga beli (formatted with commas) |
 | datePlaceInService | string | Tanggal mulai digunakan |
 | assetUnits | string | Jumlah unit |
-| categorySegment1 | string | Kategori utama |
-| categorySegment2 | string | Kategori turunan |
+| categorySegment1 | string | Kategori utama — ditampilkan di UI sebagai **"Asset Class"** (Inventory, Dashboard, MasterData, Add/EditAssetModal), tapi nama field/kolom DB (`categorySegment1`/`category_segment1`) tidak diubah |
+| categorySegment2 | string | Kategori turunan — ditampilkan di UI sebagai **"Location"**, nama field/kolom DB tidak diubah |
 | depreciationMethod | string | Metode penyusutan |
 | lifeInMonths | string | Umur ekonomis (bulan), atau "Unlimited" |
 | listed | string | Status listing (Audited/Non-Listed) |
@@ -198,8 +198,8 @@ Setiap `generatePreview()` yang sukses otomatis memanggil `saveReport()` (Report
 | assetDescription | string |
 | assetUnits | string |
 | serviceType | string |
-| assetCategorySegment1 | string |
-| assetCategorySegment2 | string |
+| assetCategorySegment1 | string | UI label: **"Asset Class"** (Maintenance table header), field/kolom DB tidak diubah |
+| assetCategorySegment2 | string | UI label: **"Location"**, field/kolom DB tidak diubah |
 | estimateCost | string |
 | actualCost | string |
 | status | string (Pending/In Progress/Completed/Overdue) |
@@ -302,6 +302,7 @@ PORT                       # default 8080
 - `claudememo.md` masih mendeskripsikan state sebelum migrasi Supabase (login access code, data in-memory) — sudah tidak akurat, jangan dijadikan acuan.
 - `.env.example` tidak sinkron dengan env var yang benar-benar dipakai kode (lihat bagian Environment Variables di atas).
 - `Settings.tsx` murni UI state (tidak ada backend call) — tombol "Save Changes" hanya simulasi `setTimeout`.
+- **UI label vs field/kolom DB tidak sinkron (disengaja)**: per 2026-08-13, label yang ditampilkan user diganti dari "Category Segment 1"/"Category Segment 2" (dan varian "Asset Category Segment 1/2") jadi **"Asset Class"**/**"Location"** di semua halaman (Inventory, Dashboard, Maintenance, MasterData, Add/EditAssetModal). Ini murni perubahan teks tampilan — field TypeScript (`categorySegment1/2`, `assetCategorySegment1/2`) dan kolom/tabel Supabase (`category_segment1/2`, `category_segments_1/2`) **tidak diubah**, supaya tidak perlu migration. Jangan asumsikan nama field mengikuti label UI saat membaca/mengubah kode.
 
 ## Improvement Roadmap
 

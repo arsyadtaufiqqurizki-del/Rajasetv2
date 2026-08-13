@@ -78,7 +78,7 @@ export default function MasterData() {
         {/* Categories 1 */}
         <div className="bg-surface border border-outline-variant rounded-xl shadow-sm overflow-hidden flex flex-col h-[500px]">
           <div className="p-4 border-b border-outline-variant bg-surface-container-low">
-            <h2 className="text-lg font-medium text-on-surface">Category Segment 1</h2>
+            <h2 className="text-lg font-medium text-on-surface">Asset Class</h2>
           </div>
           <div className="p-4 border-b border-outline-variant">
             <form onSubmit={handleAddCat1} className="flex gap-2">
@@ -114,7 +114,7 @@ export default function MasterData() {
         {/* Categories 2 */}
         <div className="bg-surface border border-outline-variant rounded-xl shadow-sm overflow-hidden flex flex-col h-[500px]">
           <div className="p-4 border-b border-outline-variant bg-surface-container-low">
-            <h2 className="text-lg font-medium text-on-surface">Category Segment 2</h2>
+            <h2 className="text-lg font-medium text-on-surface">Location</h2>
           </div>
           <div className="p-4 border-b border-outline-variant">
             <form onSubmit={handleAddCat2} className="flex gap-2">

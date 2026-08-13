@@ -302,8 +302,8 @@ export default function Maintenance() {
                   <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Asset Description</th>
                   <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Asset Units</th>
                   <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Service Type</th>
-                  <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Asset Category Segment 1</th>
-                  <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Asset Category Segment 2</th>
+                  <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Asset Class</th>
+                  <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Location</th>
                   <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Estimate Cost</th>
                   <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Actual Cost</th>
                   <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant">Status</th>

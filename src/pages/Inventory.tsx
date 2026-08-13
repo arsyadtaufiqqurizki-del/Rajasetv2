@@ -1,21 +1,34 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { logActivity } from '../lib/activityLogger';
-import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, FileDown, CheckCircle, XCircle, Loader2, Plus } from 'lucide-react';
+import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, FileDown, CheckCircle, XCircle, Loader2, Plus, X } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useAsset } from '../contexts/AssetContext';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import Papa from 'papaparse';
 
+function parseListParam(searchParams: URLSearchParams, key: string): string[] {
+  const raw = searchParams.get(key);
+  return raw ? raw.split(',').filter(Boolean) : [];
+}
+
 export default function Inventory() {
-  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, addAsset } = useAsset();
-  
+  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, addAsset } = useAsset();
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const [filterSubsidiary, setFilterSubsidiary] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [filterSubsidiary, setFilterSubsidiary] = useState<string[]>(() => parseListParam(searchParams, 'subsidiary'));
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
-  const [filterCategory, setFilterCategory] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string[]>(() => parseListParam(searchParams, 'category'));
+  const [filterLocation, setFilterLocation] = useState<string[]>(() => parseListParam(searchParams, 'location'));
+  const [filterStatus, setFilterStatus] = useState<string[]>(() => parseListParam(searchParams, 'status'));
+  const [dateFrom, setDateFrom] = useState(() => searchParams.get('dateFrom') || "");
+  const [dateTo, setDateTo] = useState(() => searchParams.get('dateTo') || "");
+  const [costMin, setCostMin] = useState(() => searchParams.get('costMin') || "");
+  const [costMax, setCostMax] = useState(() => searchParams.get('costMax') || "");
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || "");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() => searchParams.get('q') || "");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -58,6 +71,24 @@ export default function Inventory() {
 
   const uniqueStatuses = useMemo(() => Array.from(new Set(assets.map(a => a.status).filter(Boolean))), [assets]);
 
+  const activeFilters = useMemo(() => {
+    const chips: { id: string; label: string; onRemove: () => void }[] = [];
+    filterSubsidiary.forEach(v => chips.push({ id: `sub-${v}`, label: `Subsidiary: ${v}`, onRemove: () => setFilterSubsidiary(prev => prev.filter(x => x !== v)) }));
+    filterCategory.forEach(v => chips.push({ id: `cat-${v}`, label: `Asset Class: ${v}`, onRemove: () => setFilterCategory(prev => prev.filter(x => x !== v)) }));
+    filterLocation.forEach(v => chips.push({ id: `loc-${v}`, label: `Location: ${v}`, onRemove: () => setFilterLocation(prev => prev.filter(x => x !== v)) }));
+    filterStatus.forEach(v => chips.push({ id: `status-${v}`, label: `Status: ${v}`, onRemove: () => setFilterStatus(prev => prev.filter(x => x !== v)) }));
+    if (dateFrom || dateTo) {
+      chips.push({ id: 'date', label: `Date: ${dateFrom || '…'} → ${dateTo || '…'}`, onRemove: () => { setDateFrom(""); setDateTo(""); } });
+    }
+    if (costMin || costMax) {
+      chips.push({ id: 'cost', label: `Cost: ${costMin || '0'} - ${costMax || '∞'}`, onRemove: () => { setCostMin(""); setCostMax(""); } });
+    }
+    if (debouncedSearchQuery) {
+      chips.push({ id: 'search', label: `Search: "${debouncedSearchQuery}"`, onRemove: () => setSearchQuery("") });
+    }
+    return chips;
+  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -69,20 +100,43 @@ export default function Inventory() {
   // Reset page to 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterSubsidiary, filterCategory, filterStatus, debouncedSearchQuery]);
+  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
+
+  // Sync filters to URL query params
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterSubsidiary.length > 0) params.set('subsidiary', filterSubsidiary.join(','));
+    if (filterCategory.length > 0) params.set('category', filterCategory.join(','));
+    if (filterLocation.length > 0) params.set('location', filterLocation.join(','));
+    if (filterStatus.length > 0) params.set('status', filterStatus.join(','));
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (costMin) params.set('costMin', costMin);
+    if (costMax) params.set('costMax', costMax);
+    if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
+    setSearchParams(params, { replace: true });
+  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery, setSearchParams]);
 
   const filteredAssets = useMemo(() => {
+    const min = costMin === "" ? null : parseFloat(costMin);
+    const max = costMax === "" ? null : parseFloat(costMax);
     return assets.filter(asset => {
-      const matchSubsidiary = filterSubsidiary ? asset.subsidiary === filterSubsidiary : true;
-      const matchCategory = filterCategory ? asset.categorySegment1 === filterCategory : true;
-      const matchStatus = filterStatus ? asset.status === filterStatus : true;
-      const matchSearch = debouncedSearchQuery 
-        ? asset.assetDescription.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) || 
+      const matchSubsidiary = filterSubsidiary.length === 0 || filterSubsidiary.includes(asset.subsidiary);
+      const matchCategory = filterCategory.length === 0 || filterCategory.includes(asset.categorySegment1);
+      const matchLocation = filterLocation.length === 0 || filterLocation.includes(asset.categorySegment2);
+      const matchStatus = filterStatus.length === 0 || filterStatus.includes(asset.status);
+      const matchDateFrom = dateFrom === "" || asset.datePlaceInService >= dateFrom;
+      const matchDateTo = dateTo === "" || asset.datePlaceInService <= dateTo;
+      const cost = parseFloat(asset.assetCost.replace(/[^0-9.-]+/g, "")) || 0;
+      const matchCostMin = min === null || cost >= min;
+      const matchCostMax = max === null || cost <= max;
+      const matchSearch = debouncedSearchQuery
+        ? asset.assetDescription.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
           asset.assetNumber.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
         : true;
-      return matchSubsidiary && matchCategory && matchStatus && matchSearch;
+      return matchSubsidiary && matchCategory && matchLocation && matchStatus && matchDateFrom && matchDateTo && matchCostMin && matchCostMax && matchSearch;
     });
-  }, [assets, filterSubsidiary, filterCategory, filterStatus, debouncedSearchQuery]);
+  }, [assets, filterSubsidiary, filterCategory, filterLocation, filterStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAssets.length / itemsPerPage));
   
@@ -329,65 +383,125 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant flex flex-wrap gap-4 items-center shadow-sm">
-        <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
-          <Filter className="h-4 w-4" /> Filters
-        </span>
-        <div className="flex-1 flex flex-wrap gap-2.5">
-          <div className="relative min-w-[200px] flex-1 sm:flex-none">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-               <Search className="h-4 w-4 text-on-surface-variant" />
+      <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant flex flex-col gap-3 shadow-sm">
+        <div className="flex flex-wrap gap-4 items-center">
+          <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
+            <Filter className="h-4 w-4" /> Filters
+            {activeFilters.length > 0 && (
+              <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold normal-case tracking-normal">
+                {activeFilters.length}
+              </span>
+            )}
+          </span>
+          <div className="flex-1 flex flex-wrap gap-2.5 items-center">
+            <div className="relative min-w-[200px] flex-1 sm:flex-none">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                 <Search className="h-4 w-4 text-on-surface-variant" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search by ID or Description..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Search by ID or Description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+            <MultiSelectDropdown
+              placeholder="All Subsidiaries"
+              options={subsidiaries}
+              selected={filterSubsidiary}
+              onChange={setFilterSubsidiary}
             />
+            <MultiSelectDropdown
+              placeholder="All Asset Classes"
+              options={categories1}
+              selected={filterCategory}
+              onChange={setFilterCategory}
+            />
+            <MultiSelectDropdown
+              placeholder="All Locations"
+              options={categories2}
+              selected={filterLocation}
+              onChange={setFilterLocation}
+            />
+            <MultiSelectDropdown
+              placeholder="All Statuses"
+              options={uniqueStatuses}
+              selected={filterStatus}
+              onChange={setFilterStatus}
+            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                aria-label="Date place in service from"
+                className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+              />
+              <span className="text-xs text-on-surface-variant">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                aria-label="Date place in service to"
+                className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                placeholder="Min cost"
+                value={costMin}
+                onChange={(e) => setCostMin(e.target.value)}
+                className="w-28 bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+              />
+              <span className="text-xs text-on-surface-variant">-</span>
+              <input
+                type="number"
+                placeholder="Max cost"
+                value={costMax}
+                onChange={(e) => setCostMax(e.target.value)}
+                className="w-28 bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+              />
+            </div>
           </div>
-          <select 
-            value={filterSubsidiary}
-            onChange={(e) => setFilterSubsidiary(e.target.value)}
-            className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+          <button
+            onClick={() => {
+              setFilterSubsidiary([]);
+              setFilterCategory([]);
+              setFilterLocation([]);
+              setFilterStatus([]);
+              setDateFrom("");
+              setDateTo("");
+              setCostMin("");
+              setCostMax("");
+              setSearchQuery("");
+            }}
+            className="text-sm font-medium text-secondary hover:text-primary transition-colors"
           >
-            <option value="">All Subsidiaries</option>
-            {subsidiaries.map(sub => (
-              <option key={sub} value={sub}>{sub}</option>
-            ))}
-          </select>
-          <select 
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-          >
-            <option value="">All Categories</option>
-            {categories1.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-          <select 
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-          >
-            <option value="">All Statuses</option>
-            {uniqueStatuses.map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
+            Clear Filters
+          </button>
         </div>
-        <button 
-          onClick={() => {
-            setFilterSubsidiary("");
-            setFilterCategory("");
-            setFilterStatus("");
-            setSearchQuery("");
-          }}
-          className="text-sm font-medium text-secondary hover:text-primary transition-colors"
-        >
-          Clear Filters
-        </button>
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {activeFilters.map(chip => (
+              <span
+                key={chip.id}
+                className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant rounded-full pl-3 pr-1.5 py-1 text-xs text-on-surface"
+              >
+                {chip.label}
+                <button
+                  type="button"
+                  onClick={chip.onRemove}
+                  className="p-0.5 rounded-full hover:bg-surface-container-highest text-on-surface-variant hover:text-error transition-colors"
+                  aria-label={`Remove filter ${chip.label}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex-1 flex flex-col overflow-hidden">
@@ -411,8 +525,8 @@ export default function Inventory() {
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider text-right">Asset Cost</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Date Place in Service</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Units</th>
-                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Category Segment 1</th>
-                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Category Segment 2</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Class</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Location</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Depreciation Method</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Life in Months</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Listed</th>
@@ -645,7 +759,7 @@ export default function Inventory() {
                   onClick={async () => {
                     if (deleteConfirmText === 'DELETE') {
                       const total = selectedAssets.size;
-                      const noFilters = !filterSubsidiary && !filterCategory && !filterStatus && !debouncedSearchQuery;
+                      const noFilters = filterSubsidiary.length === 0 && filterCategory.length === 0 && filterLocation.length === 0 && filterStatus.length === 0 && !dateFrom && !dateTo && !costMin && !costMax && !debouncedSearchQuery;
                       const allSelected = selectedAssets.size === filteredAssets.length;
 
                       setIsDeleteModalOpen(false);

@@ -178,7 +178,7 @@ export default function AddAssetModal() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Category Segment 1</label>
+              <label className="text-sm font-semibold text-on-surface">Asset Class</label>
               <AutocompleteInput 
                 name="categorySegment1"
                 value={formData.categorySegment1}
@@ -188,7 +188,7 @@ export default function AddAssetModal() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Category Segment 2</label>
+              <label className="text-sm font-semibold text-on-surface">Location</label>
               <AutocompleteInput 
                 name="categorySegment2"
                 value={formData.categorySegment2}

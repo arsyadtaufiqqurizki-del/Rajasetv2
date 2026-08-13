@@ -308,7 +308,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col mt-2">
               <span className="text-2xl font-bold text-primary">{assets.length}</span>
-              <span className="text-xs text-on-surface-variant">Category Segment 1</span>
+              <span className="text-xs text-on-surface-variant">Asset Class</span>
             </div>
           </div>
           <div className="flex flex-wrap justify-center gap-3 mt-4">
@@ -436,8 +436,8 @@ export default function Dashboard() {
                 <th className="p-3 text-right">Asset Cost</th>
                 <th className="p-3">Date Place in Service</th>
                 <th className="p-3">Asset Units</th>
-                <th className="p-3">Category Segment 1</th>
-                <th className="p-3">Category Segment 2</th>
+                <th className="p-3">Asset Class</th>
+                <th className="p-3">Location</th>
                 <th className="p-3">Depreciation Method</th>
                 <th className="p-3 text-center">Life in Months</th>
                 <th className="p-3">Listed</th>
