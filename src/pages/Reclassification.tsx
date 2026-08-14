@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2 } from 'lucide-react';
+import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2, Wrench } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useReclassification } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
@@ -151,6 +151,17 @@ export default function Reclassification() {
     });
   }, [assets, syncFromAssets]);
 
+  // Flip to false to re-enable once the sync flow is ready to ship.
+  const SYNC_FROM_ASSETS_UNDER_MAINTENANCE = true;
+
+  const handleSyncFromAssetsClick = useCallback(() => {
+    if (SYNC_FROM_ASSETS_UNDER_MAINTENANCE) {
+      alert('Fitur "Sync from Assets" sedang dalam maintenance dan belum bisa dipakai. Akan tersedia kembali nanti.');
+      return;
+    }
+    handleSyncFromAssets();
+  }, [handleSyncFromAssets]);
+
   const handleEdit = useCallback((item: any) => {
     setEditingReclassification(item);
     setIsEditModalOpen(true);
@@ -203,13 +214,25 @@ export default function Reclassification() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={handleSyncFromAssets}
-            disabled={syncModal.isOpen && syncModal.status === 'syncing'}
-            className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Tambahkan asset dari Inventory yang belum tertaut sebagai baseline audit"
+            onClick={handleSyncFromAssetsClick}
+            disabled={!SYNC_FROM_ASSETS_UNDER_MAINTENANCE && syncModal.isOpen && syncModal.status === 'syncing'}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
+              SYNC_FROM_ASSETS_UNDER_MAINTENANCE
+                ? "bg-surface border border-dashed border-outline-variant text-on-surface-variant/70 hover:text-on-surface-variant hover:border-outline-variant"
+                : "bg-surface border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary"
+            )}
+            title={SYNC_FROM_ASSETS_UNDER_MAINTENANCE
+              ? 'Fitur sedang dalam maintenance'
+              : 'Tambahkan asset dari Inventory yang belum tertaut sebagai baseline audit'}
           >
-            <RefreshCw className="h-4 w-4" />
+            {SYNC_FROM_ASSETS_UNDER_MAINTENANCE ? <Wrench className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
             Sync from Assets
+            {SYNC_FROM_ASSETS_UNDER_MAINTENANCE && (
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded bg-amber-100 text-amber-800 border border-amber-200">
+                Maintenance
+              </span>
+            )}
           </button>
           <button
             onClick={handleExportCSV}
