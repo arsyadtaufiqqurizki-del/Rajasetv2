@@ -71,15 +71,23 @@ const GUIDE_CONTENT = [
     content: [
       {
         question: "What is the Reclassification page for?",
-        answer: "It's where you record physical audit findings — asset category, description, location, unit, ownership, and remarks — whenever what you find on the ground differs from what's in the system."
+        answer: "It's where you audit assets against Asset Inventory. Click \"Tambah Item\" and pick an existing asset from Inventory by searching its asset number or description — you don't type in its details, those are pulled live from Inventory. You just set the audit classification (Asset, Needs Review, Inventory, or a custom category) and optional remarks."
+      },
+      {
+        question: "Why can't I edit the asset description, category, location, or ownership here?",
+        answer: "For items linked to Asset Inventory (shown with a \"Linked\" badge), those fields always mirror the live data from Inventory, so they're read-only here — update the asset itself on the Inventory page instead. Only the classification and remarks belong to the reclassification record. A handful of older rows created before this change are unlinked, shown with a \"Manual\" badge, and remain fully editable."
       },
       {
         question: "How do I verify a reclassification item?",
         answer: "Click the Verified/Unverified badge on a row to open the verification dialog. Confirming it stamps the item with the verification date and the name of the verifying user."
       },
       {
+        question: "What does \"Sync from Assets\" do?",
+        answer: "It's meant to bulk-link every Inventory asset that doesn't have a reclassification row yet, so you don't have to add them one by one. It's currently marked under maintenance — clicking it just shows a notice instead of running."
+      },
+      {
         question: "Can I import or export reclassification data?",
-        answer: "Yes, the same way as Asset Inventory: download the template, import up to 5000 rows with a progress modal and a downloadable report of any invalid rows, or export the current list to CSV."
+        answer: "You can export the current (filtered) list to CSV. CSV import and the downloadable template were removed, since every new item now has to be linked to an existing asset rather than bulk-created from free text."
       },
       {
         question: "How do I delete multiple items at once?",

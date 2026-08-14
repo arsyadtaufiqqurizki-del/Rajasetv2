@@ -43,9 +43,12 @@ Icon baru yang perlu di-import dari `lucide-react` (sudah dipakai di `Layout.tsx
 ## Draft Konten per Section Baru
 
 ### 4. Reclassification
-- Apa itu Reclassification? → mencatat temuan audit fisik aset (kategori, lokasi, unit, kepemilikan, remarks) yang beda dari sistem
+> **Update 14 Agustus 2026**: draft awal di bawah ini basi — sejak fitur ini diubah jadi "selalu tertaut ke Asset Inventory", Guide.tsx sudah disesuaikan langsung. Ringkasan kondisi sekarang:
+- Apa itu Reclassification? → audit aset terhadap Asset Inventory. "Tambah Item" = pilih asset dari Inventory (search asset number/deskripsi), bukan input manual — field identitas (deskripsi/kategori/lokasi/ownership) ikut live dari Inventory, yang diisi manual cuma klasifikasi audit (Asset/Needs Review/Inventory/custom) + remarks
+- Kenapa field asset tidak bisa diedit? → untuk baris "Linked", field itu selalu ikut data Inventory (read-only di sini, edit di halaman Inventory). Baris lama sebelum perubahan ini ("Manual") tetap bisa diedit penuh
 - Bagaimana verifikasi item? → klik badge Verified/Unverified per baris, buka VerifyReclassificationModal, tercatat tanggal + nama verifier
-- Bisa import/export CSV? → ya, sama seperti Inventory (template, max 5000 baris, progress modal, invalid-row report)
+- Apa itu "Sync from Assets"? → bulk-link semua asset Inventory yang belum tertaut; **saat ini ditandai under maintenance**, klik hanya menampilkan notif, belum berfungsi
+- Bisa import/export CSV? → hanya Export CSV. Import CSV & Download Template sudah dihapus (14 Agustus 2026) karena item baru wajib tertaut ke asset yang sudah ada
 - Bulk delete? → pilih banyak baris, ketik "DELETE" untuk konfirmasi
 - Filter apa saja yang tersedia? → kategori, status verifikasi, kepemilikan, search
 
