@@ -8,7 +8,7 @@ Berdasarkan struktur dan kebutuhan umum pada sistem manajemen aset, berikut adal
 - [x] **Memoization:** Gunakan `useMemo` untuk hasil data yang difilter dan `useCallback` untuk fungsi *handlers* (seperti edit/delete) untuk mencegah *re-render* komponen anak yang tidak perlu.
 
 ## 2. Pengalaman Pengguna (User Experience / UX)
-- **Advanced Filtering & Multi-Sorting:** Kembangkan filter agar pengguna bisa menyaring data berdasarkan beberapa kriteria sekaligus (misalnya: filter Kategori "Elektronik" dengan Status "Aktif" secara bersamaan), serta kemampuan *sorting* di setiap header kolom tabel.
+- [x] **Advanced Filtering:** Filter multi-kriteria sekaligus (Subsidiary, Asset Class, Location, Status — multi-select, bisa gabung beberapa nilai per kategori), plus filter Date Place in Service (range) dan Asset Cost (range). Dilengkapi active filter chips (removable per nilai), badge jumlah filter aktif, dan persistence ke URL query params. Lihat `inventory filter system.md`. *(Multi-Sorting di header kolom tabel belum dikerjakan.)*
 - **Bulk Actions (Aksi Massal):** Tambahkan fitur checkbox di tiap baris agar pengguna dapat melakukan aksi massal seperti *Bulk Delete*, *Bulk Update Status*, atau *Bulk Export*.
 - **Export & Import Data:** Sediakan opsi untuk mengekspor data aset ke format CSV/Excel untuk kebutuhan pelaporan, serta opsi Import via CSV untuk memudahkan *mass-upload* aset baru.
 - **Visualisasi/Foto Aset:** Tambahkan dukungan upload gambar agar setiap entri aset memiliki foto aslinya atau lampiran dokumen (seperti *invoice* atau *manual book*).

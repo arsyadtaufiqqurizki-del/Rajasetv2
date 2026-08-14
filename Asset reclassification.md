@@ -2,9 +2,11 @@
 
 ## Overview
 
-Fitur audit fisik aset (stock opname) yang **independen** dari tabel `assets` yang sudah ada — tidak pakai foreign key ke `assets.id`. Tujuannya: mencatat temuan fisik apa adanya (termasuk barang yang belum terdaftar di sistem), lalu mengklasifikasikan tiap temuan sebagai Aset / Perlu Ditinjau / Inventaris / kategori custom, dan menandai status verifikasinya.
+Fitur audit fisik aset (stock opname) yang **selalu tertaut ke tabel `assets`**. Setiap baris reclassification mewakili satu aset dari Asset Inventory yang sedang diaudit: auditor memilih aset yang sudah terdaftar, lalu mengklasifikasikan hasil temuannya sebagai Aset / Perlu Ditinjau / Inventaris / kategori custom, dan menandai status verifikasinya.
 
-Keputusan desain: dibuat terpisah (bukan extend tabel `assets`) karena saat audit fisik banyak temuan yang belum tentu ada di sistem — memaksa link ke `assets.id` menyulitkan pencatatan barang yang belum terdaftar. Konsekuensinya, rekonsiliasi antara hasil audit vs data aset utama dilakukan manual (laporan terpisah), bukan otomatis lewat relasi database.
+**Perubahan arah desain (14 Agustus 2026):** versi awal fitur ini (Juli 2026) sengaja dibuat independen dari `assets` — tanpa FK, murni free-text — supaya barang yang belum terdaftar di sistem tetap bisa dicatat saat audit fisik. Setelah didiskusikan, arah ini diubah: audit sekarang **selalu berbasis aset yang sudah ada di Inventory** (mirip pola `AddMaintenanceModal.tsx` — pilih asset dari dropdown pencarian, bukan input manual). Konsekuensinya, temuan barang yang benar-benar belum terdaftar di sistem **tidak bisa lagi dicatat lewat fitur ini** — itu perlu didaftarkan dulu sebagai Asset di Inventory, baru bisa diaudit di sini.
+
+Baris-baris lama (dibuat sebelum perubahan ini, ~128 item, `asset_id IS NULL`) tetap ada apa adanya dan tetap bisa diedit/dihapus/diverifikasi seperti biasa — hanya jalur pembuatan baris **baru** yang berubah.
 
 ---
 
@@ -15,13 +17,16 @@ Keputusan desain: dibuat terpisah (bukan extend tabel `assets`) karena saat audi
 ```sql
 CREATE TABLE asset_reclassifications (
   id                 UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  asset_category     TEXT,              -- kategori aset (mis. Elektronik, Furniture) - free text
-  asset_description  TEXT NOT NULL,     -- deskripsi item yang ditemukan
-  location           TEXT,              -- lokasi fisik saat ditemukan
-  unit               NUMERIC,           -- jumlah unit
-  ownership          TEXT,              -- milik entitas/departemen mana
+  asset_id           UUID REFERENCES assets(id) ON DELETE SET NULL,
+                                         -- ditambahkan 14 Agustus 2026; NULL = baris lama/manual
+  asset_category     TEXT,              -- fallback untuk baris tanpa asset_id (legacy)
+  asset_description  TEXT,              -- nullable (sejak 14 Agustus 2026) — baris linked tidak mengisi ini
+  location           TEXT,              -- fallback untuk baris tanpa asset_id (legacy)
+  unit               NUMERIC,           -- fallback untuk baris tanpa asset_id (legacy)
+  ownership          TEXT,              -- fallback untuk baris tanpa asset_id (legacy)
   category           TEXT NOT NULL DEFAULT 'Needs Review',
-                                         -- hasil klasifikasi: 'Asset' | 'Needs Review' | 'Inventory' | custom
+                                         -- hasil klasifikasi audit: 'Asset' | 'Needs Review' | 'Inventory' | custom
+  remarks            TEXT,              -- catatan audit, selalu milik reclassification (bukan dari asset)
   verified           BOOLEAN NOT NULL DEFAULT false,
   verification_date  TIMESTAMPTZ,       -- diisi saat verified = true
   verified_by        TEXT,              -- nama user yang memverifikasi
@@ -33,159 +38,93 @@ CREATE TABLE asset_reclassifications (
 CREATE INDEX idx_reclass_category ON asset_reclassifications(category);
 CREATE INDEX idx_reclass_verified ON asset_reclassifications(verified);
 CREATE INDEX idx_reclass_created_at ON asset_reclassifications(created_at DESC);
+CREATE INDEX idx_reclass_asset_id ON asset_reclassifications(asset_id);
 ```
 
-**RLS**: semua authenticated user bisa `SELECT` dan `INSERT`; `UPDATE`/`DELETE` sebaiknya dibatasi (mis. hanya `created_by` sendiri atau role admin) — sama pola dengan tabel `activity_logs`.
+**Trigger `trg_snapshot_reclassification_before_asset_delete`** (`BEFORE DELETE ON assets`): kalau asset yang tertaut dihapus dari Inventory, nilai `asset_description` / `asset_category` / `location` / `ownership` / `unit` di-snapshot ke kolom lokal reclassification sebelum `asset_id` di-null-kan oleh FK — supaya baris audit tidak jadi kosong, riwayatnya tetap ada meski aset sumbernya sudah dihapus.
+
+**RLS**: semua authenticated user bisa `SELECT`/`UPDATE`/`DELETE`; `INSERT` wajib `created_by = auth.uid()`. Tidak berubah dari desain awal.
+
+Migrations terkait: `20260720000000_create_asset_reclassifications.sql` (awal), `20260814000000_link_reclassifications_to_assets.sql` (tambah `asset_id` + trigger), `20260814010000_relax_reclassification_description_not_null.sql` (drop NOT NULL `asset_description`).
 
 ---
 
 ## Field Detail
 
-| Field | Tipe UI | Catatan |
+| Field | Sumber (baris linked, `asset_id` terisi) | Sumber (baris legacy, `asset_id` NULL) |
 |---|---|---|
-| Asset category | Autocomplete free-text | Sama pola dengan `categorySegment1/2` di `AddAssetModal.tsx` — bisa reuse `AutocompleteInput` |
-| Asset description | Text input, required | — |
-| Location | Text input | Field baru, belum ada di sistem manapun sekarang |
-| Unit | Number input | — |
-| Ownership | Text input / autocomplete | Bisa reuse pola `subsidiary` autocomplete kalau ownership = entitas perusahaan |
-| Category (klasifikasi) | Dropdown: `Asset`, `Needs Review`, `Inventory`, + opsi custom (input manual) | Ini field inti — hasil audit |
-| Verified/Unverified | Toggle/badge, read-only di form utama | Diubah lewat modal verifikasi terpisah |
-| Verification date | Auto-terisi saat status diubah jadi Verified | Read-only, di-set oleh sistem |
+| Asset Description | **Live** dari `assets.asset_description` (join) | Kolom lokal, read-only di UI (historis) |
+| Asset Category | **Live** dari `assets.category_segment1` | Kolom lokal |
+| Location | **Live** dari `assets.category_segment2` | Kolom lokal |
+| Ownership | **Live** dari `assets.subsidiary` | Kolom lokal |
+| Unit | **Live** dari `assets.asset_units` | Kolom lokal |
+| Category (klasifikasi) | Selalu milik reclassification — dropdown `Asset` / `Needs Review` / `Inventory` / custom | sama |
+| Remarks | Selalu milik reclassification — textarea bebas | sama |
+| Verified / Verification date / Verified by | Selalu milik reclassification, diubah lewat `VerifyReclassificationModal` | sama |
+
+"Live" berarti dibaca lewat Supabase FK-embed (`asset_reclassifications.select('*, linked_asset:assets(...)')`) setiap fetch — bukan disalin sekali saat insert. Kalau deskripsi/kategori/lokasi asset diedit di Inventory, baris reclassification yang tertaut otomatis ikut berubah tanpa perlu sinkron ulang manual.
 
 ---
 
 ## Arsitektur Komponen
 
-Mengikuti pola yang sudah ada di project (Context + Modal + Page), lihat `AssetContext.tsx` / `AddAssetModal.tsx` / `Inventory.tsx` sebagai referensi.
-
 ```
-src/contexts/ReclassificationContext.tsx   ← CRUD, fetch, lookup kategori
-src/components/AddReclassificationModal.tsx
-src/components/EditReclassificationModal.tsx
-src/components/VerifyReclassificationModal.tsx   ← khusus tandai verified + verification_date
-src/pages/Reclassification.tsx             ← tabel + filter + KPI cards
+src/contexts/ReclassificationContext.tsx   ← CRUD, live-join fetch, sync dari assets
+src/components/AddReclassificationModal.tsx   ← pilih asset dari Inventory (bukan form manual)
+src/components/EditReclassificationModal.tsx  ← field identitas read-only kalau linked
+src/components/VerifyReclassificationModal.tsx   ← toggle verified + set verification_date
+src/pages/Reclassification.tsx             ← tabel + filter + KPI cards + Sync from Assets
 ```
 
-Routing & navigasi: tambah menu baru di sidebar (`Layout.tsx` / komponen nav yang ada) + route baru di `App.tsx`.
+### `ReclassificationContext.tsx` — fungsi kunci
 
-### UI Halaman (mockup kasar)
+- `fromDb(row)` — kalau `row.asset_id` ada dan join `linked_asset` berhasil, field identitas diambil dari situ; kalau tidak, fallback ke kolom lokal (baris legacy).
+- `addLinkedReclassification(assetId, category, remarks)` — satu-satunya jalur pembuatan baris baru. Insert `{ asset_id, category, remarks, created_by }` saja; field identitas tidak pernah ditulis (selalu live via join). **Melempar error** kalau insert gagal (bukan gagal diam-diam) supaya modal bisa menampilkan alert.
+- `syncFromAssets(assets, onProgress)` — versi bulk dari atas: link semua asset yang belum punya baris reclassification (dedup lewat `asset_id`), batch 10, default `category: 'Asset'`.
+- `updateReclassification(id, data)` — kalau baris `assetId` terisi, hanya `category` dan `remarks` yang di-`UPDATE`; field identitas diabaikan (karena bukan milik reclassification lagi).
+- `addReclassification(item, skipLog)` — masih ada untuk kompatibilitas baris legacy (dipanggil hanya lewat proses internal, tidak lagi lewat UI Add manapun sejak CSV import & form manual dihapus).
 
-```
-┌───────────────────────────────────────────────────────────┐
-│  Asset Reclassification                    [+ Tambah Item] │
-├───────────────────────────────────────────────────────────┤
-│  [Total: 128]  [Verified: 90]  [Unverified: 38]  [Needs   │
-│                                 Review: 12]                │
-├───────────────────────────────────────────────────────────┤
-│  Filter: [Category ▾] [Status Verifikasi ▾] [Ownership ▾] │
-│          [Search deskripsi...]                             │
-├───────────────────────────────────────────────────────────┤
-│  Description   | Category | Location | Ownership | Status │
-│  Kompresor GA-30 | Asset  | Gudang A | Div. Ops  | ✅ 12/07│
-│  Meja kantor lama| Inventory | Lt.2  | Div. HR   | ⚠️ -    │
-│  Barang tak dikenal| Needs Review | Gudang B | -  | ⚠️ -   │
-└───────────────────────────────────────────────────────────┘
-```
+### UI — `Reclassification.tsx`
 
-Klik baris → buka `VerifyReclassificationModal` untuk ubah status verifikasi + isi tanggal.
+- **Tambah Item** → buka `AddReclassificationModal`: dropdown pencarian asset (mirip `AddMaintenanceModal`), asset yang sudah tertaut disaring keluar dari daftar, lalu isi Category + Remarks saja.
+- **Sync from Assets** — tombol bulk-link untuk semua asset yang belum tertaut, dengan progress modal.
+- Kolom tabel: checkbox, Actions, **Source** (badge "Linked (#assetNumber)" vs "Manual" untuk baris legacy), Asset Description, Asset Category, Location, Unit, Ownership, Category, Remarks, Status (Verified/Unverified, klik untuk buka modal verifikasi), Verification Date.
+- Filter: Category, Status Verifikasi, Ownership, search deskripsi/lokasi (single-select, belum disamakan dengan multi-select filter Asset Inventory — di luar scope perubahan ini).
+- **Export CSV** tetap ada (mengekspor data yang sedang ter-filter). **Import CSV dan Download Template sudah dihapus** (14 Agustus 2026) — tidak relevan lagi karena baris baru selalu dibuat lewat pemilihan asset, bukan input massal free-text.
+
+### `EditReclassificationModal.tsx`
+
+- Kalau `editingReclassification.assetId` terisi: Asset Description/Category/Location/Unit/Ownership ditampilkan **read-only** dengan catatan "Sourced from Asset Inventory — edit lewat halaman Inventory". Hanya Category (klasifikasi) dan Remarks yang bisa diubah.
+- Kalau `assetId` kosong (baris legacy): form tetap seperti semula, semua field bisa diedit manual.
 
 ---
 
-## Rencana Implementasi (Bertahap)
+## Riwayat Implementasi
 
-### Fase 1 — Database & Context (fondasi) ✅
-- [x] Buat migration `supabase/migrations/20260720000000_create_asset_reclassifications.sql`
-- [x] Buat tabel `asset_reclassifications` + index + RLS policy
-- [x] Buat `src/contexts/ReclassificationContext.tsx` (fetch, add, update, delete, verify)
-- [x] Tambah action type baru (`ADD/UPDATE/DELETE/VERIFY_RECLASSIFICATION`) & entity type `reclassification` di `src/lib/activityLogger.ts`
-- [x] Daftarkan `ReclassificationProvider` di `App.tsx`
+### Fase 1–5 (Juli 2026) — desain awal, independen dari `assets` ✅
+Fondasi tabel, Context, UI, filter/KPI, dan CSV import/export dengan model free-text independen. Lihat git history untuk detail (`20260720000000` s.d. `20260724`-an).
 
-### Fase 2 — UI Komponen ✅
-- [x] Buat `src/pages/Reclassification.tsx` (tabel data + KPI cards + filter)
-- [x] Buat `AddReclassificationModal.tsx`
-- [x] Buat `EditReclassificationModal.tsx`
-- [x] Buat `VerifyReclassificationModal.tsx` (toggle verified + set verification_date otomatis)
-- [x] Tambah menu sidebar (`Layout.tsx`) + route baru (`App.tsx`, path `/reclassification`)
+### Fase 6 — Linked ke Asset Inventory (14 Agustus 2026) ✅
+- [x] Migration `asset_id` FK + index + trigger snapshot-on-delete
+- [x] `fromDb` live-join ke `assets` untuk baris linked
+- [x] `syncFromAssets()` — bulk link asset yang belum tertaut
+- [x] Kolom "Source" di tabel (Linked vs Manual)
+- [x] `EditReclassificationModal` — field identitas read-only untuk baris linked
+- [x] Lookup Add/Edit modal (waktu itu masih ada form manual) diarahkan ke `categories1`/`categories2`/`subsidiaries` milik `AssetContext`
 
-### Fase 3 — Filter & KPI ✅ (dikerjakan sekaligus di Fase 2)
-- [x] KPI cards: Total item, Verified, Unverified, Needs Review
-- [x] Filter by category, status verifikasi, ownership
-- [x] Search by description & location
-
-### Fase 4 — Integrasi Activity Log
-- [ ] Log `ADD_RECLASSIFICATION`, `VERIFY_RECLASSIFICATION`, `UPDATE_RECLASSIFICATION`, `DELETE_RECLASSIFICATION` ke tabel `activity_logs` yang sudah ada (reuse `src/lib/activityLogger.ts`, `entityType: 'reclassification'`)
-
-### Fase 5 — Export & Import CSV ✅
-- [x] Buat `public/reclassification_import_template.csv`
-- [x] Implementasi `handleExportCSV` + tombol Export CSV
-- [x] Implementasi `handleImportCSV` + progress modal + `handleDownloadInvalidRows`
-- [ ] Tes manual: export data yang ada → edit CSV → import lagi (belum diverifikasi langsung di browser oleh pembuat perubahan ini — silakan tes manual sebelum dipakai produksi)
-
-Ikuti pola yang sudah ada persis di `src/pages/Inventory.tsx` (`handleExportCSV`, `handleImportCSV`, `handleDownloadInvalidRows`) — pakai library yang sama (`papaparse`, sudah jadi dependency project, tidak perlu install lagi).
-
-#### 5.1 Export CSV
-- Tambah `handleExportCSV` di `src/pages/Reclassification.tsx`:
-  - Sumber data: `filteredItems` (hasil filter+search yang sedang aktif), bukan seluruh `reclassifications` — supaya user bisa export subset (mis. hanya yang "Needs Review").
-  - Mapping kolom (urutan sama dengan tabel & field detail di dokumen ini):
-    ```
-    'Asset Category'    ← assetCategory
-    'Asset Description' ← assetDescription
-    'Location'          ← location
-    'Unit'              ← unit
-    'Ownership'         ← ownership
-    'Category'          ← category
-    'Verified'          ← verified ? 'Yes' : 'No'
-    'Verification Date' ← verificationDate
-    'Verified By'       ← verifiedBy
-    ```
-  - `Papa.unparse(dataToExport)` → `Blob` → download sebagai `Asset_Reclassification_${tanggal}.csv`, identik dengan pola di Inventory.
-  - Tombol "Export CSV" (icon `Download` dari lucide-react) diletakkan di header halaman, sebelah tombol "+ Tambah Item" yang sudah ada.
-
-#### 5.2 Import CSV
-- Tambah `fileInputRef`, `handleImportCSV`, dan state `importModal` (struktur identik dengan Inventory: `isOpen`, `status`, `total`, `processed`, `successCount`, `failedCount`, `skippedCount`, `invalidRows`).
-- Validasi wajib per baris (baris invalid masuk `invalidRows`, tidak di-insert):
-  - `Asset Description` — wajib diisi (field `NOT NULL` di DB).
-  - `Category` — kalau kosong, default ke `'Needs Review'` (bukan error, karena kolom punya `DEFAULT` di DB).
-- Limit baris per file: samakan dengan Inventory (5000 baris) supaya konsisten dan menghindari timeout batch insert.
-- Proses insert: batch `BATCH_SIZE = 10` paralel per batch, panggil `addReclassification()` dari `ReclassificationContext` untuk tiap baris (bukan raw `supabase.insert`, supaya activity log & state lokal ikut ter-update otomatis lewat context yang sudah ada).
-- Mapping kolom CSV → `ReclassificationInput` (terima juga variasi nama kolom camelCase untuk kompatibilitas, sama seperti Inventory):
-  ```
-  assetCategory:    row['Asset Category'] || row['assetCategory'] || ''
-  assetDescription: row['Asset Description'] || row['assetDescription']   // required
-  location:         row['Location'] || row['location'] || ''
-  unit:             row['Unit'] || row['unit'] || ''
-  ownership:        row['Ownership'] || row['ownership'] || ''
-  category:         row['Category'] || row['category'] || 'Needs Review'
-  ```
-  Catatan: `verified`, `verificationDate`, `verifiedBy` **tidak** di-import lewat CSV — status verifikasi tetap harus lewat `VerifyReclassificationModal` di aplikasi, supaya "siapa yang verifikasi" akurat (bukan diklaim lewat file upload).
-- Progress modal reuse pola Inventory: tampilkan total/processed/success/failed secara live selama batch berjalan, lalu status `done` di akhir dengan tombol download `invalid_rows.csv` kalau ada baris gagal.
-- `logActivity({ actionType: 'IMPORT_CSV', entityType: 'reclassification', details: { total, success, failed } })` di akhir proses (tambah action type baru `IMPORT_CSV` untuk entity `reclassification` kalau belum general di `activityLogger.ts` — cek dulu, karena `IMPORT_CSV` untuk `entityType: 'asset'` sudah ada, mungkin bisa dibuat generic).
-
-#### 5.3 Template CSV
-- Buat `public/reclassification_import_template.csv` (pola sama dengan `public/asset_import_template.csv` yang sudah ada) berisi header kolom + 1 baris contoh:
-  ```csv
-  Asset Category,Asset Description,Location,Unit,Ownership,Category
-  Elektronik,Kompresor GA-30,Gudang A,1,Div. Ops,Asset
-  ```
-- Tombol "Download Template" (icon `FileDown`) di header halaman, link statis `href="/reclassification_import_template.csv"`.
-
-#### 5.4 File yang disentuh
-- `src/pages/Reclassification.tsx` — tambah `handleExportCSV`, `handleImportCSV`, `handleDownloadInvalidRows`, `importModal` state, `fileInputRef`, 3 tombol baru di header (Import/Template/Export), + progress modal (copy struktur dari `Inventory.tsx` baris ~488 ke bawah).
-- `src/contexts/ReclassificationContext.tsx` — tidak perlu diubah, `addReclassification` yang sudah ada langsung dipakai untuk tiap baris import.
-- `src/lib/activityLogger.ts` — cek/tambah action type `IMPORT_CSV` untuk `entityType: 'reclassification'`.
-- `public/reclassification_import_template.csv` — file baru.
-
-#### 5.5 Urutan pengerjaan
-1. Buat file template CSV di `public/`.
-2. Implementasi `handleExportCSV` + tombol Export (paling sederhana, tidak ada validasi, bisa langsung diverifikasi manual di browser).
-3. Implementasi `handleImportCSV` + progress modal + `handleDownloadInvalidRows`, reuse `addReclassification` dari context.
-4. Tes manual: export data yang ada → edit CSV → import lagi → cek data baru muncul & baris invalid ter-skip dengan benar.
-5. Update checklist Fase 5 di dokumen ini jadi ✅ setelah selesai & diverifikasi.
+### Fase 7 — Add Item selalu pilih asset, hapus form manual & CSV import (14 Agustus 2026) ✅
+- [x] `AddReclassificationModal` dirombak total — mengikuti pola `AddMaintenanceModal` (searchable asset dropdown, ringkasan read-only, lalu Category + Remarks)
+- [x] `addLinkedReclassification()` — fungsi context khusus untuk jalur ini
+- [x] Migration drop `NOT NULL` di `asset_description` (baris linked tidak lagi mengisi kolom ini saat insert)
+- [x] Error dari `addLinkedReclassification` dilempar ke pemanggil (sebelumnya gagal diam-diam lewat `setError` yang tidak ditampilkan di UI manapun)
+- [x] Import CSV, Download Template, dan `public/reclassification_import_template.csv` dihapus dari `Reclassification.tsx`
 
 ---
 
 ## Catatan
 
-- **Independen dari `assets`**: tidak ada FK ke `assets.id` — sesuai keputusan di awal diskusi. Kalau nanti dibutuhkan rekonsiliasi otomatis (mis. tandai aset di tabel `assets` sebagai "sudah diverifikasi"), perlu fitur tambahan terpisah, bukan bagian dari desain awal ini.
-- **Category dropdown custom**: opsi "custom nama" berarti field `category` tetap `TEXT` (bukan enum Postgres) supaya user bisa input nilai baru selain 3 preset (`Asset`, `Needs Review`, `Inventory`) — sama pola dengan `categorySegment1/2` yang free-text dengan autocomplete.
-- **Verification date**: sebaiknya di-set otomatis oleh sistem (`NOW()`) saat toggle verified diaktifkan, bukan diinput manual, supaya akurat sebagai jejak audit.
+- **Tidak lagi independen dari `assets`**: berbeda dari keputusan desain awal — sekarang setiap baris baru wajib berasal dari asset yang sudah terdaftar. Kalau ke depan ada kebutuhan mencatat temuan fisik yang benar-benar belum terdaftar, itu perlu didaftarkan dulu sebagai Asset baru di Inventory (lewat `AddAssetModal`), baru bisa masuk audit di sini — bukan lagi lewat form Reclassification langsung.
+- **Category dropdown custom**: opsi "custom nama" tetap ada, `category` tetap `TEXT` bebas (bukan enum), sama seperti sebelumnya.
+- **Verification date**: tetap di-set otomatis oleh sistem (`NOW()`) saat toggle verified diaktifkan lewat `VerifyReclassificationModal`.
+- **Satu asset = maksimal satu baris reclassification aktif**: baik `AddReclassificationModal` maupun `syncFromAssets()` menyaring asset yang sudah tertaut supaya tidak ada duplikat audit untuk asset yang sama.
+- **Filter UX** (multi-select, date/cost range, URL persistence, chips) yang sudah dipakai di Asset Inventory **belum** diterapkan ke halaman ini — eksplisit di luar scope perubahan 14 Agustus 2026.

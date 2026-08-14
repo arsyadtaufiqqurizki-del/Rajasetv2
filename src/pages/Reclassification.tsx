@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Upload, Download, FileDown, CheckCircle, Loader2 } from 'lucide-react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useReclassification } from '../contexts/ReclassificationContext';
-import { logActivity } from '../lib/activityLogger';
+import { useAsset } from '../contexts/AssetContext';
 import Papa from 'papaparse';
 
 // Mencegah CSV injection: field yang diawali =, +, -, @, tab, atau CR akan
@@ -14,14 +14,13 @@ const sanitizeCsvField = (value: unknown): unknown => {
 
 export default function Reclassification() {
   const {
-    reclassifications, deleteReclassification, addReclassification,
+    reclassifications, deleteReclassification,
     deleteMultipleReclassifications, deleteAllReclassifications,
     setEditingReclassification, setIsEditModalOpen,
     setVerifyingReclassification, setIsVerifyModalOpen,
-    setIsAddModalOpen,
+    setIsAddModalOpen, syncFromAssets,
   } = useReclassification();
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { assets } = useAsset();
 
   const [filterCategory, setFilterCategory] = useState("");
   const [filterVerified, setFilterVerified] = useState("");
@@ -49,24 +48,20 @@ export default function Reclassification() {
     failedCount: 0,
   });
 
-  const [importModal, setImportModal] = useState<{
+  const [syncModal, setSyncModal] = useState<{
     isOpen: boolean;
-    status: 'importing' | 'done';
+    status: 'syncing' | 'done';
     total: number;
     processed: number;
     successCount: number;
     failedCount: number;
-    skippedCount: number;
-    invalidRows: { rowNumber: number; assetDescription: string; reason: string }[];
   }>({
     isOpen: false,
-    status: 'importing',
+    status: 'syncing',
     total: 0,
     processed: 0,
     successCount: 0,
     failedCount: 0,
-    skippedCount: 0,
-    invalidRows: [],
   });
 
   useEffect(() => {
@@ -141,109 +136,20 @@ export default function Reclassification() {
     document.body.removeChild(link);
   }, [filteredItems]);
 
-  const handleImportCSV = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const data = results.data as any[];
-
-        if (data.length > 5000) {
-          alert(`File exceeds the maximum limit of 5000 rows. Your file has ${data.length} rows. Please split your file and try again.`);
-          if (event.target) event.target.value = '';
-          return;
-        }
-
-        const validRows: any[] = [];
-        const invalidRows: { rowNumber: number; assetDescription: string; reason: string }[] = [];
-
-        data.forEach((row, index) => {
-          const assetDescription = row['Asset Description'] || row['assetDescription'] || '';
-          if (!assetDescription) {
-            invalidRows.push({
-              rowNumber: index + 2, // +2 karena baris 1 = header
-              assetDescription,
-              reason: 'Asset Description kosong',
-            });
-          } else {
-            validRows.push(row);
-          }
-        });
-
-        setImportModal({
-          isOpen: true,
-          status: 'importing',
-          total: validRows.length,
-          processed: 0,
-          successCount: 0,
-          failedCount: 0,
-          skippedCount: invalidRows.length,
-          invalidRows,
-        });
-
-        const BATCH_SIZE = 10;
-        let localSuccess = 0;
-        let localFailed = 0;
-        for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
-          const batch = validRows.slice(i, i + BATCH_SIZE);
-          await Promise.all(batch.map(row => {
-            const assetDescription = row['Asset Description'] || row['assetDescription'];
-            return addReclassification({
-              assetCategory: row['Asset Category'] || row['assetCategory'] || '',
-              assetDescription,
-              location: row['Location'] || row['location'] || '',
-              unit: row['Unit'] || row['unit'] || '',
-              ownership: row['Ownership'] || row['ownership'] || '',
-              category: row['Category'] || row['category'] || 'Needs Review',
-              remarks: row['Remarks'] || row['remarks'] || '',
-            }, true)
-            .then(() => {
-              localSuccess++;
-              setImportModal(prev => ({
-                ...prev,
-                processed: prev.processed + 1,
-                successCount: prev.successCount + 1,
-              }));
-            })
-            .catch(() => {
-              localFailed++;
-              setImportModal(prev => ({
-                ...prev,
-                processed: prev.processed + 1,
-                failedCount: prev.failedCount + 1,
-              }));
-            });
-          }));
-        }
-
-        setImportModal(prev => ({ ...prev, status: 'done' }));
-        logActivity({ actionType: 'IMPORT_CSV', entityType: 'reclassification', details: { total: validRows.length + invalidRows.length, success: localSuccess, failed: localFailed + invalidRows.length } });
-        if (event.target) event.target.value = '';
-      },
-      error: (error) => {
-        alert('Error parsing CSV file: ' + error.message);
-      }
+  const handleSyncFromAssets = useCallback(async () => {
+    setSyncModal({ isOpen: true, status: 'syncing', total: 0, processed: 0, successCount: 0, failedCount: 0 });
+    const result = await syncFromAssets(assets, (processed, total, failed) => {
+      setSyncModal(prev => ({ ...prev, total, processed, failedCount: failed, successCount: processed - failed }));
     });
-  }, [addReclassification]);
-
-  const handleDownloadInvalidRows = useCallback(() => {
-    const rows = importModal.invalidRows;
-    if (rows.length === 0) return;
-    const csv = [
-      ['Row Number', 'Asset Description', 'Reason'],
-      ...rows.map(r => [r.rowNumber, sanitizeCsvField(r.assetDescription), r.reason]),
-    ].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'invalid_rows.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [importModal.invalidRows]);
+    setSyncModal({
+      isOpen: true,
+      status: 'done',
+      total: result.total,
+      processed: result.total,
+      successCount: result.success,
+      failedCount: result.failed,
+    });
+  }, [assets, syncFromAssets]);
 
   const handleEdit = useCallback((item: any) => {
     setEditingReclassification(item);
@@ -296,29 +202,15 @@ export default function Reclassification() {
           <p className="text-sm text-on-surface-variant mt-1">Catat dan verifikasi temuan audit fisik aset.</p>
         </div>
         <div className="flex items-center gap-3">
-          <input
-            type="file"
-            accept=".csv"
-            ref={fileInputRef}
-            className="hidden"
-            onChange={handleImportCSV}
-          />
           <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importModal.isOpen && importModal.status === 'importing'}
+            onClick={handleSyncFromAssets}
+            disabled={syncModal.isOpen && syncModal.status === 'syncing'}
             className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Tambahkan asset dari Inventory yang belum tertaut sebagai baseline audit"
           >
-            <Upload className="h-4 w-4" />
-            Import CSV
+            <RefreshCw className="h-4 w-4" />
+            Sync from Assets
           </button>
-          <a
-            href="/reclassification_import_template.csv"
-            download="reclassification_import_template.csv"
-            className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm"
-          >
-            <FileDown className="h-4 w-4" />
-            Download Template
-          </a>
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm"
@@ -470,6 +362,7 @@ export default function Reclassification() {
                   />
                 </th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Actions</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Source</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Description</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Category</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Location</th>
@@ -510,6 +403,18 @@ export default function Reclassification() {
                       </button>
                     </div>
                   </td>
+                  <td className="py-4 px-4">
+                    {item.assetId ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md border bg-primary/10 border-primary/30 text-primary whitespace-nowrap">
+                        <Link2 className="h-3 w-3" />
+                        Linked{item.linkedAssetNumber ? ` (#${item.linkedAssetNumber})` : ''}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-md border bg-surface-variant text-on-surface-variant border-outline-variant/50 whitespace-nowrap">
+                        Manual
+                      </span>
+                    )}
+                  </td>
                   <td className="py-4 px-4 font-semibold text-on-surface">{item.assetDescription}</td>
                   <td className="py-4 px-4 text-on-surface">{item.assetCategory || '-'}</td>
                   <td className="py-4 px-4 text-on-surface-variant">{item.location || '-'}</td>
@@ -546,7 +451,7 @@ export default function Reclassification() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-on-surface-variant">Belum ada data reclassification</td>
+                  <td colSpan={12} className="py-8 text-center text-on-surface-variant">Belum ada data reclassification</td>
                 </tr>
               )}
             </tbody>
@@ -577,102 +482,62 @@ export default function Reclassification() {
         </div>
       </div>
 
-      {/* CSV Import Progress Modal */}
-      {importModal.isOpen && (
+      {/* Sync from Assets Progress Modal */}
+      {syncModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6">
-              {importModal.status === 'importing' ? (
+              {syncModal.status === 'syncing' ? (
                 <>
                   <div className="flex items-center gap-3 mb-4">
                     <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
-                    <h3 className="text-xl font-bold text-on-surface">Importing Reclassifications...</h3>
+                    <h3 className="text-xl font-bold text-on-surface">Syncing from Assets...</h3>
                   </div>
                   <p className="text-sm text-on-surface-variant mb-5">
-                    Please wait while your CSV file is being processed.
+                    Menambahkan asset yang belum tertaut sebagai baseline audit.
                   </p>
                   <div className="mb-2 h-2.5 w-full bg-surface-container-high rounded-full overflow-hidden">
                     <div
                       className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${importModal.total > 0 ? Math.round((importModal.processed / importModal.total) * 100) : 0}%` }}
+                      style={{ width: `${syncModal.total > 0 ? Math.round((syncModal.processed / syncModal.total) * 100) : 0}%` }}
                     />
                   </div>
                   <div className="flex justify-between text-xs text-on-surface-variant mt-1.5">
-                    <span>{importModal.processed} of {importModal.total} items processed</span>
+                    <span>{syncModal.processed} of {syncModal.total} assets processed</span>
                     <span className="font-semibold text-primary">
-                      {importModal.total > 0 ? Math.round((importModal.processed / importModal.total) * 100) : 0}%
+                      {syncModal.total > 0 ? Math.round((syncModal.processed / syncModal.total) * 100) : 0}%
                     </span>
                   </div>
                 </>
               ) : (
                 <>
                   <div className="flex items-center gap-3 mb-4">
-                    {importModal.failedCount === 0 ? (
+                    {syncModal.failedCount === 0 ? (
                       <CheckCircle className="h-6 w-6 text-emerald-500 shrink-0" />
                     ) : (
                       <XCircle className="h-6 w-6 text-amber-500 shrink-0" />
                     )}
-                    <h3 className="text-xl font-bold text-on-surface">Import Complete</h3>
+                    <h3 className="text-xl font-bold text-on-surface">Sync Complete</h3>
                   </div>
-                  <div className="bg-surface-container rounded-xl p-4 mb-4 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-on-surface-variant">Successfully imported</span>
-                      <span className="font-semibold text-emerald-600">{importModal.successCount} items</span>
-                    </div>
-                    {importModal.failedCount > 0 && (
+                  {syncModal.total === 0 ? (
+                    <p className="text-sm text-on-surface-variant mb-4">Semua asset sudah tertaut ke Reclassification.</p>
+                  ) : (
+                    <div className="bg-surface-container rounded-xl p-4 mb-4 space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-on-surface-variant">Failed</span>
-                        <span className="font-semibold text-error">{importModal.failedCount} items</span>
+                        <span className="text-on-surface-variant">Berhasil ditautkan</span>
+                        <span className="font-semibold text-emerald-600">{syncModal.successCount} asset</span>
                       </div>
-                    )}
-                    {importModal.skippedCount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-on-surface-variant">Skipped (invalid rows)</span>
-                        <span className="font-semibold text-amber-600">{importModal.skippedCount} rows</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {importModal.invalidRows.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-                          Baris yang dilewati
-                        </span>
-                        <button
-                          onClick={handleDownloadInvalidRows}
-                          className="flex items-center gap-1 text-xs text-primary hover:underline font-medium"
-                        >
-                          <FileDown className="w-3.5 h-3.5" />
-                          Download CSV
-                        </button>
-                      </div>
-                      <div className="max-h-40 overflow-y-auto rounded-lg border border-outline-variant text-xs">
-                        <table className="w-full">
-                          <thead className="bg-surface-container sticky top-0">
-                            <tr>
-                              <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Baris</th>
-                              <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Asset Description</th>
-                              <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Alasan</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {importModal.invalidRows.map((row, i) => (
-                              <tr key={i} className="border-t border-outline-variant/50">
-                                <td className="px-3 py-1.5 text-on-surface-variant">{row.rowNumber}</td>
-                                <td className="px-3 py-1.5 text-on-surface">{row.assetDescription || <span className="italic text-on-surface-variant">—</span>}</td>
-                                <td className="px-3 py-1.5 text-amber-600">{row.reason}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      {syncModal.failedCount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant">Gagal</span>
+                          <span className="font-semibold text-error">{syncModal.failedCount} asset</span>
+                        </div>
+                      )}
                     </div>
                   )}
-
                   <div className="flex justify-end">
                     <button
-                      onClick={() => setImportModal(prev => ({ ...prev, isOpen: false }))}
+                      onClick={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
                       className="px-5 py-2 bg-primary text-on-primary rounded-md hover:bg-primary/90 font-medium text-sm transition-colors shadow-sm"
                     >
                       Close

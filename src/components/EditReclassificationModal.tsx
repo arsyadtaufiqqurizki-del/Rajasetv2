@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Link2 } from 'lucide-react';
 import { useReclassification, RECLASSIFICATION_PRESET_CATEGORIES } from '../contexts/ReclassificationContext';
+import { useAsset } from '../contexts/AssetContext';
 import AutocompleteInput from './AutocompleteInput';
 
 const EMPTY_FORM = {
@@ -16,13 +17,10 @@ export default function EditReclassificationModal() {
   const {
     isEditModalOpen, setIsEditModalOpen,
     editingReclassification, setEditingReclassification,
-    updateReclassification, reclassifications,
+    updateReclassification,
   } = useReclassification();
 
-  const assetCategories = useMemo(
-    () => Array.from(new Set(reclassifications.map(r => r.assetCategory).filter(Boolean))),
-    [reclassifications]
-  );
+  const { categories1, categories2, subsidiaries } = useAsset();
 
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [categorySelect, setCategorySelect] = useState<string>(RECLASSIFICATION_PRESET_CATEGORIES[1]);
@@ -45,6 +43,8 @@ export default function EditReclassificationModal() {
   }, [editingReclassification]);
 
   if (!isEditModalOpen || !editingReclassification) return null;
+
+  const isLinked = !!editingReclassification.assetId;
 
   const handleClose = () => {
     setIsEditModalOpen(false);
@@ -78,60 +78,93 @@ export default function EditReclassificationModal() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+          {isLinked && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-on-surface-variant">
+              <Link2 className="h-4 w-4 text-primary shrink-0" />
+              Item ini tertaut ke Asset Inventory{editingReclassification.linkedAssetNumber ? ` (#${editingReclassification.linkedAssetNumber})` : ''}.
+              Deskripsi/kategori/lokasi/unit/ownership mengikuti data Inventory secara live — edit lewat halaman Inventory. Hanya klasifikasi audit &amp; remarks yang bisa diubah di sini.
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <label className="text-sm font-semibold text-on-surface">Asset Description *</label>
               <input
                 required
+                disabled={isLinked}
                 name="assetDescription"
                 value={formData.assetDescription}
                 onChange={handleChange}
                 placeholder="e.g. Kompresor GA-30 ditemukan di Gudang A"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Asset Category</label>
-              <AutocompleteInput
-                name="assetCategory"
-                value={formData.assetCategory}
-                onChange={handleChange as any}
-                placeholder="e.g. Elektronik"
-                options={assetCategories}
-              />
+              {isLinked ? (
+                <input
+                  disabled
+                  value={formData.assetCategory}
+                  className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm opacity-60 cursor-not-allowed"
+                />
+              ) : (
+                <AutocompleteInput
+                  name="assetCategory"
+                  value={formData.assetCategory}
+                  onChange={handleChange as any}
+                  placeholder="e.g. Elektronik"
+                  options={categories1}
+                />
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Location</label>
-              <input
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                placeholder="e.g. Gudang A"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
+              {isLinked ? (
+                <input
+                  disabled
+                  value={formData.location}
+                  className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm opacity-60 cursor-not-allowed"
+                />
+              ) : (
+                <AutocompleteInput
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange as any}
+                  placeholder="e.g. Gudang A"
+                  options={categories2}
+                />
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Unit</label>
               <input
                 type="number"
+                disabled={isLinked}
                 name="unit"
                 value={formData.unit}
                 onChange={handleChange}
                 min="0"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Ownership</label>
-              <input
-                name="ownership"
-                value={formData.ownership}
-                onChange={handleChange}
-                placeholder="e.g. Divisi Operasional"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
+              {isLinked ? (
+                <input
+                  disabled
+                  value={formData.ownership}
+                  className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm opacity-60 cursor-not-allowed"
+                />
+              ) : (
+                <AutocompleteInput
+                  name="ownership"
+                  value={formData.ownership}
+                  onChange={handleChange as any}
+                  placeholder="e.g. Divisi Operasional"
+                  options={subsidiaries}
+                />
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">

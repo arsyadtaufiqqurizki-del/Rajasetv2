@@ -8,6 +8,8 @@ export const RECLASSIFICATION_PRESET_CATEGORIES = ['Asset', 'Needs Review', 'Inv
 
 export type Reclassification = {
   id: string;
+  assetId: string | null;
+  linkedAssetNumber: string;
   assetCategory: string;
   assetDescription: string;
   location: string;
@@ -23,7 +25,7 @@ export type Reclassification = {
 
 export type ReclassificationInput = Omit<
   Reclassification,
-  'id' | 'verified' | 'verificationDate' | 'verifiedBy' | 'createdAt'
+  'id' | 'assetId' | 'linkedAssetNumber' | 'verified' | 'verificationDate' | 'verifiedBy' | 'createdAt'
 >;
 
 interface ReclassificationContextType {
@@ -31,11 +33,16 @@ interface ReclassificationContextType {
   loading: boolean;
   error: string | null;
   addReclassification: (item: ReclassificationInput, skipLog?: boolean) => Promise<void>;
+  addLinkedReclassification: (assetId: string, category: string, remarks: string) => Promise<void>;
   updateReclassification: (id: string, item: ReclassificationInput) => Promise<void>;
   deleteReclassification: (id: string) => Promise<void>;
   deleteMultipleReclassifications: (ids: string[], onProgress?: (processed: number, failed: number) => void) => Promise<void>;
   deleteAllReclassifications: (onProgress?: (processed: number, failed: number) => void) => Promise<void>;
   verifyReclassification: (id: string, verified: boolean) => Promise<void>;
+  syncFromAssets: (
+    assets: { id: string }[],
+    onProgress?: (processed: number, total: number, failed: number) => void
+  ) => Promise<{ total: number; success: number; failed: number }>;
   isAddModalOpen: boolean;
   setIsAddModalOpen: (isOpen: boolean) => void;
   isEditModalOpen: boolean;
@@ -50,20 +57,32 @@ interface ReclassificationContextType {
 
 const ReclassificationContext = createContext<ReclassificationContextType | undefined>(undefined);
 
-const fromDb = (row: any): Reclassification => ({
-  id: row.id,
-  assetCategory: row.asset_category ?? '',
-  assetDescription: row.asset_description ?? '',
-  location: row.location ?? '',
-  unit: row.unit != null ? String(row.unit) : '',
-  ownership: row.ownership ?? '',
-  category: row.category ?? 'Needs Review',
-  remarks: row.remarks ?? '',
-  verified: row.verified ?? false,
-  verificationDate: row.verification_date ?? '',
-  verifiedBy: row.verified_by ?? '',
-  createdAt: row.created_at ?? '',
-});
+const RECLASSIFICATION_SELECT =
+  '*, linked_asset:assets(asset_number, asset_description, category_segment1, category_segment2, subsidiary, asset_units)';
+
+// Rows with asset_id set mirror Asset Inventory live (via linked_asset join) so the
+// identifying fields never go stale; unlinked rows keep their own free-text columns.
+const fromDb = (row: any): Reclassification => {
+  const linked = row.linked_asset;
+  return {
+    id: row.id,
+    assetId: row.asset_id ?? null,
+    linkedAssetNumber: linked?.asset_number ?? '',
+    assetCategory: linked ? (linked.category_segment1 ?? '') : (row.asset_category ?? ''),
+    assetDescription: linked ? (linked.asset_description ?? '') : (row.asset_description ?? ''),
+    location: linked ? (linked.category_segment2 ?? '') : (row.location ?? ''),
+    unit: linked
+      ? (linked.asset_units != null ? String(linked.asset_units) : '')
+      : (row.unit != null ? String(row.unit) : ''),
+    ownership: linked ? (linked.subsidiary ?? '') : (row.ownership ?? ''),
+    category: row.category ?? 'Needs Review',
+    remarks: row.remarks ?? '',
+    verified: row.verified ?? false,
+    verificationDate: row.verification_date ?? '',
+    verifiedBy: row.verified_by ?? '',
+    createdAt: row.created_at ?? '',
+  };
+};
 
 const toDb = (item: ReclassificationInput) => ({
   asset_category: item.assetCategory,
@@ -96,7 +115,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
       while (true) {
         const { data, error } = await supabase
           .from('asset_reclassifications')
-          .select('*')
+          .select(RECLASSIFICATION_SELECT)
           .order('created_at', { ascending: false })
           .range(from, from + CHUNK - 1);
         if (error) { setError(error.message); break; }
@@ -116,7 +135,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
     const { data, error } = await supabase
       .from('asset_reclassifications')
       .insert({ ...toDb(newItemData), created_by: user?.id ?? null })
-      .select()
+      .select(RECLASSIFICATION_SELECT)
       .single();
 
     if (error) { setError(error.message); return; }
@@ -131,12 +150,42 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
     }
   };
 
-  const updateReclassification = async (id: string, updatedData: ReclassificationInput) => {
+  // "Add Item" now always links to an existing Asset Inventory record (mirrors
+  // AddMaintenanceModal's select-asset flow) — identity fields are never typed in,
+  // they resolve live via the linked_asset join in fromDb().
+  const addLinkedReclassification = async (assetId: string, category: string, remarks: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
     const { data, error } = await supabase
       .from('asset_reclassifications')
-      .update({ ...toDb(updatedData), updated_at: new Date().toISOString() })
+      .insert({ asset_id: assetId, category, remarks, created_by: user?.id ?? null })
+      .select(RECLASSIFICATION_SELECT)
+      .single();
+
+    if (error) { setError(error.message); throw error; }
+    const created = fromDb(data);
+    setReclassifications(prev => [created, ...prev]);
+    logActivity({
+      actionType: 'ADD_RECLASSIFICATION',
+      entityType: 'reclassification',
+      entityId: data.id,
+      details: { assetDescription: created.assetDescription, category },
+    });
+  };
+
+  const updateReclassification = async (id: string, updatedData: ReclassificationInput) => {
+    // Linked rows mirror Asset Inventory live — identity fields aren't stored here,
+    // so only the audit-owned fields (classification + remarks) are persisted.
+    const isLinked = !!reclassifications.find(r => r.id === id)?.assetId;
+    const payload = isLinked
+      ? { category: updatedData.category, remarks: updatedData.remarks, updated_at: new Date().toISOString() }
+      : { ...toDb(updatedData), updated_at: new Date().toISOString() };
+
+    const { data, error } = await supabase
+      .from('asset_reclassifications')
+      .update(payload)
       .eq('id', id)
-      .select()
+      .select(RECLASSIFICATION_SELECT)
       .single();
 
     if (error) { setError(error.message); return; }
@@ -203,24 +252,62 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .select()
+      .select(RECLASSIFICATION_SELECT)
       .single();
 
     if (error) { setError(error.message); return; }
-    setReclassifications(prev => prev.map(r => r.id === id ? fromDb(data) : r));
+    const updated = fromDb(data);
+    setReclassifications(prev => prev.map(r => r.id === id ? updated : r));
     logActivity({
       actionType: 'VERIFY_RECLASSIFICATION',
       entityType: 'reclassification',
       entityId: id,
-      details: { assetDescription: data.asset_description, verified },
+      details: { assetDescription: updated.assetDescription, verified },
     });
+  };
+
+  const syncFromAssets = async (
+    assets: { id: string }[],
+    onProgress?: (processed: number, total: number, failed: number) => void
+  ) => {
+    const alreadyLinkedIds = new Set(reclassifications.filter(r => r.assetId).map(r => r.assetId));
+    const toLink = assets.filter(a => !alreadyLinkedIds.has(a.id));
+
+    const BATCH_SIZE = 10;
+    let success = 0;
+    let failed = 0;
+    for (let i = 0; i < toLink.length; i += BATCH_SIZE) {
+      const batch = toLink.slice(i, i + BATCH_SIZE);
+      const { data, error } = await supabase
+        .from('asset_reclassifications')
+        .insert(batch.map(a => ({ asset_id: a.id, category: 'Asset', verified: false })))
+        .select(RECLASSIFICATION_SELECT);
+
+      if (error) {
+        failed += batch.length;
+      } else {
+        success += data?.length ?? 0;
+        setReclassifications(prev => [...(data ?? []).map(fromDb), ...prev]);
+      }
+      onProgress?.(Math.min(i + BATCH_SIZE, toLink.length), toLink.length, failed);
+    }
+
+    if (success > 0) {
+      logActivity({
+        actionType: 'SYNC_FROM_ASSETS',
+        entityType: 'reclassification',
+        details: { total: toLink.length, success, failed },
+      });
+    }
+    return { total: toLink.length, success, failed };
   };
 
   return (
     <ReclassificationContext.Provider value={{
       reclassifications, loading, error,
-      addReclassification, updateReclassification, deleteReclassification,
+      addReclassification, addLinkedReclassification, updateReclassification, deleteReclassification,
       deleteMultipleReclassifications, deleteAllReclassifications, verifyReclassification,
+      syncFromAssets,
       isAddModalOpen, setIsAddModalOpen,
       isEditModalOpen, setIsEditModalOpen,
       editingReclassification, setEditingReclassification,

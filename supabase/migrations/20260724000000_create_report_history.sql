@@ -12,16 +12,18 @@ CREATE TABLE IF NOT EXISTS report_history (
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_report_history_created_at ON report_history(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_report_history_created_at ON report_history(created_at DESC);
 
 -- RLS: semua authenticated user bisa baca, hanya bisa insert milik sendiri
 ALTER TABLE report_history ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "authenticated users can read report history" ON report_history;
 CREATE POLICY "authenticated users can read report history"
   ON report_history FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "users can insert own report history" ON report_history;
 CREATE POLICY "users can insert own report history"
   ON report_history FOR INSERT
   TO authenticated
