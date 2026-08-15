@@ -4,8 +4,8 @@ import { useAsset } from '../contexts/AssetContext';
 import AutocompleteInput from './AutocompleteInput';
 
 export default function AddAssetModal() {
-  const { isAddModalOpen, setIsAddModalOpen, addAsset, subsidiaries, categories1, categories2 } = useAsset();
-  
+  const { isAddModalOpen, setIsAddModalOpen, addAsset, subsidiaries, categories1, categories2, itemStatuses } = useAsset();
+
   const [formData, setFormData] = useState({
     assetBook: '',
     subsidiary: '',
@@ -20,6 +20,9 @@ export default function AddAssetModal() {
     lifeInMonths: '60',
     listed: 'Audited',
     status: 'Active',
+    verification: 'No',
+    verificationDate: '',
+    itemStatus: '',
   });
 
   const [isUnlimitedLife, setIsUnlimitedLife] = useState(false);
@@ -30,7 +33,8 @@ export default function AddAssetModal() {
     e.preventDefault();
     const dataToSave = {
       ...formData,
-      assetCost: formData.assetCost.replace(/,/g, '')
+      assetCost: formData.assetCost.replace(/,/g, ''),
+      verification: formData.verification === 'Yes',
     };
     await addAsset(dataToSave);
     setIsAddModalOpen(false);
@@ -49,12 +53,24 @@ export default function AddAssetModal() {
       lifeInMonths: '60',
       listed: 'Audited',
       status: 'Active',
+      verification: 'No',
+      verificationDate: '',
+      itemStatus: '',
     });
     setIsUnlimitedLife(false);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleVerificationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      verification: value,
+      verificationDate: value === 'Yes' ? (prev.verificationDate || new Date().toISOString().split('T')[0]) : '',
+    }));
   };
 
   const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,6 +290,40 @@ export default function AddAssetModal() {
                 <option value="Broken">Broken</option>
                 <option value="Retired">Retired</option>
               </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-on-surface">Verification</label>
+              <select
+                name="verification"
+                value={formData.verification}
+                onChange={handleVerificationChange}
+                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-on-surface">Verification Date</label>
+              <input
+                name="verificationDate"
+                type="date"
+                value={formData.verificationDate}
+                onChange={handleChange}
+                disabled={formData.verification !== 'Yes'}
+                className={`w-full rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formData.verification !== 'Yes' ? 'bg-surface-container text-on-surface-variant cursor-not-allowed' : 'bg-surface-container-lowest'}`}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className="text-sm font-semibold text-on-surface">Item Status</label>
+              <AutocompleteInput
+                name="itemStatus"
+                value={formData.itemStatus}
+                onChange={handleChange as any}
+                placeholder="e.g. Asset, Inventory, Needs Review"
+                options={itemStatuses}
+              />
             </div>
           </div>
           

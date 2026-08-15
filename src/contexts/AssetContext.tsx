@@ -18,6 +18,9 @@ export type Asset = {
   listed: string;
   status: string;
   statusLevel: 'success' | 'warning' | 'error' | 'default';
+  verification: boolean;
+  verificationDate: string;
+  itemStatus: string;
   createdAt: string;
 };
 
@@ -29,6 +32,7 @@ interface AssetContextType {
   subsidiaries: string[];
   categories1: string[];
   categories2: string[];
+  itemStatuses: string[];
   addAsset: (asset: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>, skipLog?: boolean) => Promise<void>;
   updateAsset: (id: string, asset: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
@@ -40,6 +44,8 @@ interface AssetContextType {
   deleteCategory1: (name: string) => void;
   addCategory2: (name: string) => void;
   deleteCategory2: (name: string) => void;
+  addItemStatus: (name: string) => void;
+  deleteItemStatus: (name: string) => void;
   isAddModalOpen: boolean;
   setIsAddModalOpen: (isOpen: boolean) => void;
   isEditModalOpen: boolean;
@@ -74,6 +80,9 @@ const fromDb = (row: any): Asset => ({
   listed: row.listed ?? '',
   status: row.status ?? '',
   statusLevel: computeStatusLevel(row.status ?? ''),
+  verification: row.verification ?? false,
+  verificationDate: row.verification_date ?? '',
+  itemStatus: row.item_status ?? '',
   createdAt: row.created_at ?? '',
 });
 
@@ -91,6 +100,9 @@ const toDb = (asset: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>) => ({
   life_in_months: asset.lifeInMonths,
   listed: asset.listed,
   status: asset.status,
+  verification: asset.verification,
+  verification_date: asset.verificationDate || null,
+  item_status: asset.itemStatus,
 });
 
 export function AssetProvider({ children }: { children: ReactNode }) {
@@ -101,6 +113,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   const [subsidiaries, setSubsidiaries] = useState<string[]>([]);
   const [categories1, setCategories1] = useState<string[]>([]);
   const [categories2, setCategories2] = useState<string[]>([]);
+  const [itemStatuses, setItemStatuses] = useState<string[]>([]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -133,15 +146,17 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       }, 0);
       setLastFetchedAt(latestUpdateMs > 0 ? new Date(latestUpdateMs) : null);
 
-      const [subRes, cat1Res, cat2Res] = await Promise.all([
+      const [subRes, cat1Res, cat2Res, itemStatusRes] = await Promise.all([
         supabase.from('subsidiaries').select('name').order('name'),
         supabase.from('category_segments_1').select('name').order('name'),
         supabase.from('category_segments_2').select('name').order('name'),
+        supabase.from('item_statuses').select('name').order('name'),
       ]);
 
       if (!subRes.error) setSubsidiaries([...new Set((subRes.data ?? []).map(r => r.name))]);
       if (!cat1Res.error) setCategories1([...new Set((cat1Res.data ?? []).map(r => r.name))]);
       if (!cat2Res.error) setCategories2([...new Set((cat2Res.data ?? []).map(r => r.name))]);
+      if (!itemStatusRes.error) setItemStatuses([...new Set((itemStatusRes.data ?? []).map(r => r.name))]);
 
       setLoading(false);
     };
@@ -178,10 +193,21 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     supabase.from('category_segments_2').delete().eq('name', name).then();
   };
 
+  const addItemStatus = (name: string) => {
+    if (!name) return;
+    setItemStatuses(prev => prev.includes(name) ? prev : [...prev, name]);
+    supabase.from('item_statuses').upsert({ name }, { onConflict: 'name' }).then();
+  };
+  const deleteItemStatus = (name: string) => {
+    setItemStatuses(prev => prev.filter(s => s !== name));
+    supabase.from('item_statuses').delete().eq('name', name).then();
+  };
+
   const addAsset = async (newAssetData: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>, skipLog = false) => {
     if (newAssetData.subsidiary) addSubsidiary(newAssetData.subsidiary);
     if (newAssetData.categorySegment1) addCategory1(newAssetData.categorySegment1);
     if (newAssetData.categorySegment2) addCategory2(newAssetData.categorySegment2);
+    if (newAssetData.itemStatus) addItemStatus(newAssetData.itemStatus);
 
     const { data, error } = await supabase
       .from('assets')
@@ -201,6 +227,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     if (updatedData.subsidiary) addSubsidiary(updatedData.subsidiary);
     if (updatedData.categorySegment1) addCategory1(updatedData.categorySegment1);
     if (updatedData.categorySegment2) addCategory2(updatedData.categorySegment2);
+    if (updatedData.itemStatus) addItemStatus(updatedData.itemStatus);
 
     const { data, error } = await supabase
       .from('assets')
@@ -255,9 +282,10 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   return (
     <AssetContext.Provider value={{
       assets, loading, error, lastFetchedAt,
-      subsidiaries, categories1, categories2,
+      subsidiaries, categories1, categories2, itemStatuses,
       addAsset, updateAsset, deleteAsset, deleteMultipleAssets, deleteAllAssets,
       addSubsidiary, deleteSubsidiary, addCategory1, deleteCategory1, addCategory2, deleteCategory2,
+      addItemStatus, deleteItemStatus,
       isAddModalOpen, setIsAddModalOpen,
       isEditModalOpen, setIsEditModalOpen,
       editingAsset, setEditingAsset

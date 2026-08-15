@@ -8,9 +8,10 @@ Berdasarkan struktur dan kebutuhan umum pada sistem manajemen aset, berikut adal
 - [x] **Memoization:** Gunakan `useMemo` untuk hasil data yang difilter dan `useCallback` untuk fungsi *handlers* (seperti edit/delete) untuk mencegah *re-render* komponen anak yang tidak perlu.
 
 ## 2. Pengalaman Pengguna (User Experience / UX)
-- [x] **Advanced Filtering:** Filter multi-kriteria sekaligus (Subsidiary, Asset Class, Location, Status — multi-select, bisa gabung beberapa nilai per kategori), plus filter Date Place in Service (range) dan Asset Cost (range). Dilengkapi active filter chips (removable per nilai), badge jumlah filter aktif, dan persistence ke URL query params. Lihat `inventory filter system.md`. *(Multi-Sorting di header kolom tabel belum dikerjakan.)*
-- **Bulk Actions (Aksi Massal):** Tambahkan fitur checkbox di tiap baris agar pengguna dapat melakukan aksi massal seperti *Bulk Delete*, *Bulk Update Status*, atau *Bulk Export*.
-- **Export & Import Data:** Sediakan opsi untuk mengekspor data aset ke format CSV/Excel untuk kebutuhan pelaporan, serta opsi Import via CSV untuk memudahkan *mass-upload* aset baru.
+- [x] **Advanced Filtering:** Filter multi-kriteria sekaligus (Subsidiary, Asset Class, Location, Status, Verification, Item Status — multi-select, bisa gabung beberapa nilai per kategori), plus filter Date Place in Service (range) dan Asset Cost (range). Dilengkapi active filter chips (removable per nilai), badge jumlah filter aktif, dan persistence ke URL query params. Lihat `inventory filter system.md`. *(Multi-Sorting di header kolom tabel belum dikerjakan.)*
+- [x] **Bulk Actions (Aksi Massal) — sebagian:** Checkbox per baris + select-all sudah ada, dengan *Bulk Delete* (dan *Delete All*) yang jalan berbatch beserta progress modal. *Bulk Update Status* dan *Bulk Export* (export khusus baris terpilih) belum ada — export CSV saat ini selalu mengekspor seluruh hasil filter, bukan hanya yang dicentang.
+- [x] **Export & Import Data:** CSV export (mengikuti hasil filter aktif) dan CSV import (dengan validasi baris wajib, batas 5000 baris, progress modal, dan laporan baris gagal/invalid) sudah berjalan penuh.
+- [x] **Physical Verification Tracking:** Tiga kolom baru setelah Status — **Verification** (Yes/No), **Verification Date** (auto-terisi tanggal hari ini saat Verification diubah ke Yes, tetap bisa diedit manual, dikosongkan/disabled saat No), dan **Item Status** (autocomplete: Asset/Inventory/Needs Review + custom text, tersimpan ke tabel lookup `item_statuses` seperti Asset Class/Location). Sudah terintegrasi ke filter, CSV export, dan CSV import.
 - **Visualisasi/Foto Aset:** Tambahkan dukungan upload gambar agar setiap entri aset memiliki foto aslinya atau lampiran dokumen (seperti *invoice* atau *manual book*).
 
 ## 3. Manajemen State & Pengolahan Form
@@ -18,7 +19,7 @@ Berdasarkan struktur dan kebutuhan umum pada sistem manajemen aset, berikut adal
 - **State Management Skala Besar:** Saat ini Anda menggunakan `AssetContext`. Jika sistem semakin kompleks dan melibatkan pengambilan data dari API (Backend), mempertimbangkan alat *server-state management* seperti React Query (TanStack Query) akan jauh lebih efisien untuk menangani *caching*, *loading state*, dan sinkronisasi.
 
 ## 4. Keamanan dan Integritas Data
-- **Audit Trail (Riwayat Perubahan):** Untuk aplikasi inventaris berskala perusahaan, setiap aksi Edit dan Delete harus tercatat historinya. Tambahkan log riwayat yang merekam siapa yang mengubah data, kapan diubah, dan perubahan apa yang dilakukan.
+- [x] **Audit Trail (Riwayat Perubahan) — sebagian:** `logActivity` (`src/lib/activityLogger.ts`) sudah merekam ADD/UPDATE/DELETE/BULK_DELETE asset (siapa via `created_by`, kapan, dan detail perubahan) ke tabel `activity_logs`, disurfacekan lewat `NotificationBell`. Belum ada halaman *audit log* khusus yang bisa difilter/dicari untuk kebutuhan investigasi historis.
 - **Role-Based Access Control (RBAC):** Pastikan aksi-aksi destruktif (seperti hapus data atau edit nilai penyusutan) disembunyikan atau dinonaktifkan jika pengguna yang sedang *login* bukan administrator.
 
 ## 5. Kualitas Kode (Code Maintainability)

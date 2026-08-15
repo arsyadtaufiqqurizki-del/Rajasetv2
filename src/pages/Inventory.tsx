@@ -13,7 +13,7 @@ function parseListParam(searchParams: URLSearchParams, key: string): string[] {
 }
 
 export default function Inventory() {
-  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, addAsset } = useAsset();
+  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, itemStatuses, addAsset } = useAsset();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -23,6 +23,8 @@ export default function Inventory() {
   const [filterCategory, setFilterCategory] = useState<string[]>(() => parseListParam(searchParams, 'category'));
   const [filterLocation, setFilterLocation] = useState<string[]>(() => parseListParam(searchParams, 'location'));
   const [filterStatus, setFilterStatus] = useState<string[]>(() => parseListParam(searchParams, 'status'));
+  const [filterVerification, setFilterVerification] = useState<string[]>(() => parseListParam(searchParams, 'verification'));
+  const [filterItemStatus, setFilterItemStatus] = useState<string[]>(() => parseListParam(searchParams, 'itemStatus'));
   const [dateFrom, setDateFrom] = useState(() => searchParams.get('dateFrom') || "");
   const [dateTo, setDateTo] = useState(() => searchParams.get('dateTo') || "");
   const [costMin, setCostMin] = useState(() => searchParams.get('costMin') || "");
@@ -77,6 +79,8 @@ export default function Inventory() {
     filterCategory.forEach(v => chips.push({ id: `cat-${v}`, label: `Asset Class: ${v}`, onRemove: () => setFilterCategory(prev => prev.filter(x => x !== v)) }));
     filterLocation.forEach(v => chips.push({ id: `loc-${v}`, label: `Location: ${v}`, onRemove: () => setFilterLocation(prev => prev.filter(x => x !== v)) }));
     filterStatus.forEach(v => chips.push({ id: `status-${v}`, label: `Status: ${v}`, onRemove: () => setFilterStatus(prev => prev.filter(x => x !== v)) }));
+    filterVerification.forEach(v => chips.push({ id: `verif-${v}`, label: `Verification: ${v}`, onRemove: () => setFilterVerification(prev => prev.filter(x => x !== v)) }));
+    filterItemStatus.forEach(v => chips.push({ id: `itemstatus-${v}`, label: `Item Status: ${v}`, onRemove: () => setFilterItemStatus(prev => prev.filter(x => x !== v)) }));
     if (dateFrom || dateTo) {
       chips.push({ id: 'date', label: `Date: ${dateFrom || '…'} → ${dateTo || '…'}`, onRemove: () => { setDateFrom(""); setDateTo(""); } });
     }
@@ -87,7 +91,7 @@ export default function Inventory() {
       chips.push({ id: 'search', label: `Search: "${debouncedSearchQuery}"`, onRemove: () => setSearchQuery("") });
     }
     return chips;
-  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
+  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, filterVerification, filterItemStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
 
   // Debounce search
   useEffect(() => {
@@ -100,7 +104,7 @@ export default function Inventory() {
   // Reset page to 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
+  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, filterVerification, filterItemStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
 
   // Sync filters to URL query params
   useEffect(() => {
@@ -109,13 +113,15 @@ export default function Inventory() {
     if (filterCategory.length > 0) params.set('category', filterCategory.join(','));
     if (filterLocation.length > 0) params.set('location', filterLocation.join(','));
     if (filterStatus.length > 0) params.set('status', filterStatus.join(','));
+    if (filterVerification.length > 0) params.set('verification', filterVerification.join(','));
+    if (filterItemStatus.length > 0) params.set('itemStatus', filterItemStatus.join(','));
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (costMin) params.set('costMin', costMin);
     if (costMax) params.set('costMax', costMax);
     if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
     setSearchParams(params, { replace: true });
-  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery, setSearchParams]);
+  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, filterVerification, filterItemStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery, setSearchParams]);
 
   const filteredAssets = useMemo(() => {
     const min = costMin === "" ? null : parseFloat(costMin);
@@ -125,6 +131,8 @@ export default function Inventory() {
       const matchCategory = filterCategory.length === 0 || filterCategory.includes(asset.categorySegment1);
       const matchLocation = filterLocation.length === 0 || filterLocation.includes(asset.categorySegment2);
       const matchStatus = filterStatus.length === 0 || filterStatus.includes(asset.status);
+      const matchVerification = filterVerification.length === 0 || filterVerification.includes(asset.verification ? 'Yes' : 'No');
+      const matchItemStatus = filterItemStatus.length === 0 || filterItemStatus.includes(asset.itemStatus);
       const matchDateFrom = dateFrom === "" || asset.datePlaceInService >= dateFrom;
       const matchDateTo = dateTo === "" || asset.datePlaceInService <= dateTo;
       const cost = parseFloat(asset.assetCost.replace(/[^0-9.-]+/g, "")) || 0;
@@ -134,9 +142,9 @@ export default function Inventory() {
         ? asset.assetDescription.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
           asset.assetNumber.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
         : true;
-      return matchSubsidiary && matchCategory && matchLocation && matchStatus && matchDateFrom && matchDateTo && matchCostMin && matchCostMax && matchSearch;
+      return matchSubsidiary && matchCategory && matchLocation && matchStatus && matchVerification && matchItemStatus && matchDateFrom && matchDateTo && matchCostMin && matchCostMax && matchSearch;
     });
-  }, [assets, filterSubsidiary, filterCategory, filterLocation, filterStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
+  }, [assets, filterSubsidiary, filterCategory, filterLocation, filterStatus, filterVerification, filterItemStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAssets.length / itemsPerPage));
   
@@ -190,7 +198,10 @@ export default function Inventory() {
       'Depreciation Method': asset.depreciationMethod,
       'Life in Months': asset.lifeInMonths,
       'Listed': asset.listed,
-      'Status': asset.status
+      'Status': asset.status,
+      'Verification': asset.verification ? 'Yes' : 'No',
+      'Verification Date': asset.verificationDate,
+      'Item Status': asset.itemStatus
     }));
 
     const csv = Papa.unparse(dataToExport);
@@ -277,6 +288,9 @@ export default function Inventory() {
               lifeInMonths: row['Life in Months'] || row['lifeInMonths'] || '0',
               listed: row['Listed'] || row['listed'] || 'No',
               status: row['Status'] || row['status'] || 'Active',
+              verification: String(row['Verification'] || row['verification'] || 'No').trim().toLowerCase() === 'yes',
+              verificationDate: row['Verification Date'] || row['verificationDate'] || '',
+              itemStatus: row['Item Status'] || row['itemStatus'] || '',
             }, true)
             .then(() => {
               localSuccess++;
@@ -430,6 +444,18 @@ export default function Inventory() {
               selected={filterStatus}
               onChange={setFilterStatus}
             />
+            <MultiSelectDropdown
+              placeholder="All Verification"
+              options={['Yes', 'No']}
+              selected={filterVerification}
+              onChange={setFilterVerification}
+            />
+            <MultiSelectDropdown
+              placeholder="All Item Statuses"
+              options={itemStatuses}
+              selected={filterItemStatus}
+              onChange={setFilterItemStatus}
+            />
             <div className="flex items-center gap-1.5">
               <input
                 type="date"
@@ -471,6 +497,8 @@ export default function Inventory() {
               setFilterCategory([]);
               setFilterLocation([]);
               setFilterStatus([]);
+              setFilterVerification([]);
+              setFilterItemStatus([]);
               setDateFrom("");
               setDateTo("");
               setCostMin("");
@@ -531,6 +559,9 @@ export default function Inventory() {
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Life in Months</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Listed</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap text-center tracking-wider">Status</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap text-center tracking-wider">Verification</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Verification Date</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Item Status</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-outline-variant/30">
@@ -585,10 +616,20 @@ export default function Inventory() {
                       {asset.status}
                     </span>
                   </td>
+                  <td className="py-4 px-4 text-center">
+                    <span className={cn(
+                      "inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md border",
+                      asset.verification ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-surface-variant text-on-surface-variant border-outline-variant/50"
+                    )}>
+                      {asset.verification ? 'Yes' : 'No'}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-on-surface font-mono text-xs">{asset.verificationDate}</td>
+                  <td className="py-4 px-4 text-on-surface-variant">{asset.itemStatus}</td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={15} className="py-8 text-center text-on-surface-variant">Belum ada data asset</td>
+                  <td colSpan={18} className="py-8 text-center text-on-surface-variant">Belum ada data asset</td>
                 </tr>
               )}
             </tbody>
@@ -759,7 +800,7 @@ export default function Inventory() {
                   onClick={async () => {
                     if (deleteConfirmText === 'DELETE') {
                       const total = selectedAssets.size;
-                      const noFilters = filterSubsidiary.length === 0 && filterCategory.length === 0 && filterLocation.length === 0 && filterStatus.length === 0 && !dateFrom && !dateTo && !costMin && !costMax && !debouncedSearchQuery;
+                      const noFilters = filterSubsidiary.length === 0 && filterCategory.length === 0 && filterLocation.length === 0 && filterStatus.length === 0 && filterVerification.length === 0 && filterItemStatus.length === 0 && !dateFrom && !dateTo && !costMin && !costMax && !debouncedSearchQuery;
                       const allSelected = selectedAssets.size === filteredAssets.length;
 
                       setIsDeleteModalOpen(false);
