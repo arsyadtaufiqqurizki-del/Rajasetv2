@@ -40,9 +40,9 @@ interface ReclassificationContextType {
   deleteAllReclassifications: (onProgress?: (processed: number, failed: number) => void) => Promise<void>;
   verifyReclassification: (id: string, verified: boolean) => Promise<void>;
   syncFromAssets: (
-    assets: { id: string; verification: boolean }[],
+    assets: { id: string; verification: boolean; itemStatus: string }[],
     onProgress?: (processed: number, total: number, failed: number) => void
-  ) => Promise<{ total: number; success: number; failed: number }>;
+  ) => Promise<{ total: number; success: number; failed: number; errors: string[] }>;
   isAddModalOpen: boolean;
   setIsAddModalOpen: (isOpen: boolean) => void;
   isEditModalOpen: boolean;
@@ -274,7 +274,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
   };
 
   const syncFromAssets = async (
-    assets: { id: string; verification: boolean }[],
+    assets: { id: string; verification: boolean; itemStatus: string }[],
     onProgress?: (processed: number, total: number, failed: number) => void
   ) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -284,21 +284,27 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
     const BATCH_SIZE = 10;
     let success = 0;
     let failed = 0;
+    const errors: string[] = [];
     for (let i = 0; i < toLink.length; i += BATCH_SIZE) {
       const batch = toLink.slice(i, i + BATCH_SIZE);
       const { data, error } = await supabase
         .from('asset_reclassifications')
-        // category mirrors each asset's current verification so linking doesn't
-        // silently flip already-unverified assets to verified (see sync triggers).
+        // category mirrors each asset's current item_status (falling back to
+        // 'Asset' if unset) so linking doesn't silently flip already-unverified
+        // assets to verified, and stays consistent with the asset's own Item
+        // Status column (see sync triggers, migration 20260818000000).
         .insert(batch.map(a => ({
           asset_id: a.id,
-          category: a.verification ? 'Asset' : 'Needs Review',
+          category: a.verification ? (a.itemStatus || 'Asset') : 'Needs Review',
           created_by: user?.id ?? null,
         })))
         .select(RECLASSIFICATION_SELECT);
 
       if (error) {
         failed += batch.length;
+        // insert is one statement per batch, so a single bad row fails all
+        // rows in that batch — list the asset ids affected alongside the error.
+        errors.push(`Asset ID ${batch.map(a => a.id).join(', ')}: ${error.message}`);
       } else {
         success += data?.length ?? 0;
         setReclassifications(prev => [...(data ?? []).map(fromDb), ...prev]);
@@ -313,7 +319,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
         details: { total: toLink.length, success, failed },
       });
     }
-    return { total: toLink.length, success, failed };
+    return { total: toLink.length, success, failed, errors };
   };
 
   return (

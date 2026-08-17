@@ -20,7 +20,7 @@ export default function Reclassification() {
     setVerifyingReclassification, setIsVerifyModalOpen,
     setIsAddModalOpen, syncFromAssets,
   } = useReclassification();
-  const { assets } = useAsset();
+  const { assets, itemStatuses } = useAsset();
 
   const [filterCategory, setFilterCategory] = useState("");
   const [filterVerified, setFilterVerified] = useState("");
@@ -55,6 +55,7 @@ export default function Reclassification() {
     processed: number;
     successCount: number;
     failedCount: number;
+    errors: string[];
   }>({
     isOpen: false,
     status: 'syncing',
@@ -62,6 +63,7 @@ export default function Reclassification() {
     processed: 0,
     successCount: 0,
     failedCount: 0,
+    errors: [],
   });
 
   useEffect(() => {
@@ -73,9 +75,12 @@ export default function Reclassification() {
     setCurrentPage(1);
   }, [filterCategory, filterVerified, filterOwnership, debouncedSearchQuery]);
 
+  // Union of Asset Inventory's item_statuses lookup with whatever's actually in
+  // the data, so filter options stay consistent with Inventory.tsx even if a
+  // reclassification row has a category value not yet in the lookup table.
   const uniqueCategories = useMemo(
-    () => Array.from(new Set(reclassifications.map(r => r.category).filter(Boolean))),
-    [reclassifications]
+    () => Array.from(new Set([...itemStatuses, ...reclassifications.map(r => r.category).filter(Boolean)])),
+    [itemStatuses, reclassifications]
   );
   const uniqueOwnerships = useMemo(
     () => Array.from(new Set(reclassifications.map(r => r.ownership).filter(Boolean))),
@@ -137,7 +142,7 @@ export default function Reclassification() {
   }, [filteredItems]);
 
   const handleSyncFromAssets = useCallback(async () => {
-    setSyncModal({ isOpen: true, status: 'syncing', total: 0, processed: 0, successCount: 0, failedCount: 0 });
+    setSyncModal({ isOpen: true, status: 'syncing', total: 0, processed: 0, successCount: 0, failedCount: 0, errors: [] });
     const result = await syncFromAssets(assets, (processed, total, failed) => {
       setSyncModal(prev => ({ ...prev, total, processed, failedCount: failed, successCount: processed - failed }));
     });
@@ -148,6 +153,7 @@ export default function Reclassification() {
       processed: result.total,
       successCount: result.success,
       failedCount: result.failed,
+      errors: result.errors,
     });
   }, [assets, syncFromAssets]);
 
@@ -533,6 +539,16 @@ export default function Reclassification() {
                           <span className="font-semibold text-error">{syncModal.failedCount} asset</span>
                         </div>
                       )}
+                    </div>
+                  )}
+                  {syncModal.errors.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-error mb-1.5">Detail error</p>
+                      <div className="max-h-40 overflow-y-auto bg-error-container/20 border border-error/20 rounded-xl p-3 space-y-1.5">
+                        {syncModal.errors.map((message, idx) => (
+                          <p key={idx} className="text-xs text-error break-words">{message}</p>
+                        ))}
+                      </div>
                     </div>
                   )}
                   <div className="flex justify-end">
