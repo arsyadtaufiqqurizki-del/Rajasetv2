@@ -40,7 +40,7 @@ interface ReclassificationContextType {
   deleteAllReclassifications: (onProgress?: (processed: number, failed: number) => void) => Promise<void>;
   verifyReclassification: (id: string, verified: boolean) => Promise<void>;
   syncFromAssets: (
-    assets: { id: string }[],
+    assets: { id: string; verification: boolean }[],
     onProgress?: (processed: number, total: number, failed: number) => void
   ) => Promise<{ total: number; success: number; failed: number }>;
   isAddModalOpen: boolean;
@@ -77,7 +77,10 @@ const fromDb = (row: any): Reclassification => {
     ownership: linked ? (linked.subsidiary ?? '') : (row.ownership ?? ''),
     category: row.category ?? 'Needs Review',
     remarks: row.remarks ?? '',
-    verified: row.verified ?? false,
+    // Derived from category, not a stored flag: Needs Review = Unverified,
+    // anything else = Verified. Stays consistent with the bidirectional
+    // category <-> assets.verification sync (see migration 20260815020000).
+    verified: (row.category ?? 'Needs Review') !== 'Needs Review',
     verificationDate: row.verification_date ?? '',
     verifiedBy: row.verified_by ?? '',
     createdAt: row.created_at ?? '',
@@ -243,10 +246,14 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
       ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Unknown User')
       : null;
 
+    // Verification is expressed through category now: verifying resolves a
+    // pending row to 'Asset', un-verifying sends it back to 'Needs Review'.
+    // For linked rows this cascades to assets.verification via the existing
+    // category sync trigger.
     const { data, error } = await supabase
       .from('asset_reclassifications')
       .update({
-        verified,
+        category: verified ? 'Asset' : 'Needs Review',
         verification_date: verified ? new Date().toISOString() : null,
         verified_by: verifiedBy,
         updated_at: new Date().toISOString(),
@@ -267,9 +274,10 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
   };
 
   const syncFromAssets = async (
-    assets: { id: string }[],
+    assets: { id: string; verification: boolean }[],
     onProgress?: (processed: number, total: number, failed: number) => void
   ) => {
+    const { data: { user } } = await supabase.auth.getUser();
     const alreadyLinkedIds = new Set(reclassifications.filter(r => r.assetId).map(r => r.assetId));
     const toLink = assets.filter(a => !alreadyLinkedIds.has(a.id));
 
@@ -280,7 +288,13 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
       const batch = toLink.slice(i, i + BATCH_SIZE);
       const { data, error } = await supabase
         .from('asset_reclassifications')
-        .insert(batch.map(a => ({ asset_id: a.id, category: 'Asset', verified: false })))
+        // category mirrors each asset's current verification so linking doesn't
+        // silently flip already-unverified assets to verified (see sync triggers).
+        .insert(batch.map(a => ({
+          asset_id: a.id,
+          category: a.verification ? 'Asset' : 'Needs Review',
+          created_by: user?.id ?? null,
+        })))
         .select(RECLASSIFICATION_SELECT);
 
       if (error) {

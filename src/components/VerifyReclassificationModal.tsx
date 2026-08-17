@@ -47,7 +47,7 @@ export default function VerifyReclassificationModal() {
               <span className="font-semibold text-on-surface text-right">{item.assetDescription}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-on-surface-variant">Kategori</span>
+              <span className="text-on-surface-variant">Item Status</span>
               <span className="text-on-surface">{item.category}</span>
             </div>
             <div className="flex justify-between gap-4">

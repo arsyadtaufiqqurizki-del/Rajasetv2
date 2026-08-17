@@ -168,7 +168,7 @@ export default function EditReclassificationModal() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Category (Klasifikasi) *</label>
+              <label className="text-sm font-semibold text-on-surface">Item Status (Klasifikasi) *</label>
               <select
                 value={categorySelect}
                 onChange={(e) => setCategorySelect(e.target.value)}

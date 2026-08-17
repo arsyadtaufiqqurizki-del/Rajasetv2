@@ -171,7 +171,7 @@ export default function AddReclassificationModal() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Category (Klasifikasi) *</label>
+              <label className="text-sm font-semibold text-on-surface">Item Status (Klasifikasi) *</label>
               <select
                 value={categorySelect}
                 onChange={(e) => setCategorySelect(e.target.value)}

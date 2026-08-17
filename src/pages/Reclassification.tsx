@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2, Wrench } from 'lucide-react';
+import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useReclassification } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
@@ -118,9 +118,9 @@ export default function Reclassification() {
       'Location': sanitizeCsvField(item.location),
       'Unit': item.unit,
       'Ownership': sanitizeCsvField(item.ownership),
-      'Category': sanitizeCsvField(item.category),
+      'Item Status': sanitizeCsvField(item.category),
       'Remarks': sanitizeCsvField(item.remarks),
-      'Verified': item.verified ? 'Yes' : 'No',
+      'Verification': item.verified ? 'Yes' : 'No',
       'Verification Date': item.verificationDate,
       'Verified By': sanitizeCsvField(item.verifiedBy),
     }));
@@ -150,17 +150,6 @@ export default function Reclassification() {
       failedCount: result.failed,
     });
   }, [assets, syncFromAssets]);
-
-  // Flip to false to re-enable once the sync flow is ready to ship.
-  const SYNC_FROM_ASSETS_UNDER_MAINTENANCE = true;
-
-  const handleSyncFromAssetsClick = useCallback(() => {
-    if (SYNC_FROM_ASSETS_UNDER_MAINTENANCE) {
-      alert('Fitur "Sync from Assets" sedang dalam maintenance dan belum bisa dipakai. Akan tersedia kembali nanti.');
-      return;
-    }
-    handleSyncFromAssets();
-  }, [handleSyncFromAssets]);
 
   const handleEdit = useCallback((item: any) => {
     setEditingReclassification(item);
@@ -214,25 +203,13 @@ export default function Reclassification() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={handleSyncFromAssetsClick}
-            disabled={!SYNC_FROM_ASSETS_UNDER_MAINTENANCE && syncModal.isOpen && syncModal.status === 'syncing'}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
-              SYNC_FROM_ASSETS_UNDER_MAINTENANCE
-                ? "bg-surface border border-dashed border-outline-variant text-on-surface-variant/70 hover:text-on-surface-variant hover:border-outline-variant"
-                : "bg-surface border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary"
-            )}
-            title={SYNC_FROM_ASSETS_UNDER_MAINTENANCE
-              ? 'Fitur sedang dalam maintenance'
-              : 'Tambahkan asset dari Inventory yang belum tertaut sebagai baseline audit'}
+            onClick={handleSyncFromAssets}
+            disabled={syncModal.isOpen && syncModal.status === 'syncing'}
+            className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Tambahkan asset dari Inventory yang belum tertaut sebagai baseline audit"
           >
-            {SYNC_FROM_ASSETS_UNDER_MAINTENANCE ? <Wrench className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
+            <RefreshCw className="h-4 w-4" />
             Sync from Assets
-            {SYNC_FROM_ASSETS_UNDER_MAINTENANCE && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded bg-amber-100 text-amber-800 border border-amber-200">
-                Maintenance
-              </span>
-            )}
           </button>
           <button
             onClick={handleExportCSV}
@@ -333,7 +310,7 @@ export default function Reclassification() {
             onChange={(e) => setFilterCategory(e.target.value)}
             className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
           >
-            <option value="">Semua Category</option>
+            <option value="">Semua Item Status</option>
             {uniqueCategories.map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
@@ -343,7 +320,7 @@ export default function Reclassification() {
             onChange={(e) => setFilterVerified(e.target.value)}
             className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
           >
-            <option value="">Semua Status</option>
+            <option value="">Semua Verification</option>
             <option value="verified">Verified</option>
             <option value="unverified">Unverified</option>
           </select>
@@ -391,9 +368,9 @@ export default function Reclassification() {
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Location</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Unit</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Ownership</th>
-                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Category</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Item Status</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Remarks</th>
-                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap text-center tracking-wider">Status</th>
+                <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap text-center tracking-wider">Verification</th>
                 <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Verification Date</th>
               </tr>
             </thead>
