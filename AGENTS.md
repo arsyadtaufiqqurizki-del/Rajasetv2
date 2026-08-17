@@ -90,7 +90,12 @@ npm run clean      # Remove dist/ and server.js
     ├── 20260721000000_purge_old_activity_logs.sql      # pg_cron job: purge activity_logs > 3 months
     ├── 20260722000000_add_remarks_to_asset_reclassifications.sql # adds `remarks` TEXT column
     ├── 20260724000000_create_report_history.sql        # report_history table + RLS (select/insert)
-    └── 20260724010000_add_delete_policy_to_report_history.sql # RLS delete policy for report_history
+    ├── 20260724010000_add_delete_policy_to_report_history.sql # RLS delete policy for report_history
+    ├── 20260814000000_link_reclassifications_to_assets.sql # adds `asset_id` FK; linked rows mirror asset fields live
+    ├── 20260815020000_unify_reclassification_category_with_verification.sql # bidirectional trigger: category <-> assets.verification
+    ├── 20260817000000_drop_reclassification_verified_column.sql # drops `verified` col — now derived from `category`
+    ├── 20260818000000_link_reclassification_category_to_item_status.sql # extends sync to assets.item_status
+    └── 20260818010000_fix_reclassification_duplicate_on_unverify.sql # fixes duplicate-row bug in the sync trigger (see "Reclassification ↔ Asset Verification Sync" below)
 ```
 
 ## Architecture
@@ -122,11 +127,22 @@ Semua data utama (assets, maintenance_records, asset_reclassifications, report_h
 
 **ReclassificationContext** (`src/contexts/ReclassificationContext.tsx`)
 - `reclassifications`: Reclassification[] — fetched chunked (1000 rows/page) dari tabel `asset_reclassifications`
-- CRUD: `addReclassification(item, skipLog?)`, `updateReclassification`, `deleteReclassification`
-- `verifyReclassification(id, verified)`: set `verified`/`verification_date`/`verified_by` (nama dari `user_metadata.full_name` atau email)
+- Baris bisa **linked** (`assetId` set, via FK ke `assets`) atau **unlinked** (free-text). Baris linked me-mirror field identitas aset (nomor, deskripsi, lokasi, dll) secara live lewat join `linked_asset:assets(...)` — field itu tidak lagi disimpan di baris reclassification-nya sendiri untuk baris linked.
+- CRUD: `addReclassification(item, skipLog?)` (unlinked), `addLinkedReclassification(assetId, category, remarks)` (linked — dipakai `AddReclassificationModal`, hanya menampilkan asset yang belum ter-link), `updateReclassification`, `deleteReclassification`
+- `verifyReclassification(id, verified)`: menulis `category` ('Asset' saat verified, 'Needs Review' saat tidak) + `verification_date`/`verified_by` (nama dari `user_metadata.full_name` atau email). **Tidak ada kolom `verified` tersimpan** — lihat schema di bawah.
+- `syncFromAssets(assets)`: bulk-link semua asset yang belum ter-link, `category` awal mengikuti `itemStatus` asset (fallback `'Asset'`) atau `'Needs Review'` kalau asset belum verified. Skip asset yang sudah ter-link (satu baris reclassification per asset yang ter-link).
 - `remarks`: string — catatan tambahan bebas per temuan reklasifikasi (kolom `remarks` di `asset_reclassifications`, ditambah lewat migration terpisah)
 - Modal state: `isAddModalOpen`, `isEditModalOpen`, `editingReclassification`, `isVerifyModalOpen`, `verifyingReclassification`
 - Setiap mutasi (kecuali saat `skipLog=true`) memanggil `logActivity()` dengan actionType `ADD_RECLASSIFICATION`/`UPDATE_RECLASSIFICATION`/`DELETE_RECLASSIFICATION`/`VERIFY_RECLASSIFICATION`
+
+### Reclassification ↔ Asset Verification Sync (DB triggers)
+
+Untuk baris linked, `asset_reclassifications.category` dan `assets.verification`/`assets.item_status` disinkronkan bidirectional lewat Postgres trigger (bukan kode aplikasi):
+- `category = 'Needs Review'` ⟷ `assets.verification = false`; `category` lain apa pun ⟷ `verification = true` (jadi `verified` di UI **derived** dari `category`, bukan kolom tersendiri — lihat migration `20260817000000`).
+- `assets.item_status` di-mirror ke `category` dan sebaliknya (migration `20260818000000`) — dua kolom "Item Status" (Asset Inventory vs Reclassification) selalu senilai untuk baris linked.
+- **Invariant**: maksimal satu baris `asset_reclassifications` per `asset_id` yang ter-link (ditegakkan di level aplikasi — `AddReclassificationModal`/`syncFromAssets` menyaring asset yang sudah ter-link — bukan constraint DB).
+- **Bug yang pernah terjadi** (fixed di migration `20260818010000`): trigger `sync_category_from_asset_verification()` yang lama, saat un-verify dari **Asset Inventory** (bukan dari tombol Verify di halaman Reclassification), cuma cek "ada baris `category = 'Needs Review'`?" — kalau baris yang ada category-nya bukan `'Needs Review'` (mis. sudah `'Asset'`), trigger salah kaprah INSERT baris baru alih-alih UPDATE baris lama, melanggar invariant di atas dan bikin asset itu tampil dobel di halaman Reclassification. Fix-nya: cek dulu apakah asset itu **sudah punya baris apa pun**, kalau ya UPDATE baris itu balik ke `'Needs Review'`, insert baru hanya kalau benar-benar belum pernah ada baris untuk asset itu.
+- Sinkronisasi ini jalan di level DB (trigger), bukan realtime di UI — perubahan dari satu halaman (mis. edit di Asset Inventory) baru kelihatan di halaman lain (Reclassification) setelah reload, karena context fetch data sekali saat mount (tidak ada refetch/subscription lintas halaman).
 
 **ReportContext** (`src/contexts/ReportContext.tsx`)
 - `reportHistory`: ReportRecord[] — halaman saat ini dari tabel `report_history`, server-side pagination (`PAGE_SIZE = 5`) via `.range()` + `count: 'exact'`
@@ -209,13 +225,15 @@ Setiap `generatePreview()` yang sukses otomatis memanggil `saveReport()` (Report
 | Field | Type | Description |
 |---|---|---|
 | id | string (UUID) | Primary key |
-| assetCategory | string | Kategori aset saat ini |
-| assetDescription | string | Deskripsi aset |
-| location | string | Lokasi aset |
-| unit | string | Jumlah unit (disimpan numeric, di-string-kan di client) |
-| ownership | string | Kepemilikan |
-| category | 'Asset'\|'Needs Review'\|'Inventory'\|string | Kategori hasil reklasifikasi |
-| verified | boolean | Status verifikasi |
+| assetId | string \| null | FK ke `assets.id`. Null = baris unlinked (free-text) |
+| linkedAssetNumber | string | Hanya terisi untuk baris linked, live dari join `assets.asset_number` |
+| assetCategory | string | Linked: live dari `assets.category_segment1`. Unlinked: kolom lokal `asset_category` |
+| assetDescription | string | Linked: live dari `assets.asset_description`. Unlinked: kolom lokal |
+| location | string | Linked: live dari `assets.category_segment2`. Unlinked: kolom lokal |
+| unit | string | Linked: live dari `assets.asset_units`. Unlinked: kolom lokal (disimpan numeric, di-string-kan di client) |
+| ownership | string | Linked: live dari `assets.subsidiary`. Unlinked: kolom lokal |
+| category | 'Asset'\|'Needs Review'\|'Inventory'\|string | Kategori hasil reklasifikasi. UI label: **"Item Status"**. Untuk baris linked, disinkronkan bidirectional dengan `assets.verification`/`assets.item_status` via DB trigger — lihat "Reclassification ↔ Asset Verification Sync" di atas |
+| verified | boolean | **Tidak disimpan** — derived di client: `category !== 'Needs Review'` (kolom `verified` di-drop via migration `20260817000000`) |
 | verificationDate | string | Tanggal diverifikasi (kosong jika belum) |
 | verifiedBy | string | Nama/email verifikator |
 | createdAt | string | Timestamp dibuat |
