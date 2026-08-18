@@ -2,15 +2,10 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { logActivity } from '../lib/activityLogger';
 import { Eye, Edit2, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Search, Upload, Download, FileDown, CheckCircle, XCircle, Loader2, Plus, X } from 'lucide-react';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn, formatCurrency, parseListParam } from '../lib/utils';
 import { useAsset } from '../contexts/AssetContext';
 import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import Papa from 'papaparse';
-
-function parseListParam(searchParams: URLSearchParams, key: string): string[] {
-  const raw = searchParams.get(key);
-  return raw ? raw.split(',').filter(Boolean) : [];
-}
 
 export default function Inventory() {
   const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, itemStatuses, addAsset } = useAsset();

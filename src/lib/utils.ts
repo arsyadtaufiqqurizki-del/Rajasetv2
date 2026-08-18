@@ -5,6 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Reads a comma-joined multi-select filter value from URL search params. */
+export function parseListParam(searchParams: URLSearchParams, key: string): string[] {
+  const raw = searchParams.get(key);
+  return raw ? raw.split(',').filter(Boolean) : [];
+}
+
 export function formatCurrency(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return '-';
   const numeric = typeof value === 'number' ? value : parseFloat(String(value).replace(/,/g, ''));

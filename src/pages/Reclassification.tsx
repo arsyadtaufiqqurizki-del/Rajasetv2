@@ -1,8 +1,10 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { useSearchParams } from 'react-router-dom';
+import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2, X } from 'lucide-react';
+import { cn, parseListParam } from '../lib/utils';
 import { useReclassification } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import Papa from 'papaparse';
 
 // Mencegah CSV injection: field yang diawali =, +, -, @, tab, atau CR akan
@@ -21,12 +23,15 @@ export default function Reclassification() {
     setIsAddModalOpen, syncFromAssets,
   } = useReclassification();
   const { assets, itemStatuses } = useAsset();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [filterCategory, setFilterCategory] = useState("");
-  const [filterVerified, setFilterVerified] = useState("");
-  const [filterOwnership, setFilterOwnership] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string[]>(() => parseListParam(searchParams, 'category'));
+  const [filterVerified, setFilterVerified] = useState<string[]>(() => parseListParam(searchParams, 'verified'));
+  const [filterOwnership, setFilterOwnership] = useState<string[]>(() => parseListParam(searchParams, 'ownership'));
+  const [filterAssetCategory, setFilterAssetCategory] = useState<string[]>(() => parseListParam(searchParams, 'assetCategory'));
+  const [filterLocation, setFilterLocation] = useState<string[]>(() => parseListParam(searchParams, 'location'));
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || "");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() => searchParams.get('q') || "");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -73,7 +78,19 @@ export default function Reclassification() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterCategory, filterVerified, filterOwnership, debouncedSearchQuery]);
+  }, [filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery]);
+
+  // Sync filters to URL query params
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterCategory.length > 0) params.set('category', filterCategory.join(','));
+    if (filterVerified.length > 0) params.set('verified', filterVerified.join(','));
+    if (filterOwnership.length > 0) params.set('ownership', filterOwnership.join(','));
+    if (filterAssetCategory.length > 0) params.set('assetCategory', filterAssetCategory.join(','));
+    if (filterLocation.length > 0) params.set('location', filterLocation.join(','));
+    if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
+    setSearchParams(params, { replace: true });
+  }, [filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery, setSearchParams]);
 
   // Union of Asset Inventory's item_statuses lookup with whatever's actually in
   // the data, so filter options stay consistent with Inventory.tsx even if a
@@ -86,6 +103,27 @@ export default function Reclassification() {
     () => Array.from(new Set(reclassifications.map(r => r.ownership).filter(Boolean))),
     [reclassifications]
   );
+  const uniqueAssetCategories = useMemo(
+    () => Array.from(new Set(reclassifications.map(r => r.assetCategory).filter(Boolean))),
+    [reclassifications]
+  );
+  const uniqueLocations = useMemo(
+    () => Array.from(new Set(reclassifications.map(r => r.location).filter(Boolean))),
+    [reclassifications]
+  );
+
+  const activeFilters = useMemo(() => {
+    const chips: { id: string; label: string; onRemove: () => void }[] = [];
+    filterCategory.forEach(v => chips.push({ id: `cat-${v}`, label: `Item Status: ${v}`, onRemove: () => setFilterCategory(prev => prev.filter(x => x !== v)) }));
+    filterVerified.forEach(v => chips.push({ id: `verif-${v}`, label: `Verification: ${v}`, onRemove: () => setFilterVerified(prev => prev.filter(x => x !== v)) }));
+    filterOwnership.forEach(v => chips.push({ id: `own-${v}`, label: `Ownership: ${v}`, onRemove: () => setFilterOwnership(prev => prev.filter(x => x !== v)) }));
+    filterAssetCategory.forEach(v => chips.push({ id: `assetcat-${v}`, label: `Asset Category: ${v}`, onRemove: () => setFilterAssetCategory(prev => prev.filter(x => x !== v)) }));
+    filterLocation.forEach(v => chips.push({ id: `loc-${v}`, label: `Location: ${v}`, onRemove: () => setFilterLocation(prev => prev.filter(x => x !== v)) }));
+    if (debouncedSearchQuery) {
+      chips.push({ id: 'search', label: `Search: "${debouncedSearchQuery}"`, onRemove: () => setSearchQuery("") });
+    }
+    return chips;
+  }, [filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery]);
 
   const stats = useMemo(() => {
     const total = reclassifications.length;
@@ -97,18 +135,18 @@ export default function Reclassification() {
 
   const filteredItems = useMemo(() => {
     return reclassifications.filter(item => {
-      const matchCategory = filterCategory ? item.category === filterCategory : true;
-      const matchVerified = filterVerified
-        ? (filterVerified === 'verified' ? item.verified : !item.verified)
-        : true;
-      const matchOwnership = filterOwnership ? item.ownership === filterOwnership : true;
+      const matchCategory = filterCategory.length === 0 || filterCategory.includes(item.category);
+      const matchVerified = filterVerified.length === 0 || filterVerified.includes(item.verified ? 'Yes' : 'No');
+      const matchOwnership = filterOwnership.length === 0 || filterOwnership.includes(item.ownership);
+      const matchAssetCategory = filterAssetCategory.length === 0 || filterAssetCategory.includes(item.assetCategory);
+      const matchLocation = filterLocation.length === 0 || filterLocation.includes(item.location);
       const matchSearch = debouncedSearchQuery
         ? item.assetDescription.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
           item.location.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
         : true;
-      return matchCategory && matchVerified && matchOwnership && matchSearch;
+      return matchCategory && matchVerified && matchOwnership && matchAssetCategory && matchLocation && matchSearch;
     });
-  }, [reclassifications, filterCategory, filterVerified, filterOwnership, debouncedSearchQuery]);
+  }, [reclassifications, filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
   const paginatedItems = useMemo(() => {
@@ -294,64 +332,94 @@ export default function Reclassification() {
         </div>
       </div>
 
-      <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant flex flex-wrap gap-4 items-center shadow-sm">
-        <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
-          <Filter className="h-4 w-4" /> Filters
-        </span>
-        <div className="flex-1 flex flex-wrap gap-2.5">
-          <div className="relative min-w-[200px] flex-1 sm:flex-none">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-on-surface-variant" />
+      <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant flex flex-col gap-3 shadow-sm">
+        <div className="flex flex-wrap gap-4 items-center">
+          <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
+            <Filter className="h-4 w-4" /> Filters
+            {activeFilters.length > 0 && (
+              <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold normal-case tracking-normal">
+                {activeFilters.length}
+              </span>
+            )}
+          </span>
+          <div className="flex-1 flex flex-wrap gap-2.5 items-center">
+            <div className="relative min-w-[200px] flex-1 sm:flex-none">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-on-surface-variant" />
+              </div>
+              <input
+                type="text"
+                placeholder="Cari deskripsi atau lokasi..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Cari deskripsi atau lokasi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+            <MultiSelectDropdown
+              placeholder="All Item Statuses"
+              options={uniqueCategories}
+              selected={filterCategory}
+              onChange={setFilterCategory}
+            />
+            <MultiSelectDropdown
+              placeholder="All Verification"
+              options={['Yes', 'No']}
+              selected={filterVerified}
+              onChange={setFilterVerified}
+            />
+            <MultiSelectDropdown
+              placeholder="All Ownership"
+              options={uniqueOwnerships}
+              selected={filterOwnership}
+              onChange={setFilterOwnership}
+            />
+            <MultiSelectDropdown
+              placeholder="All Asset Categories"
+              options={uniqueAssetCategories}
+              selected={filterAssetCategory}
+              onChange={setFilterAssetCategory}
+            />
+            <MultiSelectDropdown
+              placeholder="All Locations"
+              options={uniqueLocations}
+              selected={filterLocation}
+              onChange={setFilterLocation}
             />
           </div>
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+          <button
+            onClick={() => {
+              setFilterCategory([]);
+              setFilterVerified([]);
+              setFilterOwnership([]);
+              setFilterAssetCategory([]);
+              setFilterLocation([]);
+              setSearchQuery("");
+            }}
+            className="text-sm font-medium text-secondary hover:text-primary transition-colors"
           >
-            <option value="">Semua Item Status</option>
-            {uniqueCategories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-          <select
-            value={filterVerified}
-            onChange={(e) => setFilterVerified(e.target.value)}
-            className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-          >
-            <option value="">Semua Verification</option>
-            <option value="verified">Verified</option>
-            <option value="unverified">Unverified</option>
-          </select>
-          <select
-            value={filterOwnership}
-            onChange={(e) => setFilterOwnership(e.target.value)}
-            className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-          >
-            <option value="">Semua Ownership</option>
-            {uniqueOwnerships.map(o => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </select>
+            Clear Filters
+          </button>
         </div>
-        <button
-          onClick={() => {
-            setFilterCategory("");
-            setFilterVerified("");
-            setFilterOwnership("");
-            setSearchQuery("");
-          }}
-          className="text-sm font-medium text-secondary hover:text-primary transition-colors"
-        >
-          Clear Filters
-        </button>
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {activeFilters.map(chip => (
+              <span
+                key={chip.id}
+                className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant rounded-full pl-3 pr-1.5 py-1 text-xs text-on-surface"
+              >
+                {chip.label}
+                <button
+                  type="button"
+                  onClick={chip.onRemove}
+                  className="p-0.5 rounded-full hover:bg-surface-container-highest text-on-surface-variant hover:text-error transition-colors"
+                  aria-label={`Remove filter ${chip.label}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex-1 flex flex-col overflow-hidden">
@@ -598,7 +666,7 @@ export default function Reclassification() {
                   onClick={async () => {
                     if (deleteConfirmText === 'DELETE') {
                       const total = selectedItems.size;
-                      const noFilters = !filterCategory && !filterVerified && !filterOwnership && !debouncedSearchQuery;
+                      const noFilters = filterCategory.length === 0 && filterVerified.length === 0 && filterOwnership.length === 0 && filterAssetCategory.length === 0 && filterLocation.length === 0 && !debouncedSearchQuery;
                       const allSelected = selectedItems.size === filteredItems.length;
 
                       setIsDeleteModalOpen(false);
