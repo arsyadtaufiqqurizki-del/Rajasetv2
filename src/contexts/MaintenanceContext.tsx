@@ -1,22 +1,9 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../lib/activityLogger';
+import type { MaintenanceRecord } from '../types/maintenance';
 
-export type MaintenanceRecord = {
-  id: string;
-  assetBook: string;
-  subsidiary: string;
-  assetNumber: string;
-  assetDescription: string;
-  assetUnits: string;
-  serviceType: string;
-  assetCategorySegment1: string;
-  assetCategorySegment2: string;
-  estimateCost: string;
-  actualCost: string;
-  status: string;
-  scheduledDate: string;
-};
+export type { MaintenanceRecord, MaintenanceInput, MaintenanceStatus } from '../types/maintenance';
 
 interface MaintenanceContextType {
   records: MaintenanceRecord[];

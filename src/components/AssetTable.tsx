@@ -1,5 +1,6 @@
 import { Edit2, Trash2 } from 'lucide-react';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn } from '../lib/utils';
+import { formatCurrency } from '../lib/money';
 import type { Asset } from '../contexts/AssetContext';
 
 interface AssetTableProps {

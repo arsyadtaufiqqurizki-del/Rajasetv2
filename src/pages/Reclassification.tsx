@@ -1,18 +1,14 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Edit2, Trash2, Filter, ChevronLeft, ChevronRight, Search, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2, X } from 'lucide-react';
-import { cn, parseListParam } from '../lib/utils';
+import { Edit2, Trash2, Plus, ClipboardList, CheckCircle2, XCircle, AlertTriangle, Download, CheckCircle, Loader2, RefreshCw, Link2 } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { sanitizeCell, toCsvBlob, downloadBlob } from '../lib/csv';
 import { useReclassification } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
-import MultiSelectDropdown from '../components/MultiSelectDropdown';
-import Papa from 'papaparse';
-
-// Mencegah CSV injection: field yang diawali =, +, -, @, tab, atau CR akan
-// dieksekusi sebagai formula oleh Excel/Sheets kalau tidak dinetralkan.
-const sanitizeCsvField = (value: unknown): unknown => {
-  if (typeof value !== 'string') return value;
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-};
+import { useReclassificationFilters } from '../hooks/useReclassificationFilters';
+import MultiSelectDropdown from '../components/ui/MultiSelectDropdown';
+import FilterBar from '../components/ui/FilterBar';
+import Pagination from '../components/ui/Pagination';
 
 export default function Reclassification() {
   const {
@@ -25,16 +21,23 @@ export default function Reclassification() {
   const { assets, itemStatuses } = useAsset();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [filterCategory, setFilterCategory] = useState<string[]>(() => parseListParam(searchParams, 'category'));
-  const [filterVerified, setFilterVerified] = useState<string[]>(() => parseListParam(searchParams, 'verified'));
-  const [filterOwnership, setFilterOwnership] = useState<string[]>(() => parseListParam(searchParams, 'ownership'));
-  const [filterAssetCategory, setFilterAssetCategory] = useState<string[]>(() => parseListParam(searchParams, 'assetCategory'));
-  const [filterLocation, setFilterLocation] = useState<string[]>(() => parseListParam(searchParams, 'location'));
-  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || "");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() => searchParams.get('q') || "");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  const {
+    filterCategory, setFilterCategory,
+    filterVerified, setFilterVerified,
+    filterOwnership, setFilterOwnership,
+    filterAssetCategory, setFilterAssetCategory,
+    filterLocation, setFilterLocation,
+    searchQuery, setSearchQuery,
+    debouncedSearchQuery,
+    uniqueCategories, uniqueOwnerships, uniqueAssetCategories, uniqueLocations,
+    activeFilters,
+    filteredItems,
+    clearFilters,
+  } = useReclassificationFilters(reclassifications, itemStatuses, searchParams, setSearchParams, () => setCurrentPage(1));
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -71,60 +74,6 @@ export default function Reclassification() {
     errors: [],
   });
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery]);
-
-  // Sync filters to URL query params
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (filterCategory.length > 0) params.set('category', filterCategory.join(','));
-    if (filterVerified.length > 0) params.set('verified', filterVerified.join(','));
-    if (filterOwnership.length > 0) params.set('ownership', filterOwnership.join(','));
-    if (filterAssetCategory.length > 0) params.set('assetCategory', filterAssetCategory.join(','));
-    if (filterLocation.length > 0) params.set('location', filterLocation.join(','));
-    if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
-    setSearchParams(params, { replace: true });
-  }, [filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery, setSearchParams]);
-
-  // Union of Asset Inventory's item_statuses lookup with whatever's actually in
-  // the data, so filter options stay consistent with Inventory.tsx even if a
-  // reclassification row has a category value not yet in the lookup table.
-  const uniqueCategories = useMemo(
-    () => Array.from(new Set([...itemStatuses, ...reclassifications.map(r => r.category).filter(Boolean)])),
-    [itemStatuses, reclassifications]
-  );
-  const uniqueOwnerships = useMemo(
-    () => Array.from(new Set(reclassifications.map(r => r.ownership).filter(Boolean))),
-    [reclassifications]
-  );
-  const uniqueAssetCategories = useMemo(
-    () => Array.from(new Set(reclassifications.map(r => r.assetCategory).filter(Boolean))),
-    [reclassifications]
-  );
-  const uniqueLocations = useMemo(
-    () => Array.from(new Set(reclassifications.map(r => r.location).filter(Boolean))),
-    [reclassifications]
-  );
-
-  const activeFilters = useMemo(() => {
-    const chips: { id: string; label: string; onRemove: () => void }[] = [];
-    filterCategory.forEach(v => chips.push({ id: `cat-${v}`, label: `Item Status: ${v}`, onRemove: () => setFilterCategory(prev => prev.filter(x => x !== v)) }));
-    filterVerified.forEach(v => chips.push({ id: `verif-${v}`, label: `Verification: ${v}`, onRemove: () => setFilterVerified(prev => prev.filter(x => x !== v)) }));
-    filterOwnership.forEach(v => chips.push({ id: `own-${v}`, label: `Ownership: ${v}`, onRemove: () => setFilterOwnership(prev => prev.filter(x => x !== v)) }));
-    filterAssetCategory.forEach(v => chips.push({ id: `assetcat-${v}`, label: `Asset Category: ${v}`, onRemove: () => setFilterAssetCategory(prev => prev.filter(x => x !== v)) }));
-    filterLocation.forEach(v => chips.push({ id: `loc-${v}`, label: `Location: ${v}`, onRemove: () => setFilterLocation(prev => prev.filter(x => x !== v)) }));
-    if (debouncedSearchQuery) {
-      chips.push({ id: 'search', label: `Search: "${debouncedSearchQuery}"`, onRemove: () => setSearchQuery("") });
-    }
-    return chips;
-  }, [filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery]);
-
   const stats = useMemo(() => {
     const total = reclassifications.length;
     const verified = reclassifications.filter(r => r.verified).length;
@@ -132,21 +81,6 @@ export default function Reclassification() {
     const needsReview = reclassifications.filter(r => r.category === 'Needs Review').length;
     return { total, verified, unverified, needsReview };
   }, [reclassifications]);
-
-  const filteredItems = useMemo(() => {
-    return reclassifications.filter(item => {
-      const matchCategory = filterCategory.length === 0 || filterCategory.includes(item.category);
-      const matchVerified = filterVerified.length === 0 || filterVerified.includes(item.verified ? 'Yes' : 'No');
-      const matchOwnership = filterOwnership.length === 0 || filterOwnership.includes(item.ownership);
-      const matchAssetCategory = filterAssetCategory.length === 0 || filterAssetCategory.includes(item.assetCategory);
-      const matchLocation = filterLocation.length === 0 || filterLocation.includes(item.location);
-      const matchSearch = debouncedSearchQuery
-        ? item.assetDescription.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-          item.location.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-        : true;
-      return matchCategory && matchVerified && matchOwnership && matchAssetCategory && matchLocation && matchSearch;
-    });
-  }, [reclassifications, filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
   const paginatedItems = useMemo(() => {
@@ -156,27 +90,19 @@ export default function Reclassification() {
 
   const handleExportCSV = useCallback(() => {
     const dataToExport = filteredItems.map(item => ({
-      'Asset Category': sanitizeCsvField(item.assetCategory),
-      'Asset Description': sanitizeCsvField(item.assetDescription),
-      'Location': sanitizeCsvField(item.location),
+      'Asset Category': sanitizeCell(item.assetCategory),
+      'Asset Description': sanitizeCell(item.assetDescription),
+      'Location': sanitizeCell(item.location),
       'Unit': item.unit,
-      'Ownership': sanitizeCsvField(item.ownership),
-      'Item Status': sanitizeCsvField(item.category),
-      'Remarks': sanitizeCsvField(item.remarks),
+      'Ownership': sanitizeCell(item.ownership),
+      'Item Status': sanitizeCell(item.category),
+      'Remarks': sanitizeCell(item.remarks),
       'Verification': item.verified ? 'Yes' : 'No',
       'Verification Date': item.verificationDate,
-      'Verified By': sanitizeCsvField(item.verifiedBy),
+      'Verified By': sanitizeCell(item.verifiedBy),
     }));
 
-    const csv = Papa.unparse(dataToExport);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Asset_Reclassification_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadBlob(`Asset_Reclassification_${new Date().toISOString().split('T')[0]}.csv`, toCsvBlob(dataToExport));
   }, [filteredItems]);
 
   const handleSyncFromAssets = useCallback(async () => {
@@ -332,95 +258,45 @@ export default function Reclassification() {
         </div>
       </div>
 
-      <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant flex flex-col gap-3 shadow-sm">
-        <div className="flex flex-wrap gap-4 items-center">
-          <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
-            <Filter className="h-4 w-4" /> Filters
-            {activeFilters.length > 0 && (
-              <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold normal-case tracking-normal">
-                {activeFilters.length}
-              </span>
-            )}
-          </span>
-          <div className="flex-1 flex flex-wrap gap-2.5 items-center">
-            <div className="relative min-w-[200px] flex-1 sm:flex-none">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-on-surface-variant" />
-              </div>
-              <input
-                type="text"
-                placeholder="Cari deskripsi atau lokasi..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
-              />
-            </div>
-            <MultiSelectDropdown
-              placeholder="All Item Statuses"
-              options={uniqueCategories}
-              selected={filterCategory}
-              onChange={setFilterCategory}
-            />
-            <MultiSelectDropdown
-              placeholder="All Verification"
-              options={['Yes', 'No']}
-              selected={filterVerified}
-              onChange={setFilterVerified}
-            />
-            <MultiSelectDropdown
-              placeholder="All Ownership"
-              options={uniqueOwnerships}
-              selected={filterOwnership}
-              onChange={setFilterOwnership}
-            />
-            <MultiSelectDropdown
-              placeholder="All Asset Categories"
-              options={uniqueAssetCategories}
-              selected={filterAssetCategory}
-              onChange={setFilterAssetCategory}
-            />
-            <MultiSelectDropdown
-              placeholder="All Locations"
-              options={uniqueLocations}
-              selected={filterLocation}
-              onChange={setFilterLocation}
-            />
-          </div>
-          <button
-            onClick={() => {
-              setFilterCategory([]);
-              setFilterVerified([]);
-              setFilterOwnership([]);
-              setFilterAssetCategory([]);
-              setFilterLocation([]);
-              setSearchQuery("");
-            }}
-            className="text-sm font-medium text-secondary hover:text-primary transition-colors"
-          >
-            Clear Filters
-          </button>
-        </div>
-        {activeFilters.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {activeFilters.map(chip => (
-              <span
-                key={chip.id}
-                className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant rounded-full pl-3 pr-1.5 py-1 text-xs text-on-surface"
-              >
-                {chip.label}
-                <button
-                  type="button"
-                  onClick={chip.onRemove}
-                  className="p-0.5 rounded-full hover:bg-surface-container-highest text-on-surface-variant hover:text-error transition-colors"
-                  aria-label={`Remove filter ${chip.label}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+      <FilterBar
+        className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm"
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        searchPlaceholder="Cari deskripsi atau lokasi..."
+        chips={activeFilters}
+        onClearFilters={clearFilters}
+      >
+        <MultiSelectDropdown
+          placeholder="All Item Statuses"
+          options={uniqueCategories}
+          selected={filterCategory}
+          onChange={setFilterCategory}
+        />
+        <MultiSelectDropdown
+          placeholder="All Verification"
+          options={['Yes', 'No']}
+          selected={filterVerified}
+          onChange={setFilterVerified}
+        />
+        <MultiSelectDropdown
+          placeholder="All Ownership"
+          options={uniqueOwnerships}
+          selected={filterOwnership}
+          onChange={setFilterOwnership}
+        />
+        <MultiSelectDropdown
+          placeholder="All Asset Categories"
+          options={uniqueAssetCategories}
+          selected={filterAssetCategory}
+          onChange={setFilterAssetCategory}
+        />
+        <MultiSelectDropdown
+          placeholder="All Locations"
+          options={uniqueLocations}
+          selected={filterLocation}
+          onChange={setFilterLocation}
+        />
+      </FilterBar>
 
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex-1 flex flex-col overflow-hidden">
         <div className="overflow-x-auto flex-1">
@@ -532,28 +408,14 @@ export default function Reclassification() {
           </table>
         </div>
 
-        <div className="p-3 border-t border-outline-variant bg-surface-container flex items-center justify-between text-sm mt-auto">
-          <span className="text-on-surface-variant">Showing {paginatedItems.length} of {filteredItems.length} entries</span>
-          <div className="flex items-center gap-1 text-sm font-medium">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
-            >
-              <ChevronLeft className="h-5 w-5"/>
-            </button>
-            <span className="px-3 py-1 rounded bg-surface-container-high text-on-surface font-semibold text-xs">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
-            >
-              <ChevronRight className="h-5 w-5"/>
-            </button>
-          </div>
-        </div>
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          visibleCount={paginatedItems.length}
+          totalCount={filteredItems.length}
+          onPrev={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+          onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+        />
       </div>
 
       {/* Sync from Assets Progress Modal */}

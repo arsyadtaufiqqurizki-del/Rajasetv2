@@ -139,7 +139,7 @@ export default function MaintenanceCalendarModal({ isOpen, onClose, records, onS
                 {label}
               </div>
             ))}
-            {weeks.map((week, weekIdx) => (
+            {weeks.map(week => (
               week.map(day => {
                 const key = toDateKey(day);
                 const dayRecords = recordsByDay.get(key) ?? [];

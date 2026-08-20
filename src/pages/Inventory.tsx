@@ -4,6 +4,7 @@ import { logActivity } from '../lib/activityLogger';
 import { CheckCircle } from 'lucide-react';
 import { useAsset, type Asset } from '../contexts/AssetContext';
 import { useAssetFilters } from '../hooks/useAssetFilters';
+import { sanitizeCell, toCsvBlob, downloadBlob } from '../lib/csv';
 import AssetToolbar from '../components/AssetToolbar';
 import AssetFilters from '../components/AssetFilters';
 import AssetTable from '../components/AssetTable';
@@ -122,34 +123,28 @@ export default function Inventory() {
     // Let the spinner paint before the synchronous CSV build blocks the thread
     setTimeout(() => {
       const dataToExport = sourceAssets.map(asset => ({
-        'Asset Number': asset.assetNumber,
-        'Asset Description': asset.assetDescription,
-        'Asset Book': asset.assetBook,
-        'Subsidiary': asset.subsidiary,
+        'Asset Number': sanitizeCell(asset.assetNumber),
+        'Asset Description': sanitizeCell(asset.assetDescription),
+        'Asset Book': sanitizeCell(asset.assetBook),
+        'Subsidiary': sanitizeCell(asset.subsidiary),
         'Asset Cost': asset.assetCost,
         'Date Place In Service': asset.datePlaceInService,
         'Asset Units': asset.assetUnits,
-        'Asset Category Segment 1': asset.categorySegment1,
-        'Asset Category Segment 2': asset.categorySegment2,
-        'Depreciation Method': asset.depreciationMethod,
+        'Asset Category Segment 1': sanitizeCell(asset.categorySegment1),
+        'Asset Category Segment 2': sanitizeCell(asset.categorySegment2),
+        'Depreciation Method': sanitizeCell(asset.depreciationMethod),
         'Life in Months': asset.lifeInMonths,
         'Listed': asset.listed,
-        'Status': asset.status,
+        'Status': sanitizeCell(asset.status),
         'Verification': asset.verification ? 'Yes' : 'No',
         'Verification Date': asset.verificationDate,
-        'Item Status': asset.itemStatus
+        'Item Status': sanitizeCell(asset.itemStatus)
       }));
 
-      const csv = Papa.unparse(dataToExport);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `Asset_Inventory_${scope === 'selected' ? 'Selected_' : ''}${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      downloadBlob(
+        `Asset_Inventory_${scope === 'selected' ? 'Selected_' : ''}${new Date().toISOString().split('T')[0]}.csv`,
+        toCsvBlob(dataToExport)
+      );
 
       setIsExporting(false);
       setExportToast(`Exported ${sourceAssets.length} row${sourceAssets.length === 1 ? '' : 's'} to CSV`);
@@ -265,17 +260,13 @@ export default function Inventory() {
   const handleDownloadInvalidRows = useCallback(() => {
     const rows = importModal.invalidRows;
     if (rows.length === 0) return;
-    const csv = [
-      ['Row Number', 'Asset Number', 'Asset Description', 'Reason'],
-      ...rows.map(r => [r.rowNumber, r.assetNumber, r.assetDescription, r.reason]),
-    ].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'invalid_rows.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    const dataToExport = rows.map(r => ({
+      'Row Number': r.rowNumber,
+      'Asset Number': sanitizeCell(r.assetNumber),
+      'Asset Description': sanitizeCell(r.assetDescription),
+      'Reason': r.reason,
+    }));
+    downloadBlob('invalid_rows.csv', toCsvBlob(dataToExport));
   }, [importModal.invalidRows]);
 
   const handleConfirmDeleteSelected = useCallback(async () => {

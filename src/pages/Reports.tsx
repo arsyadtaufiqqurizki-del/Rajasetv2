@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { ChevronRight, ChevronLeft, Play, Download, Table2, CheckCircle2, Trash2 } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import { useMaintenance } from '../contexts/MaintenanceContext';
@@ -7,7 +7,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line
 } from 'recharts';
-import { cn, monthsBetween, getQuartersInRange } from '../lib/utils';
+import { monthsBetween, getQuartersInRange } from '../lib/dates';
+import { formatCurrency, parseCost } from '../lib/money';
+import { sanitizeCell } from '../lib/csv';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -29,9 +31,6 @@ export default function Reports() {
   const [generating, setGenerating] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-
   const generatePreview = async () => {
     const start = new Date(dateStart);
     const end = new Date(dateEnd);
@@ -50,7 +49,7 @@ export default function Reports() {
 
       const grouped = filteredAssets.reduce((acc: any, asset) => {
         const cat = asset.categorySegment1 || 'Uncategorized';
-        const cost = parseFloat(asset.assetCost.replace(/[^0-9.-]+/g,"")) || 0;
+        const cost = parseCost(asset.assetCost);
         acc[cat] = (acc[cat] || 0) + cost;
         return acc;
       }, {});
@@ -88,7 +87,7 @@ export default function Reports() {
           category: a.categorySegment1 || 'Uncategorized',
           subsidiary: a.subsidiary,
           acquisitionDate: a.datePlaceInService || '-',
-          cost: parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0,
+          cost: parseCost(a.assetCost),
         })),
       };
     } else if (reportType === 'Depreciation Schedule') {
@@ -98,7 +97,7 @@ export default function Reports() {
 
       const data = quarters.map(q => {
         const totalValue = filteredAssets.reduce((sum, a) => {
-          const cost = parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0;
+          const cost = parseCost(a.assetCost);
           const life = parseInt(a.lifeInMonths) || 60;
           const placedInService = a.datePlaceInService ? new Date(a.datePlaceInService) : null;
           if (!placedInService) return sum + cost;
@@ -109,7 +108,7 @@ export default function Reports() {
         return { name: q.label, value: totalValue };
       });
 
-      const totalOriginalCost = filteredAssets.reduce((sum, a) => sum + (parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0), 0);
+      const totalOriginalCost = filteredAssets.reduce((sum, a) => sum + parseCost(a.assetCost), 0);
       const netBookValue = data.length ? data[data.length - 1].value : totalOriginalCost;
 
       generated = {
@@ -138,7 +137,7 @@ export default function Reports() {
           { key: 'remainingLifeMonths', label: 'Remaining Life (Months)' },
         ],
         detailData: filteredAssets.map(a => {
-          const cost = parseFloat(a.assetCost.replace(/[^0-9.-]+/g,"")) || 0;
+          const cost = parseCost(a.assetCost);
           const life = parseInt(a.lifeInMonths) || 60;
           const placedInService = a.datePlaceInService ? new Date(a.datePlaceInService) : null;
           const ageMonths = placedInService ? monthsBetween(placedInService, end) : 0;
@@ -162,8 +161,8 @@ export default function Reports() {
 
       const grouped = filteredRecords.reduce((acc: any, record) => {
         const type = record.serviceType || 'General';
-        const est = parseFloat(record.estimateCost.replace(/[^0-9.-]+/g,"")) || 0;
-        const act = parseFloat(record.actualCost.replace(/[^0-9.-]+/g,"")) || 0;
+        const est = parseCost(record.estimateCost);
+        const act = parseCost(record.actualCost);
         
         if (!acc[type]) acc[type] = { name: type, estimated: 0, actual: 0 };
         acc[type].estimated += est;
@@ -171,11 +170,14 @@ export default function Reports() {
         return acc;
       }, {});
 
-      const totals = Object.values(grouped).reduce((acc: any, g: any) => {
-        acc.estimated += g.estimated;
-        acc.actual += g.actual;
-        return acc;
-      }, { estimated: 0, actual: 0 });
+      const totals = (Object.values(grouped) as { estimated: number; actual: number }[]).reduce(
+        (acc, g) => {
+          acc.estimated += g.estimated;
+          acc.actual += g.actual;
+          return acc;
+        },
+        { estimated: 0, actual: 0 },
+      );
 
       generated = {
         type: 'composed',
@@ -202,8 +204,8 @@ export default function Reports() {
           { key: 'variance', label: 'Variance', currency: true },
         ],
         detailData: filteredRecords.map(r => {
-          const estimated = parseFloat(r.estimateCost.replace(/[^0-9.-]+/g,"")) || 0;
-          const actual = parseFloat(r.actualCost.replace(/[^0-9.-]+/g,"")) || 0;
+          const estimated = parseCost(r.estimateCost);
+          const actual = parseCost(r.actualCost);
           return {
             assetNumber: r.assetNumber,
             description: r.assetDescription,
@@ -234,13 +236,6 @@ export default function Reports() {
 
   const exportFileName = () => `${reportType.replace(/\s+/g, '_')}_${dateStart}_to_${dateEnd}`;
 
-  const sanitizeForSpreadsheet = (value: unknown): unknown => {
-    if (typeof value === 'string' && /^[=+\-@]/.test(value)) {
-      return `'${value}`;
-    }
-    return value;
-  };
-
   const handleExportPDF = async () => {
     if (!previewData || !previewData.data.length) return;
 
@@ -248,7 +243,7 @@ export default function Reports() {
     const numericHeaders = headers.filter(h => typeof previewData.data[0][h] === 'number');
 
     const formatCell = (header: string, value: unknown) => {
-      const sanitized = sanitizeForSpreadsheet(value);
+      const sanitized = sanitizeCell(value);
       return numericHeaders.includes(header) && typeof sanitized === 'number'
         ? formatCurrency(sanitized)
         : sanitized;
@@ -375,7 +370,7 @@ export default function Reports() {
       doc.text('Date: _______________________', x, approvalY + 26);
     });
 
-    const pageCount = doc.internal.getNumberOfPages();
+    const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
@@ -395,7 +390,7 @@ export default function Reports() {
     if (!previewData || !previewData.data.length) return;
 
     const sanitizedData = previewData.data.map((row: Record<string, unknown>) =>
-      Object.fromEntries(Object.entries(row).map(([key, value]) => [key, sanitizeForSpreadsheet(value)]))
+      Object.fromEntries(Object.entries(row).map(([key, value]) => [key, sanitizeCell(value)]))
     );
 
     const ws = XLSX.utils.json_to_sheet(sanitizedData);
@@ -524,7 +519,7 @@ export default function Reports() {
                         <XAxis dataKey="name" tick={{fill: '#6b7280', fontSize: 12}} tickLine={false} axisLine={false} />
                         <YAxis tickFormatter={previewData.yAxisFormatter} tick={{fill: '#6b7280', fontSize: 12}} tickLine={false} axisLine={false} />
                         <Tooltip 
-                          formatter={(value: any) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)}
+                          formatter={(value: any) => formatCurrency(Number(value))}
                           cursor={{fill: '#f3f4f6'}}
                           contentStyle={{borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
                         />
@@ -536,7 +531,7 @@ export default function Reports() {
                         <XAxis dataKey="name" tick={{fill: '#6b7280', fontSize: 12}} tickLine={false} axisLine={false} />
                         <YAxis tickFormatter={previewData.yAxisFormatter} tick={{fill: '#6b7280', fontSize: 12}} tickLine={false} axisLine={false} />
                         <Tooltip 
-                          formatter={(value: any) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)}
+                          formatter={(value: any) => formatCurrency(Number(value))}
                           contentStyle={{borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
                         />
                         <Line type="monotone" dataKey={previewData.dataKey} stroke={previewData.color} strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
@@ -547,7 +542,7 @@ export default function Reports() {
                         <XAxis dataKey="name" tick={{fill: '#6b7280', fontSize: 12}} tickLine={false} axisLine={false} />
                         <YAxis tickFormatter={previewData.yAxisFormatter} tick={{fill: '#6b7280', fontSize: 12}} tickLine={false} axisLine={false} />
                         <Tooltip 
-                          formatter={(value: any) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)}
+                          formatter={(value: any) => formatCurrency(Number(value))}
                           cursor={{fill: '#f3f4f6'}}
                           contentStyle={{borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
                         />

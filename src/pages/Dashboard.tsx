@@ -4,11 +4,15 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid
 } from 'recharts';
-import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp, Plus, X, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react';
-import { cn, formatCurrency, formatLastUpdate, parseListParam } from '../lib/utils';
+import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { formatCurrency, formatCurrencyWhole, formatCompactCurrency, formatCompactNumber, parseCost } from '../lib/money';
+import { formatLastUpdate } from '../lib/dates';
 
 import { useAsset } from '../contexts/AssetContext';
-import MultiSelectDropdown from '../components/MultiSelectDropdown';
+import { useDashboardFilters } from '../hooks/useDashboardFilters';
+import MultiSelectDropdown from '../components/ui/MultiSelectDropdown';
+import FilterBar from '../components/ui/FilterBar';
 
 export default function Dashboard() {
   const { assets, subsidiaries, categories1, categories2, lastFetchedAt } = useAsset();
@@ -19,47 +23,17 @@ export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const [filterSubsidiary, setFilterSubsidiary] = useState<string[]>(() => parseListParam(searchParams, 'subsidiary'));
-  const [filterCategory, setFilterCategory] = useState<string[]>(() => parseListParam(searchParams, 'category'));
-  const [filterLocation, setFilterLocation] = useState<string[]>(() => parseListParam(searchParams, 'location'));
-  const [filterStatus, setFilterStatus] = useState<string[]>(() => parseListParam(searchParams, 'status'));
-  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || "");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() => searchParams.get('q') || "");
-
-  const uniqueStatuses = useMemo(() => Array.from(new Set(assets.map(a => a.status).filter(Boolean))), [assets]);
-
-  const activeFilters = useMemo(() => {
-    const chips: { id: string; label: string; onRemove: () => void }[] = [];
-    filterSubsidiary.forEach(v => chips.push({ id: `sub-${v}`, label: `Subsidiary: ${v}`, onRemove: () => setFilterSubsidiary(prev => prev.filter(x => x !== v)) }));
-    filterCategory.forEach(v => chips.push({ id: `cat-${v}`, label: `Asset Class: ${v}`, onRemove: () => setFilterCategory(prev => prev.filter(x => x !== v)) }));
-    filterLocation.forEach(v => chips.push({ id: `loc-${v}`, label: `Location: ${v}`, onRemove: () => setFilterLocation(prev => prev.filter(x => x !== v)) }));
-    filterStatus.forEach(v => chips.push({ id: `status-${v}`, label: `Status: ${v}`, onRemove: () => setFilterStatus(prev => prev.filter(x => x !== v)) }));
-    if (debouncedSearchQuery) {
-      chips.push({ id: 'search', label: `Search: "${debouncedSearchQuery}"`, onRemove: () => setSearchQuery("") });
-    }
-    return chips;
-  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, debouncedSearchQuery]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, debouncedSearchQuery]);
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (filterSubsidiary.length > 0) params.set('subsidiary', filterSubsidiary.join(','));
-    if (filterCategory.length > 0) params.set('category', filterCategory.join(','));
-    if (filterLocation.length > 0) params.set('location', filterLocation.join(','));
-    if (filterStatus.length > 0) params.set('status', filterStatus.join(','));
-    if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
-    setSearchParams(params, { replace: true });
-  }, [filterSubsidiary, filterCategory, filterLocation, filterStatus, debouncedSearchQuery, setSearchParams]);
+  const {
+    filterSubsidiary, setFilterSubsidiary,
+    filterCategory, setFilterCategory,
+    filterLocation, setFilterLocation,
+    filterStatus, setFilterStatus,
+    searchQuery, setSearchQuery,
+    uniqueStatuses,
+    activeFilters,
+    filteredAssets,
+    clearFilters,
+  } = useDashboardFilters(assets, searchParams, setSearchParams, () => setCurrentPage(1));
 
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth();
@@ -85,42 +59,23 @@ export default function Dashboard() {
 
   const assetCountChange = calculateChange(currentMonthAssets.length, lastMonthAssets.length);
   
-  const currentMonthCost = currentMonthAssets.reduce((acc, curr) => {
-    const cost = parseFloat(curr.assetCost.replace(/[^0-9.-]+/g, ""));
-    return acc + (isNaN(cost) ? 0 : cost);
-  }, 0);
-  
-  const lastMonthCost = lastMonthAssets.reduce((acc, curr) => {
-    const cost = parseFloat(curr.assetCost.replace(/[^0-9.-]+/g, ""));
-    return acc + (isNaN(cost) ? 0 : cost);
-  }, 0);
-  
+  const currentMonthCost = currentMonthAssets.reduce((acc, curr) => acc + parseCost(curr.assetCost), 0);
+
+  const lastMonthCost = lastMonthAssets.reduce((acc, curr) => acc + parseCost(curr.assetCost), 0);
+
   const assetCostChange = calculateChange(currentMonthCost, lastMonthCost);
 
   const brokenAssetsCount = assets.filter(a => a.statusLevel === 'error').length;
   const brokenAssetPercentage = assets.length > 0 ? (brokenAssetsCount / assets.length) * 100 : 0;
 
-  const totalValuation = assets.reduce((acc, curr) => {
-    const cost = parseFloat(curr.assetCost.replace(/[^0-9.-]+/g, ""));
-    return acc + (isNaN(cost) ? 0 : cost);
-  }, 0);
+  const totalValuation = assets.reduce((acc, curr) => acc + parseCost(curr.assetCost), 0);
 
-  const formattedValuation = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    notation: 'compact',
-    maximumFractionDigits: 1
-  }).format(totalValuation);
+  const formattedValuation = formatCompactCurrency(totalValuation);
 
-  const fullValuation = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  }).format(totalValuation);
+  const fullValuation = formatCurrencyWhole(totalValuation);
 
   const subsidiaryDataMap = assets.reduce((acc, curr) => {
-    const cost = parseFloat(curr.assetCost.replace(/[^0-9.-]+/g, ""));
-    const value = isNaN(cost) ? 0 : cost;
+    const value = parseCost(curr.assetCost);
     const subsidiaryName = curr.subsidiary || "Unknown";
     acc[subsidiaryName] = (acc[subsidiaryName] || 0) + value;
     return acc;
@@ -134,8 +89,7 @@ export default function Dashboard() {
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
 
   const categoryDataMap = assets.reduce((acc, curr) => {
-    const cost = parseFloat(curr.assetCost.replace(/[^0-9.-]+/g, ""));
-    const value = isNaN(cost) ? 0 : cost;
+    const value = parseCost(curr.assetCost);
     const categoryName = curr.categorySegment1 || "Uncategorized";
     acc[categoryName] = (acc[categoryName] || 0) + value;
     return acc;
@@ -175,8 +129,7 @@ export default function Dashboard() {
     const date = new Date(curr.datePlaceInService);
     if (!isNaN(date.getTime()) && date.getFullYear().toString() === selectedYear) {
       const monthIndex = date.getMonth();
-      const cost = parseFloat(curr.assetCost.replace(/[^0-9.-]+/g, ""));
-      acc[monthIndex] = (acc[monthIndex] || 0) + (isNaN(cost) ? 0 : cost);
+      acc[monthIndex] = (acc[monthIndex] || 0) + parseCost(curr.assetCost);
     }
     return acc;
   }, {} as Record<number, number>), [assets, selectedYear]);
@@ -185,20 +138,6 @@ export default function Dashboard() {
     month,
     value: trendDataMap[index] || 0
   }));
-
-  const filteredAssets = useMemo(() => {
-    return assets.filter(asset => {
-      const matchSubsidiary = filterSubsidiary.length === 0 || filterSubsidiary.includes(asset.subsidiary);
-      const matchCategory = filterCategory.length === 0 || filterCategory.includes(asset.categorySegment1);
-      const matchLocation = filterLocation.length === 0 || filterLocation.includes(asset.categorySegment2);
-      const matchStatus = filterStatus.length === 0 || filterStatus.includes(asset.status);
-      const matchSearch = debouncedSearchQuery
-        ? asset.assetDescription.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-          asset.assetNumber.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-        : true;
-      return matchSubsidiary && matchCategory && matchLocation && matchStatus && matchSearch;
-    });
-  }, [assets, filterSubsidiary, filterCategory, filterLocation, filterStatus, debouncedSearchQuery]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -305,8 +244,8 @@ export default function Dashboard() {
                 <Tooltip
                   cursor={{ fill: 'transparent' }}
                   contentStyle={{ borderRadius: '8px', border: '1px solid #c6c6cd' }}
-                  formatter={(value: number) => [
-                    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value),
+                  formatter={(value) => [
+                    formatCurrencyWhole(Number(value)),
                     'Valuation'
                   ]}
                 />
@@ -327,8 +266,8 @@ export default function Dashboard() {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => [
-                    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value),
+                  formatter={(value) => [
+                    formatCurrencyWhole(Number(value)),
                     'Valuation'
                   ]}
                 />
@@ -372,14 +311,12 @@ export default function Dashboard() {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#76777d', fontSize: 12 }}
-                tickFormatter={(value: number) =>
-                  new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
-                }
+                tickFormatter={(value: number) => formatCompactNumber(value)}
               />
               <Tooltip
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                formatter={(value: number) => [
-                  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value),
+                formatter={(value) => [
+                  formatCurrencyWhole(Number(value)),
                   'Nilai Pembelian'
                 ]}
               />
@@ -393,88 +330,39 @@ export default function Dashboard() {
         <div className="p-5 border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
           <h3 className="text-lg font-semibold text-primary">Recent Asset Additions</h3>
         </div>
-        <div className="p-4 border-b border-outline-variant bg-surface-container-lowest flex flex-col gap-3">
-          <div className="flex flex-wrap gap-4 items-center">
-            <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
-              <Filter className="h-4 w-4" /> Filters
-              {activeFilters.length > 0 && (
-                <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold normal-case tracking-normal">
-                  {activeFilters.length}
-                </span>
-              )}
-            </span>
-            <div className="flex-1 flex flex-wrap gap-2.5 items-center">
-              <div className="relative min-w-[200px] flex-1 sm:flex-none">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-on-surface-variant" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search by ID or Description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
-                />
-              </div>
-              <MultiSelectDropdown
-                placeholder="All Subsidiaries"
-                options={subsidiaries}
-                selected={filterSubsidiary}
-                onChange={setFilterSubsidiary}
-              />
-              <MultiSelectDropdown
-                placeholder="All Categories"
-                options={categories1}
-                selected={filterCategory}
-                onChange={setFilterCategory}
-              />
-              <MultiSelectDropdown
-                placeholder="All Locations"
-                options={categories2}
-                selected={filterLocation}
-                onChange={setFilterLocation}
-              />
-              <MultiSelectDropdown
-                placeholder="All Statuses"
-                options={uniqueStatuses}
-                selected={filterStatus}
-                onChange={setFilterStatus}
-              />
-            </div>
-            <button
-              onClick={() => {
-                setFilterSubsidiary([]);
-                setFilterCategory([]);
-                setFilterLocation([]);
-                setFilterStatus([]);
-                setSearchQuery("");
-              }}
-              className="text-sm font-medium text-secondary hover:text-primary transition-colors"
-            >
-              Clear Filters
-            </button>
-          </div>
-          {activeFilters.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {activeFilters.map(chip => (
-                <span
-                  key={chip.id}
-                  className="flex items-center gap-1.5 bg-surface-container-high border border-outline-variant rounded-full pl-3 pr-1.5 py-1 text-xs text-on-surface"
-                >
-                  {chip.label}
-                  <button
-                    type="button"
-                    onClick={chip.onRemove}
-                    className="p-0.5 rounded-full hover:bg-surface-container-highest text-on-surface-variant hover:text-error transition-colors"
-                    aria-label={`Remove filter ${chip.label}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        <FilterBar
+          className="p-4 border-b border-outline-variant bg-surface-container-lowest"
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          searchPlaceholder="Search by ID or Description..."
+          chips={activeFilters}
+          onClearFilters={clearFilters}
+        >
+          <MultiSelectDropdown
+            placeholder="All Subsidiaries"
+            options={subsidiaries}
+            selected={filterSubsidiary}
+            onChange={setFilterSubsidiary}
+          />
+          <MultiSelectDropdown
+            placeholder="All Categories"
+            options={categories1}
+            selected={filterCategory}
+            onChange={setFilterCategory}
+          />
+          <MultiSelectDropdown
+            placeholder="All Locations"
+            options={categories2}
+            selected={filterLocation}
+            onChange={setFilterLocation}
+          />
+          <MultiSelectDropdown
+            placeholder="All Statuses"
+            options={uniqueStatuses}
+            selected={filterStatus}
+            onChange={setFilterStatus}
+          />
+        </FilterBar>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>

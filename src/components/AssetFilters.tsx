@@ -1,5 +1,5 @@
 import { Filter, Search, X } from 'lucide-react';
-import MultiSelectDropdown from './MultiSelectDropdown';
+import MultiSelectDropdown from './ui/MultiSelectDropdown';
 import type { FilterChip } from '../hooks/useAssetFilters';
 
 interface AssetFiltersProps {

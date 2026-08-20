@@ -1,13 +1,20 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Settings as SettingsIcon, AlertTriangle, CircleDollarSign, CalendarDays, ArrowRight, MoreVertical, Edit, Trash2, Filter, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Settings as SettingsIcon, AlertTriangle, CircleDollarSign, CalendarDays, MoreVertical, Edit, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { formatCurrency, parseCost } from '../lib/money';
 import { useMaintenance } from '../contexts/MaintenanceContext';
+import { useMaintenanceFilters } from '../hooks/useMaintenanceFilters';
 import AddMaintenanceModal from '../components/AddMaintenanceModal';
 import EditMaintenanceModal from '../components/EditMaintenanceModal';
 import MaintenanceCalendarModal from '../components/MaintenanceCalendarModal';
+import MultiSelectDropdown from '../components/ui/MultiSelectDropdown';
+import FilterBar from '../components/ui/FilterBar';
+import Pagination from '../components/ui/Pagination';
 
 export default function Maintenance() {
   const { records, deleteRecord } = useMaintenance();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
@@ -15,43 +22,19 @@ export default function Maintenance() {
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [filterSubsidiary, setFilterSubsidiary] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterAssetBook, setFilterAssetBook] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const uniqueStatuses = useMemo(() => Array.from(new Set(records.map(r => r.status).filter(Boolean))), [records]);
-  const uniqueSubsidiaries = useMemo(() => Array.from(new Set(records.map(r => r.subsidiary).filter(Boolean))), [records]);
-  const uniqueAssetBooks = useMemo(() => Array.from(new Set(records.map(r => r.assetBook).filter(Boolean))), [records]);
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Reset page to 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterSubsidiary, filterStatus, filterAssetBook, debouncedSearchQuery]);
-
-  const filteredRecords = useMemo(() => {
-    return records.filter(record => {
-      const matchSubsidiary = filterSubsidiary ? record.subsidiary === filterSubsidiary : true;
-      const matchStatus = filterStatus ? record.status === filterStatus : true;
-      const matchAssetBook = filterAssetBook ? record.assetBook === filterAssetBook : true;
-      const matchSearch = debouncedSearchQuery 
-        ? record.assetDescription.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) || 
-          record.assetNumber.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-        : true;
-      return matchSubsidiary && matchStatus && matchAssetBook && matchSearch;
-    });
-  }, [records, filterSubsidiary, filterStatus, filterAssetBook, debouncedSearchQuery]);
+  const {
+    filterSubsidiary, setFilterSubsidiary,
+    filterAssetBook, setFilterAssetBook,
+    filterStatus, setFilterStatus,
+    searchQuery, setSearchQuery,
+    uniqueSubsidiaries, uniqueAssetBooks, uniqueStatuses,
+    activeFilters,
+    filteredRecords,
+    clearFilters,
+  } = useMaintenanceFilters(records, searchParams, setSearchParams, () => setCurrentPage(1));
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
   
@@ -64,14 +47,11 @@ export default function Maintenance() {
   const overdueRecords = records.filter(r => r.status === 'Overdue');
   
   const totalCost = records.reduce((acc, curr) => {
-    const cost = parseFloat(curr.actualCost.replace(/[^0-9.-]+/g, "") || curr.estimateCost.replace(/[^0-9.-]+/g, ""));
-    return acc + (isNaN(cost) ? 0 : cost);
+    const actualStripped = curr.actualCost.replace(/[^0-9.-]+/g, "");
+    return acc + parseCost(actualStripped || curr.estimateCost);
   }, 0);
 
-  const formattedCost = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(totalCost);
+  const formattedCost = formatCurrency(totalCost);
 
   const handleEdit = (id: string) => {
     setEditingRecordId(id);
@@ -230,66 +210,33 @@ export default function Maintenance() {
             <h3 className="text-lg font-semibold text-on-surface">Recent Maintenance Activity</h3>
           </div>
           
-          <div className="p-4 border-b border-outline-variant bg-surface-container-lowest flex flex-wrap gap-4 items-center">
-            <span className="text-xs font-semibold text-on-surface-variant uppercase flex items-center gap-1.5 tracking-wider">
-              <Filter className="h-4 w-4" /> Filters
-            </span>
-            <div className="flex-1 flex flex-wrap gap-2.5">
-              <div className="relative min-w-[200px] flex-1 sm:flex-none">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                   <Search className="h-4 w-4 text-on-surface-variant" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search by ID or Description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
-                />
-              </div>
-              <select 
-                value={filterSubsidiary}
-                onChange={(e) => setFilterSubsidiary(e.target.value)}
-                className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-              >
-                <option value="">All Subsidiaries</option>
-                {uniqueSubsidiaries.map(sub => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
-              </select>
-              <select 
-                value={filterAssetBook}
-                onChange={(e) => setFilterAssetBook(e.target.value)}
-                className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-              >
-                <option value="">All Asset Books</option>
-                {uniqueAssetBooks.map(book => (
-                  <option key={book} value={book}>{book}</option>
-                ))}
-              </select>
-              <select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[140px] focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-              >
-                <option value="">All Statuses</option>
-                {uniqueStatuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-            <button 
-              onClick={() => {
-                setFilterSubsidiary("");
-                setFilterAssetBook("");
-                setFilterStatus("");
-                setSearchQuery("");
-              }}
-              className="text-sm font-medium text-secondary hover:text-primary transition-colors"
-            >
-              Clear Filters
-            </button>
-          </div>
+          <FilterBar
+            className="p-4 border-b border-outline-variant bg-surface-container-lowest"
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            searchPlaceholder="Search by ID or Description..."
+            chips={activeFilters}
+            onClearFilters={clearFilters}
+          >
+            <MultiSelectDropdown
+              placeholder="All Subsidiaries"
+              options={uniqueSubsidiaries}
+              selected={filterSubsidiary}
+              onChange={setFilterSubsidiary}
+            />
+            <MultiSelectDropdown
+              placeholder="All Asset Books"
+              options={uniqueAssetBooks}
+              selected={filterAssetBook}
+              onChange={setFilterAssetBook}
+            />
+            <MultiSelectDropdown
+              placeholder="All Statuses"
+              options={uniqueStatuses}
+              selected={filterStatus}
+              onChange={setFilterStatus}
+            />
+          </FilterBar>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -368,28 +315,14 @@ export default function Maintenance() {
               </tbody>
             </table>
           </div>
-          <div className="p-3 border-t border-outline-variant bg-surface-container flex items-center justify-between text-sm mt-auto">
-            <span className="text-on-surface-variant">Showing {paginatedRecords.length} of {filteredRecords.length} entries</span>
-            <div className="flex items-center gap-1 text-sm font-medium">
-              <button 
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
-              >
-                <ChevronLeft className="h-5 w-5"/>
-              </button>
-              <span className="px-3 py-1 rounded bg-surface-container-high text-on-surface font-semibold text-xs">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
-              >
-                <ChevronRight className="h-5 w-5"/>
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            visibleCount={paginatedRecords.length}
+            totalCount={filteredRecords.length}
+            onPrev={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+          />
         </div>
 
         <div className="lg:col-span-4 rounded-xl border border-outline-variant bg-surface-container-lowest shadow-sm flex flex-col">

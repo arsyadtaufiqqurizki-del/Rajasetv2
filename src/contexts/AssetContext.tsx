@@ -1,28 +1,9 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../lib/activityLogger';
+import type { Asset } from '../types/asset';
 
-export type Asset = {
-  id: string;
-  assetBook: string;
-  subsidiary: string;
-  assetNumber: string;
-  assetDescription: string;
-  assetCost: string;
-  datePlaceInService: string;
-  assetUnits: string;
-  categorySegment1: string;
-  categorySegment2: string;
-  depreciationMethod: string;
-  lifeInMonths: string;
-  listed: string;
-  status: string;
-  statusLevel: 'success' | 'warning' | 'error' | 'default';
-  verification: boolean;
-  verificationDate: string;
-  itemStatus: string;
-  createdAt: string;
-};
+export type { Asset } from '../types/asset';
 
 interface AssetContextType {
   assets: Asset[];

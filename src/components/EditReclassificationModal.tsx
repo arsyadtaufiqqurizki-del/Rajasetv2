@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Link2 } from 'lucide-react';
 import { useReclassification, RECLASSIFICATION_PRESET_CATEGORIES } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
-import AutocompleteInput from './AutocompleteInput';
+import AutocompleteInput from './ui/AutocompleteInput';
 
 const EMPTY_FORM = {
   assetCategory: '',

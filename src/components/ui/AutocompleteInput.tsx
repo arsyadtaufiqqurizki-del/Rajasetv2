@@ -35,7 +35,7 @@ export default function AutocompleteInput({ name, value, onChange, options, plac
     setIsTyping(false);
   };
 
-  const displayOptions = isTyping 
+  const displayOptions = isTyping
     ? options.filter(opt => opt.toLowerCase().includes(value.toLowerCase()))
     : options;
 
@@ -59,7 +59,7 @@ export default function AutocompleteInput({ name, value, onChange, options, plac
         className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary pr-10"
         autoComplete="off"
       />
-      <button 
+      <button
         type="button"
         onClick={() => {
           setIsTyping(false);
@@ -69,7 +69,7 @@ export default function AutocompleteInput({ name, value, onChange, options, plac
       >
         <ChevronDown className="h-4 w-4" />
       </button>
-      
+
       {isOpen && displayOptions.length > 0 && (
         <ul className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-surface border border-outline-variant py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
           {displayOptions.map((option) => (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { useMaintenance, MaintenanceRecord } from '../contexts/MaintenanceContext';
+import { useMaintenance } from '../contexts/MaintenanceContext';
 
 interface EditMaintenanceModalProps {
   isOpen: boolean;

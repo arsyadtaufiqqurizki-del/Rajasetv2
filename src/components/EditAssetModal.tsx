@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
-import AutocompleteInput from './AutocompleteInput';
+import AutocompleteInput from './ui/AutocompleteInput';
 
 export default function EditAssetModal() {
   const { isEditModalOpen, setIsEditModalOpen, updateAsset, editingAsset, setEditingAsset, subsidiaries, categories1, categories2, itemStatuses } = useAsset();
