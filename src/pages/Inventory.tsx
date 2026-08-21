@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, type ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { logActivity } from '../lib/activityLogger';
-import { CheckCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useAsset, type Asset } from '../contexts/AssetContext';
 import { useAssetFilters } from '../hooks/useAssetFilters';
 import { sanitizeCell, toCsvBlob, downloadBlob } from '../lib/csv';
@@ -12,6 +12,9 @@ import AssetTablePagination from '../components/AssetTablePagination';
 import ImportProgressModal, { type ImportModalState } from '../components/ImportProgressModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DeleteProgressModal, { type DeleteProgressState } from '../components/DeleteProgressModal';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import Toast from '../components/ui/Toast';
+import { en as copy } from '../i18n/en';
 import Papa from 'papaparse';
 
 export default function Inventory() {
@@ -19,7 +22,7 @@ export default function Inventory() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [isExporting, setIsExporting] = useState(false);
-  const [exportToast, setExportToast] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ message: string; variant: 'success' | 'error' } | null>(null);
 
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -27,6 +30,7 @@ export default function Inventory() {
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const [deleteProgressModal, setDeleteProgressModal] = useState<DeleteProgressState>({
     isOpen: false,
@@ -66,12 +70,12 @@ export default function Inventory() {
     clearFilters,
   } = useAssetFilters(assets, searchParams, setSearchParams, () => setCurrentPage(1));
 
-  // Auto-dismiss export toast
+  // Auto-dismiss notice toast
   useEffect(() => {
-    if (!exportToast) return;
-    const timer = setTimeout(() => setExportToast(null), 3000);
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), notice.variant === 'error' ? 5000 : 3000);
     return () => clearTimeout(timer);
-  }, [exportToast]);
+  }, [notice]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAssets.length / itemsPerPage));
 
@@ -86,10 +90,13 @@ export default function Inventory() {
   }, [setEditingAsset, setIsEditModalOpen]);
 
   const handleDeleteAsset = useCallback((assetId: string) => {
-    if (window.confirm('Are you sure you want to delete this asset?')) {
-      deleteAsset(assetId);
-    }
-  }, [deleteAsset]);
+    setPendingDeleteId(assetId);
+  }, []);
+
+  const handleConfirmDeleteAsset = useCallback(() => {
+    if (pendingDeleteId) deleteAsset(pendingDeleteId);
+    setPendingDeleteId(null);
+  }, [pendingDeleteId, deleteAsset]);
 
   const handleSelectAll = useCallback((checked: boolean) => {
     if (checked) {
@@ -147,7 +154,7 @@ export default function Inventory() {
       );
 
       setIsExporting(false);
-      setExportToast(`Exported ${sourceAssets.length} row${sourceAssets.length === 1 ? '' : 's'} to CSV`);
+      setNotice({ message: `Exported ${sourceAssets.length} row${sourceAssets.length === 1 ? '' : 's'} to CSV`, variant: 'success' });
     }, 0);
   }, [filteredAssets, selectedAssets]);
 
@@ -162,7 +169,7 @@ export default function Inventory() {
         const data = results.data as any[];
 
         if (data.length > 5000) {
-          alert(`File exceeds the maximum limit of 5000 rows. Your file has ${data.length} rows. Please split your file and try again.`);
+          setNotice({ message: `File exceeds the maximum limit of 5000 rows. Your file has ${data.length} rows. Please split your file and try again.`, variant: 'error' });
           if (event.target) event.target.value = '';
           return;
         }
@@ -252,7 +259,7 @@ export default function Inventory() {
         if (event.target) event.target.value = '';
       },
       error: (error) => {
-        alert('Error parsing CSV file: ' + error.message);
+        setNotice({ message: 'Error parsing CSV file: ' + error.message, variant: 'error' });
       }
     });
   }, [addAsset]);
@@ -384,12 +391,21 @@ export default function Inventory() {
         onClose={() => setDeleteProgressModal(prev => ({ ...prev, isOpen: false }))}
       />
 
-      {exportToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-surface border border-outline-variant rounded-md shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-          <span className="text-sm text-on-surface">{exportToast}</span>
-        </div>
-      )}
+      <ConfirmModal
+        isOpen={pendingDeleteId !== null}
+        title={copy.confirm.deleteAssetTitle}
+        message={copy.confirm.deleteAssetMessage}
+        confirmLabel={copy.confirm.deleteLabel}
+        cancelLabel={copy.confirm.cancelLabel}
+        destructive
+        onConfirm={handleConfirmDeleteAsset}
+        onCancel={() => setPendingDeleteId(null)}
+      />
+
+      <Toast
+        message={notice?.message ?? null}
+        icon={notice?.variant === 'error' ? <AlertCircle className="h-4 w-4 text-error shrink-0" /> : undefined}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Settings as SettingsIcon, AlertTriangle, CircleDollarSign, CalendarDays } from 'lucide-react';
 import StatCard from './ui/StatCard';
+import { id as copy } from '../i18n/id';
 
 interface MaintenanceStatsProps {
   activeCount: number;
@@ -16,7 +17,7 @@ export default function MaintenanceStats({ activeCount, overdueCount, formattedC
         label="Assets Under Maint."
         value={activeCount}
         icon={<SettingsIcon className="h-5 w-5" />}
-        footer={activeCount === 0 ? 'Belum ada data' : 'Active service tickets'}
+        footer={activeCount === 0 ? copy.emptyState.noDataFooter : 'Active service tickets'}
       />
       <StatCard
         label="Overdue Maintenance"
@@ -24,19 +25,19 @@ export default function MaintenanceStats({ activeCount, overdueCount, formattedC
         icon={<AlertTriangle className="h-5 w-5 fill-current text-error" />}
         tone="danger"
         valueClassName={overdueCount > 0 ? 'text-error' : 'text-on-surface'}
-        footer={overdueCount === 0 ? 'Belum ada data' : 'Requires attention'}
+        footer={overdueCount === 0 ? copy.emptyState.noDataFooter : 'Requires attention'}
       />
       <StatCard
         label="Total Cost (YTD)"
         value={formattedCost}
         icon={<CircleDollarSign className="h-5 w-5" />}
-        footer={totalCost === 0 ? 'Belum ada data' : 'Estimated & Actual'}
+        footer={totalCost === 0 ? copy.emptyState.noDataFooter : 'Estimated & Actual'}
       />
       <StatCard
         label="Upcoming This Week"
         value={upcomingCount}
         icon={<CalendarDays className="h-5 w-5" />}
-        footer={upcomingCount === 0 ? 'Belum ada data' : 'Scheduled maintenance'}
+        footer={upcomingCount === 0 ? copy.emptyState.noDataFooter : 'Scheduled maintenance'}
       />
     </div>
   );

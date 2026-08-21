@@ -12,6 +12,8 @@ import ReportConfigForm from '../components/reports/ReportConfigForm';
 import ExportPanel from '../components/reports/ExportPanel';
 import ReportChart from '../components/reports/ReportChart';
 import ReportHistoryTable from '../components/reports/ReportHistoryTable';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import { en as copy } from '../i18n/en';
 
 export default function Reports() {
   const { assets, subsidiaries } = useAsset();
@@ -27,6 +29,7 @@ export default function Reports() {
   const [previewData, setPreviewData] = useState<ReportPreview | null>(null);
   const [generating, setGenerating] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const generatePreview = async () => {
     const start = new Date(dateStart);
@@ -45,9 +48,12 @@ export default function Reports() {
   };
 
   const handleDeleteReport = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this report?')) {
-      deleteReport(id);
-    }
+    setPendingDeleteId(id);
+  };
+
+  const confirmDeleteReport = () => {
+    if (pendingDeleteId) deleteReport(pendingDeleteId);
+    setPendingDeleteId(null);
   };
 
   const exportFileName = () => `${reportType.replace(/\s+/g, '_')}_${dateStart}_to_${dateEnd}`;
@@ -124,6 +130,17 @@ export default function Reports() {
           />
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={pendingDeleteId !== null}
+        title={copy.confirm.deleteReportTitle}
+        message={copy.confirm.deleteReportMessage}
+        confirmLabel={copy.confirm.deleteLabel}
+        cancelLabel={copy.confirm.cancelLabel}
+        destructive
+        onConfirm={confirmDeleteReport}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

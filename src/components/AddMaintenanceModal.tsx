@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, ChevronDown, Search, Loader2 } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import { useMaintenance } from '../contexts/MaintenanceContext';
+import { id as copy } from '../i18n/id';
 
 interface AddMaintenanceModalProps {
   isOpen: boolean;
@@ -146,7 +147,7 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
                   </div>
                   <ul className="max-h-56 overflow-y-auto py-1">
                     {filteredAssets.length === 0 ? (
-                      <li className="px-3 py-2 text-sm text-on-surface-variant">Tidak ada hasil</li>
+                      <li className="px-3 py-2 text-sm text-on-surface-variant">{copy.emptyState.noResults}</li>
                     ) : (
                       filteredAssets.map(asset => (
                         <li

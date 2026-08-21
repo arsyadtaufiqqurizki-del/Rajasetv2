@@ -1,5 +1,6 @@
 import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { en as copy } from '../i18n/en';
 import StatCard from './ui/StatCard';
 
 interface DashboardKpiRowProps {
@@ -14,7 +15,7 @@ interface DashboardKpiRowProps {
 
 function ChangeFooter({ change }: { change: number }) {
   if (change === 0) {
-    return <span className="text-on-surface-variant font-medium">No change from last month</span>;
+    return <span className="text-on-surface-variant font-medium">{copy.emptyState.noChangeFromLastMonth}</span>;
   }
   return (
     <>

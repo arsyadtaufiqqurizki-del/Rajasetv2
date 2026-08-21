@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, ChevronDown, Search, Loader2 } from 'lucide-react';
 import { useReclassification, RECLASSIFICATION_PRESET_CATEGORIES } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
+import { id as copy } from '../i18n/id';
 
 export default function AddReclassificationModal() {
   const { isAddModalOpen, setIsAddModalOpen, addLinkedReclassification, reclassifications } = useReclassification();
@@ -11,6 +12,7 @@ export default function AddReclassificationModal() {
   const [assetSearch, setAssetSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [categorySelect, setCategorySelect] = useState<string>(RECLASSIFICATION_PRESET_CATEGORIES[0]);
@@ -43,6 +45,7 @@ export default function AddReclassificationModal() {
       setAssetSearch('');
       setDropdownOpen(false);
       setIsSubmitting(false);
+      setSubmitError(null);
       setCategorySelect(RECLASSIFICATION_PRESET_CATEGORIES[0]);
       setCustomCategory('');
       setRemarks('');
@@ -70,13 +73,14 @@ export default function AddReclassificationModal() {
     if (!category) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       const minDelay = new Promise(resolve => setTimeout(resolve, 600));
       await Promise.all([addLinkedReclassification(selectedAssetId, category, remarks), minDelay]);
       setIsAddModalOpen(false);
     } catch (err) {
       setIsSubmitting(false);
-      alert('Gagal menyimpan item: ' + (err instanceof Error ? err.message : 'Terjadi kesalahan'));
+      setSubmitError('Gagal menyimpan item: ' + (err instanceof Error ? err.message : 'Terjadi kesalahan'));
     }
   };
 
@@ -132,7 +136,7 @@ export default function AddReclassificationModal() {
                   </div>
                   <ul className="max-h-56 overflow-y-auto py-1">
                     {filteredAssets.length === 0 ? (
-                      <li className="px-3 py-2 text-sm text-on-surface-variant">Tidak ada hasil</li>
+                      <li className="px-3 py-2 text-sm text-on-surface-variant">{copy.emptyState.noResults}</li>
                     ) : (
                       filteredAssets.map(asset => (
                         <li
@@ -205,6 +209,12 @@ export default function AddReclassificationModal() {
               />
             </div>
           </div>
+
+          {submitError && (
+            <p className="text-sm text-error bg-error-container/20 border border-error/20 rounded-lg px-3 py-2">
+              {submitError}
+            </p>
+          )}
 
           <div className="mt-4 pt-4 border-t border-outline-variant/30 flex justify-end gap-3">
             <button

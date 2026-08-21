@@ -1,6 +1,7 @@
 import { Edit2, Trash2, CheckCircle2, XCircle, Link2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { TableEmptyRow } from './ui/EmptyState';
+import { id as copy } from '../i18n/id';
 import type { Reclassification } from '../types/reclassification';
 
 interface ReclassificationTableProps {
@@ -133,7 +134,7 @@ export default function ReclassificationTable({
               </td>
             </tr>
           )) : (
-            <TableEmptyRow colSpan={12} message="Belum ada data reclassification" />
+            <TableEmptyRow colSpan={12} message={copy.emptyState.noReclassificationData} />
           )}
         </tbody>
       </table>

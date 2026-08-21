@@ -4,6 +4,7 @@ import MultiSelectDropdown from './ui/MultiSelectDropdown';
 import FilterBar from './ui/FilterBar';
 import Pagination from './ui/Pagination';
 import { TableEmptyRow } from './ui/EmptyState';
+import { id as copy } from '../i18n/id';
 import type { Asset } from '../types/asset';
 import type { FilterChip } from '../types/filters';
 
@@ -157,7 +158,7 @@ export default function DashboardRecentAssetsPanel({
               </tr>
             ))}
             {filteredCount === 0 && (
-              <TableEmptyRow colSpan={13} message="Belum ada data asset" />
+              <TableEmptyRow colSpan={13} message={copy.emptyState.noAssetData} />
             )}
           </tbody>
         </table>

@@ -1,6 +1,7 @@
 import { Edit, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { TableEmptyRow } from './ui/EmptyState';
+import { id as copy } from '../i18n/id';
 import type { MaintenanceRecord } from '../types/maintenance';
 
 interface MaintenanceTableProps {
@@ -82,7 +83,7 @@ export default function MaintenanceTable({ records, hasAnyRecords, onEdit, onDel
           )) : (
             <TableEmptyRow
               colSpan={12}
-              message={hasAnyRecords ? 'Tidak ada data yang sesuai dengan filter' : 'Belum ada aktivitas maintenance'}
+              message={hasAnyRecords ? copy.emptyState.noMaintenanceFiltered : copy.emptyState.noMaintenanceData}
             />
           )}
         </tbody>

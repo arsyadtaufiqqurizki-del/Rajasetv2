@@ -3,6 +3,7 @@ import { AlertTriangle, Bell, Plus, Pencil, Trash2, Upload, Wrench, X } from 'lu
 import { useActivityLog, ActivityLog } from '../hooks/useActivityLog'
 import { useSystemAlerts } from '../hooks/useSystemAlerts'
 import { cn } from '../lib/utils'
+import { id as copy } from '../i18n/id'
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -167,7 +168,7 @@ export default function NotificationBell() {
               )}
               <div className="divide-y divide-outline-variant/40">
                 {loading ? (
-                  <p className="px-4 py-8 text-center text-sm text-on-surface-variant">Memuat...</p>
+                  <p className="px-4 py-8 text-center text-sm text-on-surface-variant">{copy.emptyState.loading}</p>
                 ) : logs.length === 0 && alerts.length === 0 ? (
                   <p className="px-4 py-8 text-center text-sm text-on-surface-variant">
                     Belum ada notifikasi

@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import type { ReportPreview } from '../../types/report';
 import { formatCurrency } from '../../lib/money';
+import { id as copy } from '../../i18n/id';
 
 interface ReportChartProps {
   previewData: ReportPreview | null;
@@ -29,7 +30,7 @@ const ReportChart = forwardRef<HTMLDivElement, ReportChartProps>(function Report
         {!previewData ? (
           <div className="absolute inset-0 bg-surface border border-outline-variant/50 rounded-lg flex flex-col items-center justify-center p-6">
             <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(#000 1px, transparent 1px)", backgroundSize: "16px 16px" }}></div>
-            <span className="text-on-surface-variant text-sm font-medium z-10 bg-surface-container-lowest px-4 py-2 rounded-full border border-outline-variant shadow-sm">Belum ada data untuk ditampilkan</span>
+            <span className="text-on-surface-variant text-sm font-medium z-10 bg-surface-container-lowest px-4 py-2 rounded-full border border-outline-variant shadow-sm">{copy.emptyState.noChartData}</span>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

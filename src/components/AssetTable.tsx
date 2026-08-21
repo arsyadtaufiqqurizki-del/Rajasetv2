@@ -1,6 +1,7 @@
 import { Edit2, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { formatCurrency } from '../lib/money';
+import { id as copy } from '../i18n/id';
 import type { Asset } from '../contexts/AssetContext';
 
 interface AssetTableProps {
@@ -119,7 +120,7 @@ export default function AssetTable({
             </tr>
           )) : (
             <tr>
-              <td colSpan={18} className="py-8 text-center text-on-surface-variant">Belum ada data asset</td>
+              <td colSpan={18} className="py-8 text-center text-on-surface-variant">{copy.emptyState.noAssetData}</td>
             </tr>
           )}
         </tbody>

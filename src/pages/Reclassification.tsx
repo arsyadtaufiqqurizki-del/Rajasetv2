@@ -14,6 +14,8 @@ import ReclassificationToolbar from '../components/ReclassificationToolbar';
 import ReclassificationTable from '../components/ReclassificationTable';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DeleteProgressModal, { type DeleteProgressState } from '../components/DeleteProgressModal';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import { id as copy } from '../i18n/id';
 
 export default function Reclassification() {
   const {
@@ -46,6 +48,7 @@ export default function Reclassification() {
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const [deleteProgressModal, setDeleteProgressModal] = useState<DeleteProgressState>({
     isOpen: false,
@@ -131,10 +134,13 @@ export default function Reclassification() {
   }, [setVerifyingReclassification, setIsVerifyModalOpen]);
 
   const handleDelete = useCallback((id: string) => {
-    if (window.confirm('Yakin ingin menghapus item reclassification ini?')) {
-      deleteReclassification(id);
-    }
-  }, [deleteReclassification]);
+    setPendingDeleteId(id);
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (pendingDeleteId) deleteReclassification(pendingDeleteId);
+    setPendingDeleteId(null);
+  }, [pendingDeleteId, deleteReclassification]);
 
   const handleSelectAll = useCallback((checked: boolean) => {
     if (checked) {
@@ -311,6 +317,17 @@ export default function Reclassification() {
         deleteProgressModal={deleteProgressModal}
         onClose={() => setDeleteProgressModal(prev => ({ ...prev, isOpen: false }))}
         itemLabel="items"
+      />
+
+      <ConfirmModal
+        isOpen={pendingDeleteId !== null}
+        title={copy.confirm.deleteReclassificationTitle}
+        message={copy.confirm.deleteReclassificationMessage}
+        confirmLabel={copy.confirm.deleteLabel}
+        cancelLabel={copy.confirm.cancelLabel}
+        destructive
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
       />
     </div>
   );
