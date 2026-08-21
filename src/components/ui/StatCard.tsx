@@ -6,9 +6,11 @@ interface StatCardProps {
   icon: React.ReactNode;
   footer?: React.ReactNode;
   tone?: 'default' | 'danger';
+  /** overrides the value's default text-primary color, e.g. to conditionally flag a non-zero count */
+  valueClassName?: string;
 }
 
-export default function StatCard({ label, value, icon, footer, tone = 'default' }: StatCardProps) {
+export default function StatCard({ label, value, icon, footer, tone = 'default', valueClassName }: StatCardProps) {
   return (
     <div
       className={cn(
@@ -22,7 +24,7 @@ export default function StatCard({ label, value, icon, footer, tone = 'default' 
         <span>{label}</span>
         {icon}
       </div>
-      <div className="text-4xl font-bold text-primary mb-2">{value}</div>
+      <div className={cn('text-4xl font-bold mb-2', valueClassName ?? 'text-primary')}>{value}</div>
       {footer && <div className="flex items-center gap-1 text-xs">{footer}</div>}
     </div>
   );

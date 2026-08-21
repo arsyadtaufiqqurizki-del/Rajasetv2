@@ -7,9 +7,15 @@ interface DeleteConfirmModalProps {
   onConfirmTextChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
+  /** plural noun for the items being deleted, e.g. "assets" or "reclassification items" */
+  itemLabel?: string;
 }
 
 const TITLE_ID = 'delete-confirm-modal-title';
+
+function titleCase(label: string) {
+  return label.replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function DeleteConfirmModal({
   isOpen,
@@ -18,13 +24,16 @@ export default function DeleteConfirmModal({
   onConfirmTextChange,
   onCancel,
   onConfirm,
+  itemLabel = 'assets',
 }: DeleteConfirmModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onCancel} labelledBy={TITLE_ID}>
       <div className="p-6">
-        <h3 id={TITLE_ID} className="text-xl font-bold text-on-surface mb-2">Delete Multiple Assets</h3>
+        <h3 id={TITLE_ID} className="text-xl font-bold text-on-surface mb-2">
+          Delete Multiple {titleCase(itemLabel)}
+        </h3>
         <p className="text-on-surface-variant mb-4 text-sm">
-          You are about to delete <strong>{selectedCount}</strong> assets. This action is irreversible.
+          You are about to delete <strong>{selectedCount}</strong> {itemLabel}. This action is irreversible.
           Please type <strong>DELETE</strong> below to confirm.
         </p>
 
