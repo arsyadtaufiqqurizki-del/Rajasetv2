@@ -1,6 +1,7 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../lib/activityLogger';
+import type { ReportPreview } from '../types/report';
 
 export type ReportRecord = {
   id: string;
@@ -9,7 +10,7 @@ export type ReportRecord = {
   subsidiary: string;
   dateStart: string;
   dateEnd: string;
-  reportData: any;
+  reportData: ReportPreview;
   status: string;
   createdAt: string;
 };
@@ -19,7 +20,7 @@ type SaveReportParams = {
   subsidiary: string;
   dateStart: string;
   dateEnd: string;
-  reportData: any;
+  reportData: ReportPreview;
 };
 
 interface ReportContextType {

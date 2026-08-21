@@ -95,7 +95,10 @@ describe('Reports > Depreciation Schedule NBV per quarter', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /export to excel/i }));
 
-    expect(jsonToSheetSpy).toHaveBeenCalledTimes(1);
+    // exportReportXlsx dynamic-imports 'xlsx' (Step 9), so the call is now async.
+    await waitFor(() => {
+      expect(jsonToSheetSpy).toHaveBeenCalledTimes(1);
+    });
     const rows = jsonToSheetSpy.mock.calls[0][0] as { name: string; value: number }[];
 
     expect(rows.map(r => r.name)).toEqual(['Q1 2023', 'Q2 2023']);
