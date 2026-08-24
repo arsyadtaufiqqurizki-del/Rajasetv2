@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrencyWhole } from '../lib/money';
 import type { DashboardCategoryPoint } from '../hooks/useDashboardMetrics';
+import AllCategoriesModal from './AllCategoriesModal';
 
 interface DashboardCategoryPieChartProps {
   data: DashboardCategoryPoint[];
@@ -8,9 +10,19 @@ interface DashboardCategoryPieChartProps {
 }
 
 export default function DashboardCategoryPieChart({ data, totalAssets }: DashboardCategoryPieChartProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   return (
     <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm flex flex-col">
-      <h3 className="text-lg font-semibold text-primary mb-4">Asset Categories</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-primary">Asset Categories</h3>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="text-sm font-medium text-primary hover:underline"
+        >
+          View All
+        </button>
+      </div>
       <div className="flex-1 min-h-[200px] relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -35,6 +47,7 @@ export default function DashboardCategoryPieChart({ data, totalAssets }: Dashboa
           </div>
         ))}
       </div>
+      <AllCategoriesModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} data={data} />
     </div>
   );
 }
