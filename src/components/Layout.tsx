@@ -1,7 +1,7 @@
 import { UserCircle, Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Archive, Wrench, BarChart2, Settings, Plus, HelpCircle, LogOut, Database, Sparkles, BookOpen, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, Archive, Wrench, BarChart2, Settings, Plus, HelpCircle, LogOut, Database, Sparkles, BookOpen, ClipboardCheck, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAsset } from "../contexts/AssetContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -27,10 +27,17 @@ const NAV_ITEMS = [
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("sidebarCollapsed") === "true"
+  );
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const { setIsAddModalOpen } = useAsset();
   const { logout, userEmail } = useAuth();
+
+  useEffect(() => {
+    localStorage.setItem("sidebarCollapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -54,12 +61,27 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-surface-container-lowest border-r border-outline-variant transition-transform duration-300 md:static md:translate-x-0 hidden md:flex",
-        mobileMenuOpen ? "flex translate-x-0" : "-translate-x-full"
+        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-surface-container-lowest border-r border-outline-variant transition-all duration-300 md:static md:translate-x-0 hidden md:flex",
+        mobileMenuOpen ? "flex translate-x-0" : "-translate-x-full",
+        sidebarCollapsed ? "md:w-20" : "md:w-64"
       )}>
-        <div className="flex flex-col gap-2 border-b border-outline-variant/30 p-6">
-          <h1 className="text-xl font-bold text-primary tracking-tight">RAJA</h1>
-          <p className="text-xs font-medium text-on-surface-variant">Asset Management</p>
+        <div className={cn(
+          "flex items-center gap-2 border-b border-outline-variant/30 p-6",
+          sidebarCollapsed ? "justify-center px-3" : "justify-between"
+        )}>
+          {!sidebarCollapsed && (
+            <div className="flex flex-col gap-2 min-w-0">
+              <h1 className="text-xl font-bold text-primary tracking-tight">RAJA</h1>
+              <p className="text-xs font-medium text-on-surface-variant">Asset Management</p>
+            </div>
+          )}
+          <button
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden shrink-0 rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary md:flex md:items-center md:justify-center"
+          >
+            {sidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+          </button>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto w-full p-2 py-4">
@@ -72,15 +94,17 @@ export default function Layout() {
                   <Link
                     to={item.href}
                     onClick={() => setMobileMenuOpen(false)}
+                    title={sidebarCollapsed ? item.label : undefined}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors w-full",
+                      sidebarCollapsed && "md:justify-center md:px-2",
                       isActive
                         ? "bg-secondary-container text-on-secondary-container border-r-4 border-primary shadow-sm"
                         : "text-on-surface-variant hover:bg-surface-container-low"
                     )}
                   >
-                    <Icon className="h-5 w-5" />
-                    {item.label}
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className={cn(sidebarCollapsed && "md:hidden")}>{item.label}</span>
                   </Link>
                 </li>
               );
@@ -89,28 +113,42 @@ export default function Layout() {
         </nav>
 
         <div className="mt-auto border-t border-outline-variant/30 p-4">
-          <button 
+          <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex w-full items-center justify-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-opacity hover:opacity-90"
+            title={sidebarCollapsed ? "Add New Asset" : undefined}
+            className={cn(
+              "flex w-full items-center justify-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-opacity hover:opacity-90",
+              sidebarCollapsed && "md:px-2"
+            )}
           >
-            <Plus className="h-4 w-4" />
-            Add New Asset
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className={cn(sidebarCollapsed && "md:hidden")}>Add New Asset</span>
           </button>
-          
+
           <ul className="mt-4 flex flex-col gap-1 w-full">
             <li>
-              <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors">
-                <HelpCircle className="h-4 w-4" />
-                Help Center
+              <button
+                title={sidebarCollapsed ? "Help Center" : undefined}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors",
+                  sidebarCollapsed && "md:justify-center md:px-2"
+                )}
+              >
+                <HelpCircle className="h-4 w-4 shrink-0" />
+                <span className={cn(sidebarCollapsed && "md:hidden")}>Help Center</span>
               </button>
             </li>
             <li>
-              <button 
+              <button
                 onClick={logout}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                title={sidebarCollapsed ? "Logout" : undefined}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors",
+                  sidebarCollapsed && "md:justify-center md:px-2"
+                )}
               >
-                <LogOut className="h-4 w-4" />
-                Logout
+                <LogOut className="h-4 w-4 shrink-0" />
+                <span className={cn(sidebarCollapsed && "md:hidden")}>Logout</span>
               </button>
             </li>
           </ul>
