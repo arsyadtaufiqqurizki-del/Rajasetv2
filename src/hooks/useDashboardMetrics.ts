@@ -5,6 +5,9 @@ import { formatCurrencyWhole, formatCompactCurrency, parseCost } from '../lib/mo
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+export const ASSET_STATUS_OPTIONS = ['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Retired'] as const;
+export type AssetStatusOption = typeof ASSET_STATUS_OPTIONS[number];
+
 export interface DashboardChartPoint {
   name: string;
   value: number;
@@ -48,8 +51,10 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string) {
     const lastMonthCost = lastMonthAssets.reduce((acc, curr) => acc + parseCost(curr.assetCost), 0);
     const assetCostChange = calculateChange(currentMonthCost, lastMonthCost);
 
-    const brokenAssetsCount = assets.filter(a => a.statusLevel === 'error').length;
-    const brokenAssetPercentage = assets.length > 0 ? (brokenAssetsCount / assets.length) * 100 : 0;
+    const statusCounts = ASSET_STATUS_OPTIONS.reduce((acc, statusOption) => {
+      acc[statusOption] = assets.filter(a => a.status.trim().toLowerCase() === statusOption.toLowerCase()).length;
+      return acc;
+    }, {} as Record<AssetStatusOption, number>);
 
     const totalValuation = assets.reduce((acc, curr) => acc + parseCost(curr.assetCost), 0);
     const formattedValuation = formatCompactCurrency(totalValuation);
@@ -96,8 +101,7 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string) {
     return {
       assetCountChange,
       assetCostChange,
-      brokenAssetsCount,
-      brokenAssetPercentage,
+      statusCounts,
       totalValuation,
       formattedValuation,
       fullValuation,

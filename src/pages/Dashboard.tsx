@@ -10,6 +10,7 @@ import DashboardSubsidiaryBarChart from '../components/DashboardSubsidiaryBarCha
 import DashboardCategoryPieChart from '../components/DashboardCategoryPieChart';
 import DashboardTrendChart from '../components/DashboardTrendChart';
 import DashboardRecentAssetsPanel from '../components/DashboardRecentAssetsPanel';
+import type { AssetStatusOption } from '../hooks/useDashboardMetrics';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -20,6 +21,7 @@ export default function Dashboard() {
 
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedStatus, setSelectedStatus] = useState<AssetStatusOption>('Broken');
 
   const {
     filterSubsidiary, setFilterSubsidiary,
@@ -36,8 +38,7 @@ export default function Dashboard() {
   const {
     assetCountChange,
     assetCostChange,
-    brokenAssetsCount,
-    brokenAssetPercentage,
+    statusCounts,
     formattedValuation,
     fullValuation,
     subsidiaryData,
@@ -84,8 +85,9 @@ export default function Dashboard() {
         formattedValuation={formattedValuation}
         fullValuation={fullValuation}
         assetCostChange={assetCostChange}
-        brokenAssetsCount={brokenAssetsCount}
-        brokenAssetPercentage={brokenAssetPercentage}
+        statusCounts={statusCounts}
+        selectedStatus={selectedStatus}
+        onSelectedStatusChange={setSelectedStatus}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -2,6 +2,7 @@ import { Package, TrendingUp, TrendingDown, AlertTriangle, FileUp } from 'lucide
 import { cn } from '../lib/utils';
 import { en as copy } from '../i18n/en';
 import StatCard from './ui/StatCard';
+import { ASSET_STATUS_OPTIONS, type AssetStatusOption } from '../hooks/useDashboardMetrics';
 
 interface DashboardKpiRowProps {
   assetsCount: number;
@@ -9,9 +10,12 @@ interface DashboardKpiRowProps {
   formattedValuation: string;
   fullValuation: string;
   assetCostChange: number;
-  brokenAssetsCount: number;
-  brokenAssetPercentage: number;
+  statusCounts: Record<AssetStatusOption, number>;
+  selectedStatus: AssetStatusOption;
+  onSelectedStatusChange: (status: AssetStatusOption) => void;
 }
+
+const URGENT_STATUSES: AssetStatusOption[] = ['Needs Service', 'Broken'];
 
 function ChangeFooter({ change }: { change: number }) {
   if (change === 0) {
@@ -34,9 +38,14 @@ export default function DashboardKpiRow({
   formattedValuation,
   fullValuation,
   assetCostChange,
-  brokenAssetsCount,
-  brokenAssetPercentage,
+  statusCounts,
+  selectedStatus,
+  onSelectedStatusChange,
 }: DashboardKpiRowProps) {
+  const selectedStatusCount = statusCounts[selectedStatus];
+  const selectedStatusPercentage = assetsCount > 0 ? (selectedStatusCount / assetsCount) * 100 : 0;
+  const isUrgent = URGENT_STATUSES.includes(selectedStatus);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <StatCard
@@ -64,14 +73,24 @@ export default function DashboardKpiRow({
       />
 
       <StatCard
-        label="Broken Asset"
-        icon={<AlertTriangle className="h-5 w-5 text-error" />}
-        value={brokenAssetsCount}
-        tone="danger"
+        label={
+          <select
+            value={selectedStatus}
+            onChange={(e) => onSelectedStatusChange(e.target.value as AssetStatusOption)}
+            className="bg-transparent text-on-surface-variant font-medium text-xs tracking-wider uppercase focus:outline-none cursor-pointer"
+          >
+            {ASSET_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+        }
+        icon={<AlertTriangle className={cn('h-5 w-5', isUrgent ? 'text-error' : 'text-primary')} />}
+        value={selectedStatusCount}
+        tone={isUrgent ? 'danger' : 'default'}
         footer={
           <>
-            <span className={cn('font-medium', brokenAssetPercentage > 10 ? 'text-red-600' : 'text-amber-600')}>
-              {brokenAssetPercentage.toFixed(1)}%
+            <span className={cn('font-medium', isUrgent && selectedStatusPercentage > 10 ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-on-surface-variant')}>
+              {selectedStatusPercentage.toFixed(1)}%
             </span>
             <span className="text-on-surface-variant">of total assets</span>
           </>
