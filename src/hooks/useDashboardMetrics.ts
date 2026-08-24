@@ -67,10 +67,11 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string) {
       return acc;
     }, {} as Record<string, number>);
 
-    const subsidiaryData: DashboardChartPoint[] = Object.entries(subsidiaryDataMap)
+    const allSubsidiaryData: DashboardChartPoint[] = Object.entries(subsidiaryDataMap)
       .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
+      .sort((a, b) => b.value - a.value);
+
+    const subsidiaryData = allSubsidiaryData.slice(0, 5);
 
     const categoryDataMap = assets.reduce((acc, curr) => {
       const value = parseCost(curr.assetCost);
@@ -106,6 +107,7 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string) {
       formattedValuation,
       fullValuation,
       subsidiaryData,
+      allSubsidiaryData,
       categoryData,
       availableYears,
     };

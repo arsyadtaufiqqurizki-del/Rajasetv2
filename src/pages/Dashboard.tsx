@@ -42,6 +42,7 @@ export default function Dashboard() {
     formattedValuation,
     fullValuation,
     subsidiaryData,
+    allSubsidiaryData,
     categoryData,
     availableYears,
     trendData,
@@ -91,7 +92,7 @@ export default function Dashboard() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <DashboardSubsidiaryBarChart data={subsidiaryData} />
+        <DashboardSubsidiaryBarChart data={subsidiaryData} allData={allSubsidiaryData} />
         <DashboardCategoryPieChart data={categoryData} totalAssets={assets.length} />
       </div>
 
