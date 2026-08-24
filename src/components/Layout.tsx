@@ -50,7 +50,7 @@ export default function Layout() {
   }, [profileMenuOpen]);
 
   return (
-    <div className="flex min-h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Overlay for mobile sidebar */}
       {mobileMenuOpen && (
         <div 
@@ -61,7 +61,7 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-surface-container-lowest border-r border-outline-variant transition-all duration-300 md:static md:translate-x-0 hidden md:flex",
+        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-surface-container-lowest border-r border-outline-variant transition-all duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 hidden md:flex",
         mobileMenuOpen ? "flex translate-x-0" : "-translate-x-full",
         sidebarCollapsed ? "md:w-20" : "md:w-64"
       )}>
