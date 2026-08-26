@@ -37,6 +37,24 @@
   --color-on-error: #ffffff;
   --color-error-container: #ffdad6;
   --color-on-error-container: #93000a;
+
+  /* Chart palette — 8 vivid, maximally distinct categorical hues.
+     Recharts doesn't read Tailwind classes on fill/stroke, so reference these as var(--color-chart-N). */
+  --color-chart-1: #22c55e;
+  --color-chart-2: #ef4444;
+  --color-chart-3: #f59e0b;
+  --color-chart-4: #3b82f6;
+  --color-chart-5: #a855f7;
+  --color-chart-6: #ec4899;
+  --color-chart-7: #06b6d4;
+  --color-chart-8: #f97316;
+  --color-chart-grid: #e0e3e5;
+  --color-chart-axis: #76777d;
+
+  /* Semantic colors for KPI deltas */
+  --color-positive: #059669;
+  --color-negative: #dc2626;
+  --color-neutral: #76777d;
 }
 
 @layer base {

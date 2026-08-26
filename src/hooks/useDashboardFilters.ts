@@ -25,6 +25,14 @@ export function useDashboardFilters(
 
   const uniqueStatuses = useMemo(() => Array.from(new Set(assets.map((a) => a.status).filter(Boolean))), [assets]);
 
+  const recentFirst = useMemo(() => {
+    const time = (a: Asset) => {
+      const t = new Date(a.createdAt).getTime();
+      return isNaN(t) ? 0 : t;
+    };
+    return [...list.filtered].sort((a, b) => time(b) - time(a));
+  }, [list.filtered]);
+
   return {
     filterSubsidiary: list.getMulti('subsidiary'),
     setFilterSubsidiary: (v: string[]) => list.setMulti('subsidiary', v),
@@ -39,7 +47,7 @@ export function useDashboardFilters(
     debouncedSearchQuery: list.debouncedSearchQuery,
     uniqueStatuses,
     activeFilters: list.chips,
-    filteredAssets: list.filtered,
+    filteredAssets: recentFirst,
     clearFilters: list.clearFilters,
   };
 }

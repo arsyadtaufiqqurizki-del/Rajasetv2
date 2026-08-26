@@ -2,7 +2,16 @@ import { useMemo } from 'react';
 import type { Asset } from '../types/asset';
 import { formatCurrencyWhole, formatCompactCurrency, parseCost } from '../lib/money';
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+const CHART_COLORS = [
+  'var(--color-chart-1)',
+  'var(--color-chart-2)',
+  'var(--color-chart-3)',
+  'var(--color-chart-4)',
+  'var(--color-chart-5)',
+  'var(--color-chart-6)',
+  'var(--color-chart-7)',
+  'var(--color-chart-8)',
+];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export const ASSET_STATUS_OPTIONS = ['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Retired'] as const;
@@ -22,8 +31,9 @@ export interface DashboardTrendPoint {
   value: number;
 }
 
-function calculateChange(current: number, previous: number): number {
-  if (previous === 0) return current > 0 ? 100 : 0;
+/** Returns null (no comparable baseline) rather than a misleading 100% when last month had no data. */
+function calculateChange(current: number, previous: number): number | null {
+  if (previous === 0) return null;
   return ((current - previous) / previous) * 100;
 }
 

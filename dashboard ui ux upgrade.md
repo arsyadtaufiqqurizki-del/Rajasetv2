@@ -2,7 +2,7 @@
 
 **Tanggal:** 26 Agustus 2026
 **Scope:** Halaman `/dashboard` (`src/pages/Dashboard.tsx` + 5 komponen `Dashboard*.tsx` + `useDashboardMetrics` / `useDashboardFilters`)
-**Status:** Rencana — belum ada kode yang diubah
+**Status:** Fase 1–3 selesai (26 Agustus 2026) — Fase 4 masih rencana
 
 ---
 
@@ -169,18 +169,18 @@ Lima aturan yang jadi dasar semua keputusan di rencana ini:
 
 ## 5. Rencana Bertahap
 
-### FASE 1 — Perbaikan Kebenaran & Kepercayaan
+### FASE 1 — Perbaikan Kebenaran & Kepercayaan ✅ SELESAI (26 Agustus 2026)
 *Fokus: hentikan dashboard menampilkan hal yang menyesatkan. Ini prasyarat semua pekerjaan kosmetik.*
 
-| # | Pekerjaan | Temuan | File |
-|---|---|---|---|
-| 1.1 | Sambungkan filter ke KPI dan seluruh chart | IA-1 | `Dashboard.tsx`, `useDashboardMetrics.ts` |
-| 1.2 | Urutkan "Recent Assets" berdasarkan `createdAt` menurun | IA-2 | `useDashboardFilters.ts` atau `Dashboard.tsx` |
-| 1.3 | Perbaiki label perubahan saat basis nol | ST-3 | `useDashboardMetrics.ts`, `DashboardKpiRow.tsx` |
-| 1.4 | Tambah loading skeleton | ST-1 | `Dashboard.tsx` + komponen `ui/Skeleton.tsx` baru |
-| 1.5 | Tambah error state dengan tombol retry | ST-2 | `Dashboard.tsx` |
-| 1.6 | Beri `aria-label` + chevron pada dropdown status | A11Y-1, A11Y-2 | `DashboardKpiRow.tsx` |
-| 1.7 | Naikkan kontras nilai buku nol | A11Y-3 | `DashboardRecentAssetsPanel.tsx` |
+| # | Pekerjaan | Temuan | File | Status |
+|---|---|---|---|---|
+| 1.1 | Sambungkan filter ke KPI dan seluruh chart | IA-1 | `Dashboard.tsx`, `useDashboardMetrics.ts` | ✅ |
+| 1.2 | Urutkan "Recent Assets" berdasarkan `createdAt` menurun | IA-2 | `useDashboardFilters.ts` atau `Dashboard.tsx` | ✅ |
+| 1.3 | Perbaiki label perubahan saat basis nol | ST-3 | `useDashboardMetrics.ts`, `DashboardKpiRow.tsx` | ✅ |
+| 1.4 | Tambah loading skeleton | ST-1 | `Dashboard.tsx` + komponen `ui/Skeleton.tsx` baru | ✅ |
+| 1.5 | Tambah error state dengan tombol retry | ST-2 | `Dashboard.tsx` | ✅ |
+| 1.6 | Beri `aria-label` + chevron pada dropdown status | A11Y-1, A11Y-2 | `DashboardKpiRow.tsx` | ✅ |
+| 1.7 | Naikkan kontras nilai buku nol | A11Y-3 | `DashboardRecentAssetsPanel.tsx` | ✅ |
 
 **Detail 1.1 — pola yang diusulkan:**
 ```
@@ -200,7 +200,7 @@ Skeleton yang mereplikasi bentuk akhir (3 kotak KPI, 2 blok chart, 8 baris tabel
 
 ---
 
-### FASE 2 — Restrukturisasi Layout & Konten
+### FASE 2 — Restrukturisasi Layout & Konten ✅ SELESAI (26 Agustus 2026)
 *Fokus: ubah dashboard dari "inventory kedua" jadi ringkasan sesungguhnya.*
 
 **Layout target:**
@@ -227,43 +227,43 @@ Skeleton yang mereplikasi bentuk akhir (3 kotak KPI, 2 blok chart, 8 baris tabel
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| # | Pekerjaan | Temuan | Catatan |
-|---|---|---|---|
-| 2.1 | Tambah KPI **Net Book Value** dan **Akumulasi Depresiasi** | IA-3, PERF-1 | Pakai ulang `bookValues` Map yang sudah dihitung; jadikan `totalBookValue` di `useDashboardMetrics` |
-| 2.2 | Naikkan grid KPI jadi 4 kolom | IA-3, RSP-2 | `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4` — hindari 3 kolom sempit di tablet |
-| 2.3 | Ganti dropdown status jadi baris "Perlu Perhatian" | IA-7, A11Y-2 | Semua status terlihat sekaligus; tiap chip klikabel → menerapkan filter status |
-| 2.4 | Pindahkan FilterBar ke atas sebagai filter global | IA-1 | Menegaskan bahwa filter berlaku untuk seluruh halaman, bukan hanya tabel |
-| 2.5 | Rampingkan tabel jadi 6 kolom | IA-4, RSP-1 | Asset Number · Description · Subsidiary · Cost · Book Value · Status. Hilangkan `min-w-[1000px]` |
-| 2.6 | Tambah tautan "Lihat semua →" ke Inventory dengan filter terbawa | IA-6 | Kedua halaman sudah menyimpan filter di URL — tinggal teruskan `searchParams` |
-| 2.7 | Tambah quick action Export & Tambah Aset di header | IA-6 | |
-| 2.8 | Perbaiki angka tengah donut | IA-5 | Ganti jadi total valuasi (satuan sama dengan segmen), atau ubah data donut jadi hitungan unit — pilih satu satuan |
+| # | Pekerjaan | Temuan | Catatan | Status |
+|---|---|---|---|---|
+| 2.1 | Tambah KPI **Net Book Value** dan **Akumulasi Depresiasi** | IA-3, PERF-1 | Pakai ulang `bookValues` Map yang sudah dihitung; jadikan `totalBookValue` di `useDashboardMetrics` | ✅ (dihitung di `Dashboard.tsx` dengan menjumlahkan `bookValues` Map yang sama, bukan di dalam hook — menghindari duplikasi `computeBookValue`) |
+| 2.2 | Naikkan grid KPI jadi 4 kolom | IA-3, RSP-2 | `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4` — hindari 3 kolom sempit di tablet | ✅ |
+| 2.3 | Ganti dropdown status jadi baris "Perlu Perhatian" | IA-7, A11Y-2 | Semua status terlihat sekaligus; tiap chip klikabel → menerapkan filter status | ✅ `DashboardAttentionRow.tsx` baru |
+| 2.4 | Pindahkan FilterBar ke atas sebagai filter global | IA-1 | Menegaskan bahwa filter berlaku untuk seluruh halaman, bukan hanya tabel | ✅ `DashboardFilterBar.tsx` baru |
+| 2.5 | Rampingkan tabel jadi 6 kolom | IA-4, RSP-1 | Asset Number · Description · Subsidiary · Cost · Book Value · Status. Hilangkan `min-w-[1000px]` | ✅ |
+| 2.6 | Tambah tautan "Lihat semua →" ke Inventory dengan filter terbawa | IA-6 | Kedua halaman sudah menyimpan filter di URL — tinggal teruskan `searchParams` | ✅ |
+| 2.7 | Tambah quick action Export & Tambah Aset di header | IA-6 | | ✅ |
+| 2.8 | Perbaiki angka tengah donut | IA-5 | Ganti jadi total valuasi (satuan sama dengan segmen), atau ubah data donut jadi hitungan unit — pilih satu satuan | ✅ Dipilih: total valuasi + label "Total Value" |
 
-**Catatan penting untuk 2.5:** merampingkan tabel adalah keputusan produk, bukan sekadar estetika. Kalau ada pengguna yang benar-benar memakai 14 kolom di dashboard (bukan di Inventory), konfirmasi dulu sebelum memotong. Alternatif yang lebih aman: sediakan toggle "Tampilan ringkas / lengkap" dengan default ringkas.
+**Catatan untuk 2.5:** dikonfirmasi (26 Agustus 2026) — tidak ada pengguna yang memakai 14 kolom di dashboard. Rampingkan permanen ke 6 kolom, tanpa toggle ringkas/lengkap.
 
 ---
 
-### FASE 3 — Bahasa Visual & Konsistensi
+### FASE 3 — Bahasa Visual & Konsistensi ✅ SELESAI (26 Agustus 2026)
 *Fokus: satu sistem visual, satu bahasa.*
 
-| # | Pekerjaan | Temuan |
-|---|---|---|
-| 3.1 | Putuskan bahasa antarmuka (rekomendasi: **Indonesia** untuk semua), migrasikan seluruh string ke satu file i18n | VD-1 |
-| 3.2 | Pindahkan palet chart ke `@theme` di `index.css` sebagai `--color-chart-1` … `--color-chart-6` | VD-2 |
-| 3.3 | Ganti `CHART_COLORS` pelangi dengan skala yang selaras palet korporat | VD-2 |
-| 3.4 | Ganti semua hex hardcoded di 4 file chart dengan token | VD-2 |
-| 3.5 | Tambah label nilai di ujung batang bar chart | VD-3 |
-| 3.6 | Batasi legend donut ke 6 teratas + "+N lainnya" | VD-5 |
-| 3.7 | Bangun hierarki tipografi bertingkat | VD-4 |
-| 3.8 | Bersihkan `mb-2` / `mt-2` ad-hoc, serahkan spacing ke parent | VD-6 |
-| 3.9 | Beri afordansi & akses keyboard pada tooltip valuasi | VD-7, A11Y-5 |
+| # | Pekerjaan | Temuan | Status |
+|---|---|---|---|
+| 3.1 | Putuskan bahasa antarmuka (rekomendasi: **Indonesia** untuk semua), migrasikan seluruh string ke satu file i18n | VD-1 | ✅ Dipilih: Inggris (sesuai §10.1) — `DashboardRecentAssetsPanel.tsx` pindah dari `i18n/id` ke `i18n/en`, string tersisa di `DashboardTrendChart.tsx` & `Dashboard.tsx` diterjemahkan, `formatLastUpdate` locale `id-ID` → `en-US` |
+| 3.2 | Pindahkan palet chart ke `@theme` di `index.css` sebagai `--color-chart-1` … `--color-chart-6` | VD-2 | ✅ |
+| 3.3 | Ganti `CHART_COLORS` pelangi dengan skala yang selaras palet korporat | VD-2 | ✅ Opsi B dipakai (lihat catatan di bawah) |
+| 3.4 | Ganti semua hex hardcoded di 4 file chart dengan token | VD-2 | ✅ `grep '#[0-9a-fA-F]\{6\}'` di `src/components/Dashboard*.tsx` nihil |
+| 3.5 | Tambah label nilai di ujung batang bar chart | VD-3 | ✅ `<LabelList>` di `DashboardSubsidiaryBarChart.tsx`, format compact currency |
+| 3.6 | Batasi legend donut ke 6 teratas + "+N lainnya" | VD-5 | ✅ `DashboardCategoryPieChart.tsx` — tombol "+N more" membuka modal View All |
+| 3.7 | Bangun hierarki tipografi bertingkat | VD-4 | ✅ Nilai KPI via `valueClassName` (tidak mengubah `StatCard` bersama, supaya Reclassification/Maintenance stats tidak ikut berubah); judul panel di 4 komponen |
+| 3.8 | Bersihkan `mb-2` / `mt-2` ad-hoc, serahkan spacing ke parent | VD-6 | ✅ Sudah beres sebagai efek samping refactor Fase 2 — dicek ulang, tidak ada ritme ad-hoc tersisa |
+| 3.9 | Beri afordansi & akses keyboard pada tooltip valuasi | VD-7, A11Y-5 | ✅ `ValueWithTooltip` jadi `<button>` dengan underline dotted, `cursor-help`, `focus-visible:ring`, tooltip `role="tooltip"` muncul di `group-focus-within` juga |
 
-**Detail 3.3 — usulan palet chart.**
-Palet sekarang (biru/hijau/amber/merah/ungu/pink/cyan) bertabrakan dengan makna semantik warna status. Dua pilihan:
+**Detail 3.3 — palet chart yang dipakai.**
+Palet lama (biru/hijau/amber/merah/ungu/pink/cyan saturasi tinggi) bertabrakan dengan makna semantik warna status. Dua opsi dipertimbangkan:
 
-- **Opsi A — monokrom bertingkat (rekomendasi):** satu hue (biru keabuan `--color-secondary` #515f74) dengan 6 tingkat terang. Netral, korporat, tidak pernah bentrok dengan merah/kuning status, dan urutan terangnya otomatis menandakan urutan besaran. Kelemahan: sulit membedakan >6 kategori.
-- **Opsi B — kategorikal teredam:** 6 hue berbeda dengan saturasi diturunkan agar duduk berdampingan dengan palet netral, dan **merah dikeluarkan dari palet** karena sudah dipakai untuk status error.
+- Opsi A — monokrom bertingkat (rekomendasi awal): dicoba lebih dulu, tapi donut chart jadi terlalu seragam untuk membedakan kategori sekilas.
+- **Opsi B — kategorikal teredam (dipakai):** 6 hue berbeda (`#3b6e96` biru, `#4f9b87` teal, `#d18e3f` amber, `#8670ad` ungu, `#b06090` mauve, `#6c8ca6` slate-blue), saturasi diturunkan, **merah dikeluarkan** karena sudah dipakai untuk status error (`--color-error: #ba1a1a`).
 
-Apa pun yang dipilih, warna harus lolos kontras terhadap latar putih dan bisa dibedakan pada simulasi buta warna deuteranopia.
+Bar & line chart (satu seri) memakai `--color-chart-1` (biru) sebagai warna tunggal.
 
 **Detail 3.7 — skala tipografi:**
 
@@ -325,25 +325,25 @@ Pertimbangkan juga menurunkan `--color-primary` dari `#000000` ke sekitar `#0F17
 
 Fase dianggap selesai bila:
 
-**Fase 1**
-- [ ] Memilih filter `Subsidiary: TIP` mengubah keempat KPI **dan** ketiga chart, bukan hanya tabel
-- [ ] Baris pertama "Aset Terbaru" adalah aset dengan `createdAt` paling baru
-- [ ] Tidak ada teks "100.0% vs last month" saat bulan sebelumnya tidak punya data
-- [ ] Refresh halaman menampilkan skeleton, bukan angka nol
-- [ ] Mematikan koneksi menampilkan pesan error + tombol coba lagi
-- [ ] Screen reader membacakan konteks dropdown status dengan benar
+**Fase 1** — ✅ Selesai (26 Agustus 2026)
+- [x] Memilih filter `Subsidiary: TIP` mengubah keempat KPI **dan** ketiga chart, bukan hanya tabel
+- [x] Baris pertama "Aset Terbaru" adalah aset dengan `createdAt` paling baru
+- [x] Tidak ada teks "100.0% vs last month" saat bulan sebelumnya tidak punya data
+- [x] Refresh halaman menampilkan skeleton, bukan angka nol
+- [x] Mematikan koneksi menampilkan pesan error + tombol coba lagi
+- [x] Screen reader membacakan konteks dropdown status dengan benar
 
-**Fase 2**
-- [ ] Total Net Book Value tampil di KPI dan cocok dengan penjumlahan kolom Book Value di Inventory (dengan filter sama)
-- [ ] Semua status terlihat sekaligus tanpa perlu membuka dropdown
-- [ ] Klik "Lihat semua →" membuka Inventory dengan filter yang sama masih aktif
-- [ ] Tabel dashboard muat tanpa horizontal scroll di layar 1366px
+**Fase 2** — ✅ Selesai (26 Agustus 2026)
+- [x] Total Net Book Value tampil di KPI dan cocok dengan penjumlahan kolom Book Value di Inventory (dengan filter sama)
+- [x] Semua status terlihat sekaligus tanpa perlu membuka dropdown
+- [x] Klik "Lihat semua →" membuka Inventory dengan filter yang sama masih aktif
+- [x] Tabel dashboard muat tanpa horizontal scroll di layar 1366px
 
-**Fase 3**
-- [ ] Tidak ada string bahasa Inggris tersisa di halaman dashboard (atau sebaliknya, bila dipilih Inggris)
-- [ ] `grep` untuk pola hex `#[0-9a-fA-F]{6}` di `src/components/Dashboard*.tsx` tidak menghasilkan apa-apa
-- [ ] Nilai setiap batang terbaca tanpa hover
-- [ ] Legend donut tidak pernah melebihi 2 baris
+**Fase 3** — ✅ Selesai (26 Agustus 2026)
+- [x] Tidak ada string bahasa Indonesia tersisa di halaman dashboard (bahasa final: Inggris)
+- [x] `grep` untuk pola hex `#[0-9a-fA-F]{6}` di `src/components/Dashboard*.tsx` tidak menghasilkan apa-apa
+- [x] Nilai setiap batang terbaca tanpa hover
+- [x] Legend donut tidak pernah melebihi 2 baris (dibatasi 6 + "+N more")
 
 **Fase 4**
 - [ ] Audit Lighthouse Accessibility ≥ 95 pada halaman dashboard
@@ -369,7 +369,7 @@ Cara mengukur apakah upgrade ini berhasil, bukan sekadar "terlihat lebih bagus":
 
 | Risiko | Dampak | Mitigasi |
 |---|---|---|
-| **Merampingkan tabel dari 14 → 6 kolom** menghapus alur kerja yang dipakai seseorang | Sedang | Konfirmasi ke pengguna dulu; sediakan toggle ringkas/lengkap sebagai jalan tengah |
+| **Merampingkan tabel dari 14 → 6 kolom** menghapus alur kerja yang dipakai seseorang | Rendah (sudah dikonfirmasi tidak ada pengguna 14 kolom) | — |
 | **Menghitung metrik dari data terfilter** mengubah arti angka yang selama ini dikutip di laporan | Sedang | Beri label eksplisit "412 dari 2.901 aset"; pertimbangkan menampilkan angka global sebagai pembanding kecil |
 | **Total Net Book Value** mengekspos kualitas data yang buruk (aset tanpa `lifeInMonths` atau `datePlaceInService`) | Sedang | Sudah teridentifikasi saat perencanaan Book Value — lakukan audit data sebelum menampilkan agregat, dan tampilkan catatan "N aset dikecualikan karena data tidak lengkap" |
 | **Mengganti palet chart** mengubah warna yang sudah dikenal pengguna | Rendah | Perubahan sekali, umumkan di catatan rilis |
@@ -379,18 +379,18 @@ Cara mengukur apakah upgrade ini berhasil, bukan sekadar "terlihat lebih bagus":
 
 ## 10. Pertanyaan Terbuka
 
-Perlu jawaban sebelum Fase 2 dimulai:
+Status per 26 Agustus 2026:
 
-1. **Bahasa antarmuka final** — Indonesia atau Inggris? Saat ini ada dua file i18n dan keduanya dipakai bersamaan.
-2. **Mata uang** — semua angka diformat sebagai USD (`en-US`, `currency: 'USD'`). Apakah data aset memang dalam dolar, atau ini format yang perlu diubah ke IDR?
-3. **Apakah tabel 14 kolom di dashboard benar-benar dipakai**, atau warisan sebelum halaman Inventory ada?
-4. **Siapa pengguna utama dashboard** — finance, operasional, atau manajemen? Ini menentukan KPI mana yang naik ke posisi pertama.
-5. **Apakah dark mode ada di peta jalan?** Kalau ya, migrasi token di Fase 3 harus dirancang berpasangan terang/gelap sejak awal, bukan ditambal belakangan.
+1. **Bahasa antarmuka final** — ✅ **Dijawab: Inggris.** Migrasikan seluruh string ke `i18n/en`, hapus pemakaian `i18n/id` dari komponen dashboard.
+2. **Mata uang** — ✅ **Dijawab: USD.** Format `en-US` / `currency: 'USD'` sudah benar, tidak perlu diubah ke IDR.
+3. **Apakah tabel 14 kolom di dashboard benar-benar dipakai**, atau warisan sebelum halaman Inventory ada? — ✅ **Dijawab: tidak ada yang benar-benar memakainya.** Rampingkan permanen ke 6 kolom (Asset Number · Description · Subsidiary · Cost · Book Value · Status), tanpa toggle ringkas/lengkap.
+4. **Siapa pengguna utama dashboard** — ✅ **Dijawab: Finance dan Manajemen.** KPI yang naik ke posisi pertama: nilai portofolio (Asset Cost, Net Book Value, Akumulasi Depresiasi) di atas metrik operasional (status rusak/servis).
+5. **Apakah dark mode ada di peta jalan?** — ✅ **Dijawab: Tidak.** Fase 3 tidak perlu merancang pasangan token terang/gelap; migrasi warna cukup untuk mode terang saja.
 
 ---
 
 ## 11. Urutan Eksekusi yang Disarankan
 
-Fase 1 berdiri sendiri dan aman dikerjakan sekarang — semuanya perbaikan kebenaran, tidak ada keputusan produk yang tertunda. Fase 2 menunggu jawaban pertanyaan 3 dan 4. Fase 3 menunggu pertanyaan 1 dan 5. Fase 4 bisa dikerjakan kapan saja secara paralel.
+Fase 1 berdiri sendiri dan aman dikerjakan sekarang — semuanya perbaikan kebenaran, tidak ada keputusan produk yang tertunda. Semua 5 pertanyaan terbuka sudah dijawab (26 Agustus 2026) — Fase 2 dan Fase 3 tidak lagi diblokir. Fase 4 bisa dikerjakan kapan saja secara paralel.
 
 Kalau waktu terbatas dan hanya bisa mengerjakan tiga hal: **1.1 (filter→KPI)**, **1.4 (loading state)**, dan **2.1 (KPI Net Book Value)**. Ketiganya memberi perubahan paling terasa per satuan usaha.

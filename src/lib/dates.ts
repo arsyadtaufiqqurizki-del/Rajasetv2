@@ -1,16 +1,16 @@
-/** Formats a Date as "Hari, tanggal Bulan tahun · HH:mm" in Indonesian. */
+/** Formats a Date as "Weekday, Month day, year · HH:mm". */
 export function formatLastUpdate(date: Date): string {
-  const datePart = new Intl.DateTimeFormat('id-ID', {
+  const datePart = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   }).format(date);
-  const timePart = new Intl.DateTimeFormat('id-ID', {
+  const timePart = new Intl.DateTimeFormat('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(date).replace('.', ':');
+  }).format(date);
   return `${datePart} · ${timePart}`;
 }
 

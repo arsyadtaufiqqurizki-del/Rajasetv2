@@ -13,7 +13,7 @@ export default function DashboardTrendChart({ data, selectedYear, availableYears
   return (
     <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-primary">Tren Pembelian Aset Tahunan</h3>
+        <h3 className="text-base font-semibold text-on-surface">Annual Purchase Trend</h3>
         <select
           value={selectedYear}
           onChange={(e) => onSelectYear(e.target.value)}
@@ -27,19 +27,19 @@ export default function DashboardTrendChart({ data, selectedYear, availableYears
       <div className="h-72 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0e3e5" />
-            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#76777d', fontSize: 12 }} dy={10} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-chart-grid)" />
+            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-chart-axis)', fontSize: 12 }} dy={10} />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#76777d', fontSize: 12 }}
+              tick={{ fill: 'var(--color-chart-axis)', fontSize: 12 }}
               tickFormatter={(value: number) => formatCompactNumber(value)}
             />
             <Tooltip
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-              formatter={(value) => [formatCurrencyWhole(Number(value)), 'Nilai Pembelian']}
+              formatter={(value) => [formatCurrencyWhole(Number(value)), 'Purchase Value']}
             />
-            <Line type="monotone" dataKey="value" stroke="#0F172A" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+            <Line type="monotone" dataKey="value" stroke="var(--color-chart-1)" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>

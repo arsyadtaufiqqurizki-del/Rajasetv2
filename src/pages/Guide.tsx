@@ -17,7 +17,7 @@ const GUIDE_CONTENT = [
         answer: "The dashboard provides a high-level overview of total assets, asset cost, and broken assets, plus charts for subsidiary valuation, category breakdown, and annual purchase trends. Use the sidebar on the left to access every section: Dashboard, Asset Inventory, Maintenance, Reclassification, Master Data, Reports, AI Assistant, and Settings."
       },
       {
-        question: "What does the 'Terakhir diperbarui' (last updated) timestamp on the Dashboard mean?",
+        question: "What does the 'Last updated' timestamp on the Dashboard mean?",
         answer: "It shows when asset data was last fetched or changed — including every add, edit, delete, or bulk delete you or your teammates perform. It updates automatically after each successful change, so you always know how fresh the numbers are."
       }
     ]

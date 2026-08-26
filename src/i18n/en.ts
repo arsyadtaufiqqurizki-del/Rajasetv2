@@ -9,6 +9,7 @@ export const en = {
     noDataFooter: 'No data yet',
     loading: 'Loading...',
     noChangeFromLastMonth: 'No change from last month',
+    noPriorMonthData: 'No data for last month',
   },
   confirm: {
     deleteAssetTitle: 'Delete Asset',

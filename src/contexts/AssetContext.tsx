@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../lib/activityLogger';
 import type { Asset } from '../types/asset';
@@ -9,6 +9,7 @@ interface AssetContextType {
   assets: Asset[];
   loading: boolean;
   error: string | null;
+  refetch: () => Promise<void>;
   lastFetchedAt: Date | null;
   subsidiaries: string[];
   categories1: string[];
@@ -100,49 +101,51 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      // Fetch all assets in chunks to bypass Supabase's default 1000-row limit
-      const CHUNK = 1000;
-      let allRows: any[] = [];
-      let from = 0;
-      while (true) {
-        const { data, error } = await supabase
-          .from('assets')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(from, from + CHUNK - 1);
-        if (error) { setError(error.message); break; }
-        allRows = allRows.concat(data ?? []);
-        if (!data || data.length < CHUNK) break;
-        from += CHUNK;
-      }
-      setAssets(allRows.map(fromDb));
+    // Fetch all assets in chunks to bypass Supabase's default 1000-row limit
+    const CHUNK = 1000;
+    let allRows: any[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('assets')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, from + CHUNK - 1);
+      if (error) { setError(error.message); break; }
+      allRows = allRows.concat(data ?? []);
+      if (!data || data.length < CHUNK) break;
+      from += CHUNK;
+    }
+    setAssets(allRows.map(fromDb));
 
-      const latestUpdateMs = allRows.reduce((max, row) => {
-        const t = row.updated_at ? new Date(row.updated_at).getTime() : 0;
-        return t > max ? t : max;
-      }, 0);
-      setLastFetchedAt(latestUpdateMs > 0 ? new Date(latestUpdateMs) : null);
+    const latestUpdateMs = allRows.reduce((max, row) => {
+      const t = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+      return t > max ? t : max;
+    }, 0);
+    setLastFetchedAt(latestUpdateMs > 0 ? new Date(latestUpdateMs) : null);
 
-      const [subRes, cat1Res, cat2Res, itemStatusRes] = await Promise.all([
-        supabase.from('subsidiaries').select('name').order('name'),
-        supabase.from('category_segments_1').select('name').order('name'),
-        supabase.from('category_segments_2').select('name').order('name'),
-        supabase.from('item_statuses').select('name').order('name'),
-      ]);
+    const [subRes, cat1Res, cat2Res, itemStatusRes] = await Promise.all([
+      supabase.from('subsidiaries').select('name').order('name'),
+      supabase.from('category_segments_1').select('name').order('name'),
+      supabase.from('category_segments_2').select('name').order('name'),
+      supabase.from('item_statuses').select('name').order('name'),
+    ]);
 
-      if (!subRes.error) setSubsidiaries([...new Set((subRes.data ?? []).map(r => r.name))]);
-      if (!cat1Res.error) setCategories1([...new Set((cat1Res.data ?? []).map(r => r.name))]);
-      if (!cat2Res.error) setCategories2([...new Set((cat2Res.data ?? []).map(r => r.name))]);
-      if (!itemStatusRes.error) setItemStatuses([...new Set((itemStatusRes.data ?? []).map(r => r.name))]);
+    if (!subRes.error) setSubsidiaries([...new Set((subRes.data ?? []).map(r => r.name))]);
+    if (!cat1Res.error) setCategories1([...new Set((cat1Res.data ?? []).map(r => r.name))]);
+    if (!cat2Res.error) setCategories2([...new Set((cat2Res.data ?? []).map(r => r.name))]);
+    if (!itemStatusRes.error) setItemStatuses([...new Set((itemStatusRes.data ?? []).map(r => r.name))]);
 
-      setLoading(false);
-    };
-    fetchAll();
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   const addSubsidiary = (name: string) => {
     if (!name) return;
@@ -262,7 +265,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
 
   return (
     <AssetContext.Provider value={{
-      assets, loading, error, lastFetchedAt,
+      assets, loading, error, refetch: fetchAll, lastFetchedAt,
       subsidiaries, categories1, categories2, itemStatuses,
       addAsset, updateAsset, deleteAsset, deleteMultipleAssets, deleteAllAssets,
       addSubsidiary, deleteSubsidiary, addCategory1, deleteCategory1, addCategory2, deleteCategory2,

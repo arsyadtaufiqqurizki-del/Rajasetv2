@@ -41,6 +41,9 @@ function renderDashboard(assets: Asset[]) {
     categories1: [],
     categories2: [],
     lastFetchedAt: null,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
   });
   return render(
     <MemoryRouter>
@@ -70,7 +73,7 @@ describe('Dashboard MoM delta (calculateChange)', () => {
     expect(screen.getAllByText('100.0%').length).toBeGreaterThan(0);
   });
 
-  it('caps the change at a fixed 100% when the previous month was zero, regardless of magnitude', () => {
+  it('shows "No data for last month" instead of a misleading 100% when the previous month was zero', () => {
     const assets = [
       makeAsset({ id: '1', createdAt: '2024-03-01T00:00:00.000Z' }),
       makeAsset({ id: '2', createdAt: '2024-03-02T00:00:00.000Z' }),
@@ -79,17 +82,18 @@ describe('Dashboard MoM delta (calculateChange)', () => {
       makeAsset({ id: '5', createdAt: '2024-03-05T00:00:00.000Z' }),
     ];
     renderDashboard(assets);
-    // 5 this month vs 0 last month: calculateChange special-cases this to a flat 100%, not 500%.
-    expect(screen.getAllByText('100.0%').length).toBeGreaterThan(0);
+    // 5 this month vs 0 last month: no baseline to compare against, so no percentage is claimed.
+    expect(screen.queryByText('100.0%')).not.toBeInTheDocument();
     expect(screen.queryByText('500.0%')).not.toBeInTheDocument();
+    expect(screen.getAllByText('No data for last month').length).toBeGreaterThan(0);
   });
 
-  it('shows "No change from last month" when both months are zero', () => {
+  it('shows "No data for last month" (not a false "no change") when both months are zero', () => {
     const assets = [
       makeAsset({ id: '1', createdAt: '2024-01-01T00:00:00.000Z' }),
     ];
     renderDashboard(assets);
-    const noChangeLabels = screen.getAllByText('No change from last month');
-    expect(noChangeLabels.length).toBeGreaterThan(0);
+    const noDataLabels = screen.getAllByText('No data for last month');
+    expect(noDataLabels.length).toBeGreaterThan(0);
   });
 });
