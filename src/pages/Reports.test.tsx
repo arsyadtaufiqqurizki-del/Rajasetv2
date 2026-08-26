@@ -60,9 +60,9 @@ describe('Reports > Depreciation Schedule NBV per quarter', () => {
   it('computes straight-line remaining value per quarter for a mix of assets', async () => {
     // A: cost 12000, life 12mo, placed 2023-01-01 -> ages into depreciation within range.
     // B: cost 6000, life 24mo, placed 2023-07-01 -> placed *after* both quarter-end dates,
-    //    so monthsBetween(from, to<=from) returns 0 and it is (currently) valued at full cost.
-    // C: cost 3000, lifeInMonths '0' -> parseInt('0') || 60 falls back to 60mo (falsy-zero bug),
-    //    placed 2020-01-01 so it's well into its (wrongly-defaulted) 60-month life.
+    //    so monthsBetween(from, to<=from) returns 0 and it is valued at full cost.
+    // C: cost 3000, lifeInMonths '0' -> treated as non-depreciable (computeBookValue), so it
+    //    stays at full cost regardless of placement date.
     const assets = [
       makeAsset({ id: 'A', assetCost: '12000', lifeInMonths: '12', datePlaceInService: '2023-01-01' }),
       makeAsset({ id: 'B', assetCost: '6000', lifeInMonths: '24', datePlaceInService: '2023-07-01' }),
@@ -102,7 +102,7 @@ describe('Reports > Depreciation Schedule NBV per quarter', () => {
     const rows = jsonToSheetSpy.mock.calls[0][0] as { name: string; value: number }[];
 
     expect(rows.map(r => r.name)).toEqual(['Q1 2023', 'Q2 2023']);
-    expect(rows[0].value).toBeCloseTo(10000 + 6000 + 1100, 6); // Q1 2023 (ends 2023-03-31)
-    expect(rows[1].value).toBeCloseTo(7000 + 6000 + 950, 6);   // Q2 2023 (ends 2023-06-30)
+    expect(rows[0].value).toBeCloseTo(10000 + 6000 + 3000, 6); // Q1 2023 (ends 2023-03-31)
+    expect(rows[1].value).toBeCloseTo(7000 + 6000 + 3000, 6);  // Q2 2023 (ends 2023-06-30)
   });
 });

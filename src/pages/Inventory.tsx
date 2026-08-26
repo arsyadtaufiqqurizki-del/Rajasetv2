@@ -5,6 +5,8 @@ import { AlertCircle } from 'lucide-react';
 import { useAsset, type Asset } from '../contexts/AssetContext';
 import { useAssetFilters } from '../hooks/useAssetFilters';
 import { sanitizeCell, toCsvBlob, downloadBlob } from '../lib/csv';
+import { computeBookValue } from '../lib/depreciation';
+import { startOfToday } from '../lib/dates';
 import AssetToolbar from '../components/AssetToolbar';
 import AssetFilters from '../components/AssetFilters';
 import AssetTable from '../components/AssetTable';
@@ -84,6 +86,12 @@ export default function Inventory() {
     return filteredAssets.slice(start, start + itemsPerPage);
   }, [filteredAssets, currentPage]);
 
+  const asOf = useMemo(() => startOfToday(), []);
+  const bookValues = useMemo(
+    () => new Map(assets.map(a => [a.id, computeBookValue(a, asOf).bookValue])),
+    [assets, asOf]
+  );
+
   const handleEditAsset = useCallback((asset: Asset) => {
     setEditingAsset(asset);
     setIsEditModalOpen(true);
@@ -135,6 +143,7 @@ export default function Inventory() {
         'Asset Book': sanitizeCell(asset.assetBook),
         'Subsidiary': sanitizeCell(asset.subsidiary),
         'Asset Cost': asset.assetCost,
+        'Book Value': bookValues.get(asset.id) ?? 0,
         'Date Place In Service': asset.datePlaceInService,
         'Asset Units': asset.assetUnits,
         'Asset Category Segment 1': sanitizeCell(asset.categorySegment1),
@@ -156,7 +165,7 @@ export default function Inventory() {
       setIsExporting(false);
       setNotice({ message: `Exported ${sourceAssets.length} row${sourceAssets.length === 1 ? '' : 's'} to CSV`, variant: 'success' });
     }, 0);
-  }, [filteredAssets, selectedAssets]);
+  }, [filteredAssets, selectedAssets, bookValues]);
 
   const handleImportCSV = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -356,6 +365,7 @@ export default function Inventory() {
           paginatedAssets={paginatedAssets}
           filteredAssets={filteredAssets}
           selectedAssets={selectedAssets}
+          bookValues={bookValues}
           onSelectAll={handleSelectAll}
           onSelectAsset={handleSelectAsset}
           onEditAsset={handleEditAsset}

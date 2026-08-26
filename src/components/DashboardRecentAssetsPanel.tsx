@@ -10,6 +10,7 @@ import type { FilterChip } from '../types/filters';
 
 interface DashboardRecentAssetsPanelProps {
   currentAssets: Asset[];
+  bookValues: Map<string, number>;
   filteredCount: number;
   page: number;
   totalPages: number;
@@ -37,6 +38,7 @@ interface DashboardRecentAssetsPanelProps {
 
 export default function DashboardRecentAssetsPanel({
   currentAssets,
+  bookValues,
   filteredCount,
   page,
   totalPages,
@@ -106,6 +108,7 @@ export default function DashboardRecentAssetsPanel({
               <th className="p-3">Asset Number</th>
               <th className="p-3 min-w-[300px]">Asset Description</th>
               <th className="p-3 text-right">Asset Cost</th>
+              <th className="p-3 text-right">Book Value</th>
               <th className="p-3">Date Place in Service</th>
               <th className="p-3">Asset Units</th>
               <th className="p-3">Asset Class</th>
@@ -137,6 +140,12 @@ export default function DashboardRecentAssetsPanel({
                   </span>
                 </td>
                 <td className="p-3 text-on-surface-variant text-right font-mono tabular-nums">{formatCurrency(asset.assetCost)}</td>
+                <td className={cn(
+                  "p-3 text-right font-mono tabular-nums",
+                  bookValues.get(asset.id) === 0 ? "text-on-surface-variant/60" : "text-on-surface-variant"
+                )}>
+                  {asset.assetCost === '' ? '-' : formatCurrency(bookValues.get(asset.id) ?? 0)}
+                </td>
                 <td className="p-3 text-on-surface font-mono text-xs whitespace-nowrap">{asset.datePlaceInService}</td>
                 <td className="p-3 text-on-surface-variant">{asset.assetUnits}</td>
                 <td className="p-3 text-on-surface">{asset.categorySegment1}</td>
@@ -158,7 +167,7 @@ export default function DashboardRecentAssetsPanel({
               </tr>
             ))}
             {filteredCount === 0 && (
-              <TableEmptyRow colSpan={13} message={copy.emptyState.noAssetData} />
+              <TableEmptyRow colSpan={14} message={copy.emptyState.noAssetData} />
             )}
           </tbody>
         </table>

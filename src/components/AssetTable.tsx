@@ -8,6 +8,7 @@ interface AssetTableProps {
   paginatedAssets: Asset[];
   filteredAssets: Asset[];
   selectedAssets: Set<string>;
+  bookValues: Map<string, number>;
   onSelectAll: (checked: boolean) => void;
   onSelectAsset: (assetId: string, checked: boolean) => void;
   onEditAsset: (asset: Asset) => void;
@@ -18,6 +19,7 @@ export default function AssetTable({
   paginatedAssets,
   filteredAssets,
   selectedAssets,
+  bookValues,
   onSelectAll,
   onSelectAsset,
   onEditAsset,
@@ -42,6 +44,7 @@ export default function AssetTable({
             <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Number</th>
             <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Description</th>
             <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider text-right">Asset Cost</th>
+            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider text-right">Book Value</th>
             <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Date Place in Service</th>
             <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Units</th>
             <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Class</th>
@@ -89,6 +92,12 @@ export default function AssetTable({
               <td className="py-4 px-4 font-mono text-on-surface text-xs">{asset.assetNumber}</td>
               <td className="py-4 px-4 font-semibold text-on-surface">{asset.assetDescription}</td>
               <td className="py-4 px-4 text-on-surface-variant text-right font-mono tabular-nums">{formatCurrency(asset.assetCost)}</td>
+              <td className={cn(
+                "py-4 px-4 text-right font-mono tabular-nums",
+                bookValues.get(asset.id) === 0 ? "text-on-surface-variant/60" : "text-on-surface-variant"
+              )}>
+                {asset.assetCost === '' ? '-' : formatCurrency(bookValues.get(asset.id) ?? 0)}
+              </td>
               <td className="py-4 px-4 text-on-surface font-mono text-xs">{asset.datePlaceInService}</td>
               <td className="py-4 px-4 text-on-surface-variant">{asset.assetUnits}</td>
               <td className="py-4 px-4 text-on-surface">{asset.categorySegment1}</td>
@@ -120,7 +129,7 @@ export default function AssetTable({
             </tr>
           )) : (
             <tr>
-              <td colSpan={18} className="py-8 text-center text-on-surface-variant">{copy.emptyState.noAssetData}</td>
+              <td colSpan={19} className="py-8 text-center text-on-surface-variant">{copy.emptyState.noAssetData}</td>
             </tr>
           )}
         </tbody>

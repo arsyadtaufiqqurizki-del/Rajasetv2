@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { formatLastUpdate } from '../lib/dates';
+import { formatLastUpdate, startOfToday } from '../lib/dates';
+import { computeBookValue } from '../lib/depreciation';
 
 import { useAsset } from '../contexts/AssetContext';
 import { useDashboardFilters } from '../hooks/useDashboardFilters';
@@ -59,6 +60,12 @@ export default function Dashboard() {
   const currentAssets = filteredAssets.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.max(1, Math.ceil(filteredAssets.length / ITEMS_PER_PAGE));
 
+  const asOf = useMemo(() => startOfToday(), []);
+  const bookValues = useMemo(
+    () => new Map(assets.map(a => [a.id, computeBookValue(a, asOf).bookValue])),
+    [assets, asOf]
+  );
+
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
@@ -105,6 +112,7 @@ export default function Dashboard() {
 
       <DashboardRecentAssetsPanel
         currentAssets={currentAssets}
+        bookValues={bookValues}
         filteredCount={filteredAssets.length}
         page={currentPage}
         totalPages={totalPages}

@@ -1,7 +1,8 @@
 import type { Asset } from '../../types/asset';
 import type { DepreciationReportPreview } from '../../types/report';
 import { formatCurrency, parseCost } from '../money';
-import { monthsBetween, getQuartersInRange } from '../dates';
+import { getQuartersInRange } from '../dates';
+import { computeBookValue } from '../depreciation';
 import { compactCurrencyAxisFormatter, filterBySubsidiary } from './shared';
 
 export function buildDepreciationReport(
@@ -14,15 +15,9 @@ export function buildDepreciationReport(
   const quarters = getQuartersInRange(start, end);
 
   const data = quarters.map(q => {
-    const totalValue = filteredAssets.reduce((sum, a) => {
-      const cost = parseCost(a.assetCost);
-      const life = parseInt(a.lifeInMonths) || 60;
-      const placedInService = a.datePlaceInService ? new Date(a.datePlaceInService) : null;
-      if (!placedInService) return sum + cost;
-      const ageMonths = monthsBetween(placedInService, q.endDate);
-      const remaining = life > 0 ? Math.max(0, cost * (1 - Math.min(ageMonths, life) / life)) : 0;
-      return sum + remaining;
-    }, 0);
+    const totalValue = filteredAssets.reduce(
+      (sum, a) => sum + computeBookValue(a, q.endDate).bookValue, 0
+    );
     return { name: q.label, value: totalValue };
   });
 
@@ -51,18 +46,14 @@ export function buildDepreciationReport(
       { key: 'remainingLifeMonths', label: 'Remaining Life (Months)' },
     ],
     detailData: filteredAssets.map(a => {
-      const cost = parseCost(a.assetCost);
-      const life = parseInt(a.lifeInMonths) || 60;
-      const placedInService = a.datePlaceInService ? new Date(a.datePlaceInService) : null;
-      const ageMonths = placedInService ? monthsBetween(placedInService, end) : 0;
-      const netBookValueAtEnd = placedInService ? Math.max(0, cost * (1 - Math.min(ageMonths, life) / life)) : cost;
+      const { cost, accumulatedDepreciation, bookValue, remainingLifeMonths } = computeBookValue(a, end);
       return {
         assetNumber: a.assetNumber,
         description: a.assetDescription,
         cost,
-        accumulatedDepreciation: cost - netBookValueAtEnd,
-        netBookValue: netBookValueAtEnd,
-        remainingLifeMonths: Math.max(0, life - Math.min(ageMonths, life)),
+        accumulatedDepreciation,
+        netBookValue: bookValue,
+        remainingLifeMonths: remainingLifeMonths ?? 0,
       };
     }),
   };

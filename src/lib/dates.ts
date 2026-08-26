@@ -14,6 +14,13 @@ export function formatLastUpdate(date: Date): string {
   return `${datePart} · ${timePart}`;
 }
 
+/** Midnight today — a stable value for useMemo dependencies. */
+export function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 /** Full months elapsed from `from` to `to`, floored at 0. */
 export function monthsBetween(from: Date, to: Date): number {
   if (to <= from) return 0;
