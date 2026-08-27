@@ -45,6 +45,12 @@ export default function Dashboard() {
     clearFilters,
   } = useDashboardFilters(assets, searchParams, setSearchParams, () => setCurrentPage(1));
 
+  const asOf = useMemo(() => startOfToday(), []);
+  const bookValues = useMemo(
+    () => new Map(assets.map(a => [a.id, computeBookValue(a, asOf).bookValue])),
+    [assets, asOf]
+  );
+
   const {
     assetCountChange,
     assetCostChange,
@@ -52,12 +58,12 @@ export default function Dashboard() {
     totalValuation,
     formattedValuation,
     fullValuation,
-    subsidiaryData,
-    allSubsidiaryData,
+    subsidiaryComparisonData,
+    allSubsidiaryComparisonData,
     categoryData,
     availableYears,
     trendData,
-  } = useDashboardMetrics(filteredAssets, selectedYear);
+  } = useDashboardMetrics(filteredAssets, selectedYear, bookValues);
 
   useEffect(() => {
     if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
@@ -69,12 +75,6 @@ export default function Dashboard() {
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
   const currentAssets = filteredAssets.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.max(1, Math.ceil(filteredAssets.length / ITEMS_PER_PAGE));
-
-  const asOf = useMemo(() => startOfToday(), []);
-  const bookValues = useMemo(
-    () => new Map(assets.map(a => [a.id, computeBookValue(a, asOf).bookValue])),
-    [assets, asOf]
-  );
 
   // Sums the already-computed per-asset book values over the current filter scope, rather than
   // re-running computeBookValue — the Map above already paid that cost once for all assets.
@@ -215,7 +215,7 @@ export default function Dashboard() {
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <DashboardSubsidiaryBarChart data={subsidiaryData} allData={allSubsidiaryData} />
+            <DashboardSubsidiaryBarChart data={subsidiaryComparisonData} allData={allSubsidiaryComparisonData} />
             <DashboardCategoryPieChart data={categoryData} totalValueFormatted={formattedValuation} />
           </div>
 

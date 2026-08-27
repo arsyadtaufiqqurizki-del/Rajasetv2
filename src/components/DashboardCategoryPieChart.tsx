@@ -31,12 +31,12 @@ export default function DashboardCategoryPieChart({ data, totalValueFormatted }:
       <div className="flex-1 min-h-[200px] relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={data} innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value">
+            <Pie data={data} innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="assetCost">
               {data.map((entry, index) => (
                 <Cell key={index} fill={entry.color} />
               ))}
             </Pie>
-            <Tooltip formatter={(value) => [formatCurrencyWhole(Number(value)), 'Valuation']} />
+            <Tooltip formatter={(value) => [formatCurrencyWhole(Number(value)), 'Asset Cost']} />
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col mt-2">

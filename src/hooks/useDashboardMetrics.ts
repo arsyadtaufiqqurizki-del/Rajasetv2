@@ -17,12 +17,16 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export const ASSET_STATUS_OPTIONS = ['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Retired'] as const;
 export type AssetStatusOption = typeof ASSET_STATUS_OPTIONS[number];
 
-export interface DashboardChartPoint {
+export interface DashboardSubsidiaryComparisonPoint {
   name: string;
-  value: number;
+  assetCost: number;
+  bookValue: number;
+  accumulatedDepreciation: number;
+  /** 0-100; 0 when assetCost is 0. */
+  percentDepreciated: number;
 }
 
-export interface DashboardCategoryPoint extends DashboardChartPoint {
+export interface DashboardCategoryPoint extends DashboardSubsidiaryComparisonPoint {
   color: string;
 }
 
@@ -37,7 +41,7 @@ function calculateChange(current: number, previous: number): number | null {
   return ((current - previous) / previous) * 100;
 }
 
-export function useDashboardMetrics(assets: Asset[], selectedYear: string) {
+export function useDashboardMetrics(assets: Asset[], selectedYear: string, bookValues: Map<string, number>) {
   const summary = useMemo(() => {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
@@ -71,32 +75,55 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string) {
     const fullValuation = formatCurrencyWhole(totalValuation);
 
     const subsidiaryDataMap = assets.reduce((acc, curr) => {
-      const value = parseCost(curr.assetCost);
+      const assetCost = parseCost(curr.assetCost);
+      const bookValue = bookValues.get(curr.id) ?? assetCost;
       const subsidiaryName = curr.subsidiary || 'Unknown';
-      acc[subsidiaryName] = (acc[subsidiaryName] || 0) + value;
+      const entry = acc[subsidiaryName] || { assetCost: 0, bookValue: 0 };
+      entry.assetCost += assetCost;
+      entry.bookValue += bookValue;
+      acc[subsidiaryName] = entry;
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as Record<string, { assetCost: number; bookValue: number }>);
 
-    const allSubsidiaryData: DashboardChartPoint[] = Object.entries(subsidiaryDataMap)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
+    const allSubsidiaryComparisonData: DashboardSubsidiaryComparisonPoint[] = Object.entries(subsidiaryDataMap)
+      .map(([name, { assetCost, bookValue }]) => {
+        const accumulatedDepreciation = Math.max(0, assetCost - bookValue);
+        return {
+          name,
+          assetCost,
+          bookValue,
+          accumulatedDepreciation,
+          percentDepreciated: assetCost > 0 ? (accumulatedDepreciation / assetCost) * 100 : 0,
+        };
+      })
+      .sort((a, b) => b.assetCost - a.assetCost);
 
-    const subsidiaryData = allSubsidiaryData.slice(0, 5);
+    const subsidiaryComparisonData = allSubsidiaryComparisonData.slice(0, 5);
 
     const categoryDataMap = assets.reduce((acc, curr) => {
-      const value = parseCost(curr.assetCost);
+      const assetCost = parseCost(curr.assetCost);
+      const bookValue = bookValues.get(curr.id) ?? assetCost;
       const categoryName = curr.categorySegment1 || 'Uncategorized';
-      acc[categoryName] = (acc[categoryName] || 0) + value;
+      const entry = acc[categoryName] || { assetCost: 0, bookValue: 0 };
+      entry.assetCost += assetCost;
+      entry.bookValue += bookValue;
+      acc[categoryName] = entry;
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as Record<string, { assetCost: number; bookValue: number }>);
 
     const categoryData: DashboardCategoryPoint[] = Object.entries(categoryDataMap)
-      .map(([name, value], index) => ({
-        name,
-        value,
-        color: CHART_COLORS[index % CHART_COLORS.length],
-      }))
-      .sort((a, b) => b.value - a.value);
+      .map(([name, { assetCost, bookValue }], index) => {
+        const accumulatedDepreciation = Math.max(0, assetCost - bookValue);
+        return {
+          name,
+          assetCost,
+          bookValue,
+          accumulatedDepreciation,
+          percentDepreciated: assetCost > 0 ? (accumulatedDepreciation / assetCost) * 100 : 0,
+          color: CHART_COLORS[index % CHART_COLORS.length],
+        };
+      })
+      .sort((a, b) => b.assetCost - a.assetCost);
 
     const years = Array.from(new Set(
       assets
@@ -116,12 +143,12 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string) {
       totalValuation,
       formattedValuation,
       fullValuation,
-      subsidiaryData,
-      allSubsidiaryData,
+      subsidiaryComparisonData,
+      allSubsidiaryComparisonData,
       categoryData,
       availableYears,
     };
-  }, [assets]);
+  }, [assets, bookValues]);
 
   const trendData = useMemo<DashboardTrendPoint[]>(() => {
     const trendDataMap = assets.reduce((acc, curr) => {

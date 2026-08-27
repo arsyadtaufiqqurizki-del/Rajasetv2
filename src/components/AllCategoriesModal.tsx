@@ -21,17 +21,16 @@ export default function AllCategoriesModal({ isOpen, onClose, data }: AllCategor
     if (isOpen) setPage(1);
   }, [isOpen]);
 
-  const totalValuation = data.reduce((acc, curr) => acc + curr.value, 0);
   const totalPages = Math.max(1, Math.ceil(data.length / ITEMS_PER_PAGE));
   const indexOfFirstItem = (page - 1) * ITEMS_PER_PAGE;
   const currentItems = data.slice(indexOfFirstItem, indexOfFirstItem + ITEMS_PER_PAGE);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} labelledBy={TITLE_ID} className="max-w-lg">
+    <Modal isOpen={isOpen} onClose={onClose} labelledBy={TITLE_ID} className="max-w-3xl">
       <div className="flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between p-6 border-b border-outline-variant/30">
           <h2 id={TITLE_ID} className="text-xl font-bold text-on-surface">
-            All Asset Categories by Valuation
+            All Asset Categories — Asset Cost vs Book Value
           </h2>
           <button
             onClick={onClose}
@@ -41,29 +40,46 @@ export default function AllCategoriesModal({ isOpen, onClose, data }: AllCategor
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto p-6">
-          <ul className="divide-y divide-outline-variant/50">
-            {currentItems.map((item, index) => {
-              const percentage = totalValuation > 0 ? (item.value / totalValuation) * 100 : 0;
-              return (
-                <li key={item.name} className="flex items-center justify-between gap-4 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xs font-mono text-on-surface-variant w-5 shrink-0">
-                      {indexOfFirstItem + index + 1}
-                    </span>
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-sm font-medium text-on-surface truncate" title={item.name}>
-                      {item.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs text-on-surface-variant tabular-nums">{percentage.toFixed(1)}%</span>
-                    <span className="text-sm font-mono text-on-surface tabular-nums">{formatCurrencyWhole(item.value)}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+        <div className="overflow-x-auto p-6">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-outline-variant/50 text-xs font-medium text-on-surface-variant">
+                <th className="py-2 pr-3 text-left w-8">#</th>
+                <th className="py-2 pr-3 text-left">Category</th>
+                <th className="py-2 pr-3 text-right">Asset Cost</th>
+                <th className="py-2 pr-3 text-right">Book Value</th>
+                <th className="py-2 pr-3 text-right">Accum. Depreciation</th>
+                <th className="py-2 pl-3 text-right">% Depreciated</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/50">
+              {currentItems.map((item, index) => (
+                <tr key={item.name}>
+                  <td className="py-3 pr-3 text-xs font-mono text-on-surface-variant">
+                    {indexOfFirstItem + index + 1}
+                  </td>
+                  <td className="py-3 pr-3 font-medium text-on-surface">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="truncate max-w-[9rem]" title={item.name}>{item.name}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 pr-3 text-right font-mono tabular-nums text-on-surface">
+                    {formatCurrencyWhole(item.assetCost)}
+                  </td>
+                  <td className="py-3 pr-3 text-right font-mono tabular-nums text-on-surface">
+                    {formatCurrencyWhole(item.bookValue)}
+                  </td>
+                  <td className="py-3 pr-3 text-right font-mono tabular-nums text-on-surface-variant">
+                    {formatCurrencyWhole(item.accumulatedDepreciation)}
+                  </td>
+                  <td className="py-3 pl-3 text-right tabular-nums text-on-surface-variant">
+                    {item.percentDepreciated.toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         {data.length > 0 && (
           <Pagination

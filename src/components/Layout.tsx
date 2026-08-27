@@ -72,7 +72,7 @@ export default function Layout() {
           {!sidebarCollapsed && (
             <div className="flex flex-col gap-2 min-w-0">
               <h1 className="text-xl font-bold text-primary tracking-tight">RAJA</h1>
-              <p className="text-xs font-medium text-on-surface-variant">Asset Management</p>
+              <p className="text-xs font-medium text-on-surface-variant">Enterprise Asset Management</p>
             </div>
           )}
           <button
