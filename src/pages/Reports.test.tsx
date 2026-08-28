@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import Reports from './Reports';
 import type { Asset } from '../contexts/AssetContext';
@@ -13,6 +14,7 @@ import type { Asset } from '../contexts/AssetContext';
 const mockUseAsset = vi.fn();
 const mockUseMaintenance = vi.fn();
 const mockUseReport = vi.fn();
+const mockUseAuth = vi.fn();
 
 vi.mock('../contexts/AssetContext', () => ({
   useAsset: () => mockUseAsset(),
@@ -22,6 +24,9 @@ vi.mock('../contexts/MaintenanceContext', () => ({
 }));
 vi.mock('../contexts/ReportContext', () => ({
   useReport: () => mockUseReport(),
+}));
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
 }));
 vi.mock('../lib/activityLogger', () => ({
   logActivity: vi.fn(),
@@ -68,38 +73,49 @@ describe('Reports > Depreciation Schedule NBV per quarter', () => {
       makeAsset({ id: 'B', assetCost: '6000', lifeInMonths: '24', datePlaceInService: '2023-07-01' }),
       makeAsset({ id: 'C', assetCost: '3000', lifeInMonths: '0', datePlaceInService: '2020-01-01' }),
     ];
-    mockUseAsset.mockReturnValue({ assets, subsidiaries: [] });
+    mockUseAsset.mockReturnValue({ assets, subsidiaries: [], categories1: [], categories2: [] });
     mockUseMaintenance.mockReturnValue({ records: [] });
     mockUseReport.mockReturnValue({
-      reportHistory: [], page: 1, totalPages: 1, totalCount: 0,
+      reportHistory: [], loading: false, error: null, page: 1, totalPages: 1, totalCount: 0,
       setPage: vi.fn(), saveReport: vi.fn(), deleteReport: vi.fn(),
     });
+    mockUseAuth.mockReturnValue({ userName: 'Test User' });
 
-    const jsonToSheetSpy = vi.spyOn(XLSX.utils, 'json_to_sheet');
+    // Excel now writes two sheets (Ringkasan + Rincian); the chart's aggregate rows — the
+    // ones carrying the NBV-per-quarter formula under test — land in Ringkasan via
+    // sheet_add_json, appended after the summary block.
+    const sheetAddJsonSpy = vi.spyOn(XLSX.utils, 'sheet_add_json');
 
-    render(<Reports />);
+    render(
+      <MemoryRouter>
+        <Reports />
+      </MemoryRouter>
+    );
 
     fireEvent.change(screen.getByDisplayValue('Asset Valuation Summary'), {
       target: { value: 'Depreciation Schedule' },
     });
 
+    // Date pickers are collapsed under a period preset dropdown; switch to Custom to reveal them.
+    fireEvent.change(screen.getByLabelText('Periode'), { target: { value: 'custom' } });
+
     const dateInputs = document.querySelectorAll('input[type="date"]');
     fireEvent.change(dateInputs[0], { target: { value: '2023-01-01' } });
     fireEvent.change(dateInputs[1], { target: { value: '2023-06-30' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /generate preview/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^tinjau$/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /export to excel/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /ekspor ke excel/i })).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /export to excel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /ekspor ke excel/i }));
 
-    // exportReportXlsx dynamic-imports 'xlsx' (Step 9), so the call is now async.
+    // exportReportXlsx dynamic-imports 'xlsx', so the call is now async.
     await waitFor(() => {
-      expect(jsonToSheetSpy).toHaveBeenCalledTimes(1);
+      expect(sheetAddJsonSpy).toHaveBeenCalledTimes(1);
     });
-    const rows = jsonToSheetSpy.mock.calls[0][0] as { name: string; value: number }[];
+    const rows = sheetAddJsonSpy.mock.calls[0][1] as { name: string; value: number }[];
 
     expect(rows.map(r => r.name)).toEqual(['Q1 2023', 'Q2 2023']);
     expect(rows[0].value).toBeCloseTo(10000 + 6000 + 3000, 6); // Q1 2023 (ends 2023-03-31)

@@ -1,10 +1,12 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { resolveUserDisplayName } from '../lib/currentUser';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   userEmail: string | null;
+  userName: string | null;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
 }
@@ -15,17 +17,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setIsAuthenticated(!!data.session);
       setUserEmail(data.session?.user.email ?? null);
+      setUserName(data.session ? resolveUserDisplayName(data.session.user) : null);
       setLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
       setIsAuthenticated(!!session);
       setUserEmail(session?.user.email ?? null);
+      setUserName(session ? resolveUserDisplayName(session.user) : null);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -42,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, loading, userEmail, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, loading, userEmail, userName, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

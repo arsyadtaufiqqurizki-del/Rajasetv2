@@ -1,6 +1,7 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../lib/activityLogger';
+import { resolveUserDisplayName } from '../lib/currentUser';
 import type { ReportPreview } from '../types/report';
 
 export type ReportRecord = {
@@ -32,7 +33,7 @@ interface ReportContextType {
   totalCount: number;
   setPage: (page: number) => void;
   saveReport: (params: SaveReportParams) => Promise<void>;
-  deleteReport: (id: string) => Promise<void>;
+  deleteReport: (id: string) => Promise<boolean>;
 }
 
 const PAGE_SIZE = 5;
@@ -84,9 +85,7 @@ export function ReportProvider({ children }: { children: ReactNode }) {
 
   const saveReport = async (params: SaveReportParams) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const userName = user?.user_metadata?.full_name
-      || user?.email?.split('@')[0]
-      || 'Unknown User';
+    const userName = resolveUserDisplayName(user);
 
     const { data, error } = await supabase
       .from('report_history')
@@ -110,13 +109,14 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     else setPage(1);
   };
 
-  const deleteReport = async (id: string) => {
+  const deleteReport = async (id: string): Promise<boolean> => {
     const { error } = await supabase.from('report_history').delete().eq('id', id);
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); return false; }
 
     const isLastItemOnPage = reportHistory.length === 1;
     if (isLastItemOnPage && page > 1) setPage(page - 1);
     else await fetchPage(page);
+    return true;
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));

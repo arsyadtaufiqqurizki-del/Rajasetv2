@@ -1,15 +1,14 @@
 import type { Asset } from '../../types/asset';
 import type { AssetValuationReportPreview } from '../../types/report';
 import { formatCurrency, parseCost } from '../money';
-import { compactCurrencyAxisFormatter, filterBySubsidiary } from './shared';
+import { compactCurrencyAxisFormatter } from './shared';
 
 export function buildValuationReport(
   assets: Asset[],
-  subsidiary: string,
   start: Date,
   end: Date,
 ): AssetValuationReportPreview {
-  const filteredAssets = assets.filter(filterBySubsidiary(subsidiary)).filter(a => {
+  const filteredAssets = assets.filter(a => {
     if (!a.datePlaceInService) return true;
     const d = new Date(a.datePlaceInService);
     return d >= start && d <= end;
@@ -29,7 +28,6 @@ export function buildValuationReport(
     title: 'Asset Valuation by Category',
     data: Object.keys(grouped).map(k => ({ name: k, value: grouped[k] })),
     dataKey: 'value',
-    color: '#3b82f6',
     yAxisFormatter: compactCurrencyAxisFormatter,
     summary: [
       { label: 'Total Asset Value', value: formatCurrency(totalValue) },

@@ -14,13 +14,15 @@ export interface ExportPdfParams {
   onChartRenderEnd?: () => void;
 }
 
-export async function exportReportPdf(params: ExportPdfParams): Promise<void> {
+export type ExportResult = { ok: true } | { ok: false; reason: 'empty' };
+
+export async function exportReportPdf(params: ExportPdfParams): Promise<ExportResult> {
   const {
     previewData, subsidiary, dateStart, dateEnd, generatedBy, fileName,
     chartElement, onChartRenderStart, onChartRenderEnd,
   } = params;
 
-  if (!previewData.data.length) return;
+  if (!previewData.data.length) return { ok: false, reason: 'empty' };
 
   const [{ default: jsPDF }, { default: autoTable }, { default: html2canvas }] = await Promise.all([
     import('jspdf'),
@@ -178,4 +180,5 @@ export async function exportReportPdf(params: ExportPdfParams): Promise<void> {
   }
 
   doc.save(`${fileName}.pdf`);
+  return { ok: true };
 }

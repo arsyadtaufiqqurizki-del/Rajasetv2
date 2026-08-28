@@ -5,6 +5,12 @@
 
 export type ReportType = 'Asset Valuation Summary' | 'Depreciation Schedule' | 'Maintenance Cost Analysis';
 
+export const REPORT_TYPES: ReportType[] = [
+  'Asset Valuation Summary',
+  'Depreciation Schedule',
+  'Maintenance Cost Analysis',
+];
+
 export type ChartKind = 'bar' | 'line' | 'composed';
 
 export type ReportSummaryItem = {
@@ -58,14 +64,12 @@ export type AssetValuationReportPreview = ReportPreviewBase<AssetValuationDetail
   type: 'bar';
   data: { name: string; value: number }[];
   dataKey: 'value';
-  color: string;
 };
 
 export type DepreciationReportPreview = ReportPreviewBase<DepreciationDetailRow> & {
   type: 'line';
   data: { name: string; value: number }[];
   dataKey: 'value';
-  color: string;
 };
 
 export type MaintenanceCostReportPreview = ReportPreviewBase<MaintenanceCostDetailRow> & {

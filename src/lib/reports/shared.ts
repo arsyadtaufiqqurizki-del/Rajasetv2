@@ -4,7 +4,3 @@ export function compactCurrencyAxisFormatter(val: number): string {
   if (val >= 1000) return `$${(val / 1000).toFixed(1)}K`;
   return `$${val}`;
 }
-
-export function filterBySubsidiary<T extends { subsidiary: string }>(subsidiary: string) {
-  return (item: T) => (subsidiary === 'All Divisions' ? true : item.subsidiary === subsidiary);
-}

@@ -3,15 +3,14 @@ import type { DepreciationReportPreview } from '../../types/report';
 import { formatCurrency, parseCost } from '../money';
 import { getQuartersInRange } from '../dates';
 import { computeBookValue } from '../depreciation';
-import { compactCurrencyAxisFormatter, filterBySubsidiary } from './shared';
+import { compactCurrencyAxisFormatter } from './shared';
 
 export function buildDepreciationReport(
   assets: Asset[],
-  subsidiary: string,
   start: Date,
   end: Date,
 ): DepreciationReportPreview {
-  const filteredAssets = assets.filter(filterBySubsidiary(subsidiary));
+  const filteredAssets = assets;
   const quarters = getQuartersInRange(start, end);
 
   const data = quarters.map(q => {
@@ -29,7 +28,6 @@ export function buildDepreciationReport(
     title: 'Depreciated Value Over Year',
     data,
     dataKey: 'value',
-    color: '#8b5cf6',
     yAxisFormatter: compactCurrencyAxisFormatter,
     summary: [
       { label: 'Total Original Cost', value: formatCurrency(totalOriginalCost) },

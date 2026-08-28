@@ -1,15 +1,14 @@
 import type { MaintenanceRecord } from '../../types/maintenance';
 import type { MaintenanceCostReportPreview } from '../../types/report';
 import { formatCurrency, parseCost } from '../money';
-import { compactCurrencyAxisFormatter, filterBySubsidiary } from './shared';
+import { compactCurrencyAxisFormatter } from './shared';
 
 export function buildMaintenanceCostReport(
   records: MaintenanceRecord[],
-  subsidiary: string,
   start: Date,
   end: Date,
 ): MaintenanceCostReportPreview {
-  const filteredRecords = records.filter(filterBySubsidiary(subsidiary)).filter(r => {
+  const filteredRecords = records.filter(r => {
     if (!r.scheduledDate) return true;
     const d = new Date(r.scheduledDate);
     return d >= start && d <= end;
