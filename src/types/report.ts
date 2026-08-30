@@ -27,6 +27,8 @@ export type DetailColumn<T> = {
 type ReportPreviewBase<TDetail> = {
   title: string;
   yAxisFormatter: (value: number) => string;
+  /** Discloses a hidden filtering/calculation assumption the report makes (e.g. how undated records are handled). Shown on screen and in the PDF; omitted when a report has no such assumption to state. */
+  methodologyNote?: string;
   summary: ReportSummaryItem[];
   detailColumns: DetailColumn<TDetail>[];
   detailData: TDetail[];

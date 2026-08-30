@@ -2,7 +2,7 @@
 
 **Tanggal:** 27 Agustus 2026
 **Scope:** Halaman `/reports` — `src/pages/Reports.tsx`, 4 komponen di `src/components/reports/`, `src/contexts/ReportContext.tsx`, 5 modul di `src/lib/reports/`, `src/types/report.ts`
-**Status:** Fase 1–4 selesai (27 Agustus 2026), kecuali GOV-1 (perketat RLS) yang sengaja ditunda — Fase 5 belum dikerjakan (backlog)
+**Status:** Fase 1–4 selesai (27 Agustus 2026), kecuali GOV-1 (perketat RLS) yang sengaja ditunda — Fase 5 sebagian dikerjakan (28 Agustus 2026): DATA-5/6/7 selesai, sisanya masih backlog
 **Dokumen terkait:** `reports implementation.md` (riwayat implementasi fungsional), `dashboard ui ux upgrade.md` (pola & standar yang jadi acuan)
 
 ---
@@ -364,16 +364,18 @@ Fase disusun berdasarkan **dampak per satuan usaha**, dan tiap fase berdiri send
 8. **Responsif** — bar filter jadi dapat diciutkan di bawah `lg` sehingga hasil terlihat tanpa scroll panjang; tinggi chart responsif (`h-[260px] sm:h-[320px] lg:h-[380px]`); tabel riwayat menjatuhkan kolom sekunder di layar sempit alih-alih memaksa scroll horizontal.
 9. **Judul chart jujur** — hilangkan judul default saat `previewData` masih `null`; empty state berbicara sendiri.
 
-### Fase 5 — Kedalaman analitik (backlog)
+### Fase 5 — Kedalaman analitik (sebagian selesai, sisanya backlog)
 
-**Menyelesaikan:** DATA-5, DATA-6, DATA-7 + kemampuan baru · **3 temuan (0 tinggi)**
+**Menyelesaikan:** DATA-5, DATA-6, DATA-7 (✅ 28 Agustus 2026) + kemampuan baru (backlog) · **3 temuan (0 tinggi)**
 **Perkiraan usaha:** Besar · **Nilai:** Sedang — kerjakan setelah 1–4 stabil dan ada permintaan nyata
 
-1. **Nyatakan asumsi metodologi** — catatan kecil di UI dan di PDF: perilaku aset tanpa tanggal (DATA-5) dan cakupan rentang tanggal pada Depreciation Schedule (DATA-6). Alternatif yang lebih baik: jadikan pilihan eksplisit ("Sertakan aset tanpa tanggal: ya/tidak").
-2. **Konsolidasi formatter** — hapus `compactCurrencyAxisFormatter` (`shared.ts:2`), pakai `formatCompactCurrency` dari `money.ts` (DATA-7).
-3. **Jenis report baru** — kandidat berdasarkan modul yang sudah ada: *Reclassification Audit Trail*, *Maintenance Compliance* (jadwal vs realisasi), *Asset Register* (daftar lengkap untuk stock opname).
-4. **Mode perbandingan** — periode vs periode pada report yang sama, mengikuti pola dual-metric yang sudah dipakai di `DashboardSubsidiaryBarChart` (commit `4abf242`).
-5. **Report terjadwal** — sudah tercatat di luar scope pada `reports implementation.md`; butuh Edge Function + kebijakan retensi `report_history`.
+> **Implementasi aktual (28 Agustus 2026):** Item 1 dan 2 dikerjakan atas permintaan eksplisit — item 3–5 (jenis report baru, mode perbandingan, report terjadwal) tetap backlog, belum ada permintaan nyata. Untuk DATA-5/6, dipilih pendekatan "catatan kecil" dari dua alternatif di rencana ini, bukan toggle eksplisit ("Sertakan aset tanpa tanggal: ya/tidak") — field baru `methodologyNote?: string` ditambahkan ke `ReportPreviewBase` (`types/report.ts`), diisi oleh `buildValuationReport.ts` dan `buildMaintenanceCostReport.ts` (DATA-5: baris tanpa tanggal selalu lolos filter) serta `buildDepreciationReport.ts` (DATA-6: rentang tanggal hanya menentukan kuartal sumbu-X, bukan seleksi aset). Catatan ini dirender di `ReportChart.tsx` (baris kecil di bawah metadata "N baris · dibuat ...", ikon `Info`) dan di `exportPdf.ts` (teks di atas kotak ringkasan, posisi kotak digeser dinamis mengikuti tinggi catatan). Ditulis berbahasa Inggris, konsisten dengan konten builder lain (`summary[].label`, `detailColumns[].label`) yang sudah diputuskan tetap Inggris di Fase 4 karena mengalir ke dokumen ekspor. DATA-7: `compactCurrencyAxisFormatter` dan `src/lib/reports/shared.ts` dihapus total; ketiga builder memakai `formatCompactCurrency` dari `money.ts` langsung sebagai `yAxisFormatter`. `npx tsc --noEmit`, `npm test` (63/63), dan `npm run build` lolos setelah perubahan.
+
+1. ✅ **Nyatakan asumsi metodologi** — catatan kecil di UI dan di PDF: perilaku aset tanpa tanggal (DATA-5) dan cakupan rentang tanggal pada Depreciation Schedule (DATA-6).
+2. ✅ **Konsolidasi formatter** — hapus `compactCurrencyAxisFormatter` (`shared.ts:2`), pakai `formatCompactCurrency` dari `money.ts` (DATA-7).
+3. **Jenis report baru** (backlog) — kandidat berdasarkan modul yang sudah ada: *Reclassification Audit Trail*, *Maintenance Compliance* (jadwal vs realisasi), *Asset Register* (daftar lengkap untuk stock opname).
+4. **Mode perbandingan** (backlog) — periode vs periode pada report yang sama, mengikuti pola dual-metric yang sudah dipakai di `DashboardSubsidiaryBarChart` (commit `4abf242`).
+5. **Report terjadwal** (backlog) — sudah tercatat di luar scope pada `reports implementation.md`; butuh Edge Function + kebijakan retensi `report_history`.
 
 ---
 
@@ -420,7 +422,7 @@ Fase 1  ██████████  6 temuan  · 5 TINGGI · usaha sedang   
 Fase 2  ██████████  11 temuan · 1 TINGGI · usaha sedang-besar  ✅
 Fase 3  ██████      5 temuan  · 1 TINGGI · usaha sedang        ✅ (kecuali GOV-1)
 Fase 4  ████████    14 temuan · 2 TINGGI · usaha sedang        ✅
-Fase 5  ███         3 temuan  · 0 TINGGI · usaha besar (backlog)  ← berikutnya
+Fase 5  ██          3 temuan  · 0 TINGGI · usaha besar             ✅ (DATA-5/6/7) + backlog (item 3-5)
 ```
 
 Fase 1 dan 2 bersama-sama menyelesaikan 8 dari 10 temuan dampak tinggi dan mengubah karakter halaman secara fundamental. Fase 4 bisa disisipkan lebih awal jika ada tekanan konsistensi visual — isinya tidak bergantung pada fase mana pun.

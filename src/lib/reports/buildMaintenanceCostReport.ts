@@ -1,7 +1,6 @@
 import type { MaintenanceRecord } from '../../types/maintenance';
 import type { MaintenanceCostReportPreview } from '../../types/report';
-import { formatCurrency, parseCost } from '../money';
-import { compactCurrencyAxisFormatter } from './shared';
+import { formatCompactCurrency, formatCurrency, parseCost } from '../money';
 
 export function buildMaintenanceCostReport(
   records: MaintenanceRecord[],
@@ -38,7 +37,8 @@ export function buildMaintenanceCostReport(
     type: 'composed',
     title: 'Estimated vs Actual Maintenance Costs',
     data: Object.values(grouped),
-    yAxisFormatter: compactCurrencyAxisFormatter,
+    yAxisFormatter: formatCompactCurrency,
+    methodologyNote: 'Records without a scheduled date are included in every period selected, since there is no date to filter against.',
     summary: [
       { label: 'Total Estimated', value: formatCurrency(totals.estimated) },
       { label: 'Total Actual', value: formatCurrency(totals.actual) },

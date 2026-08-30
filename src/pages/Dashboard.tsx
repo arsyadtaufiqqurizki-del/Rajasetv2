@@ -63,6 +63,7 @@ export default function Dashboard() {
     categoryData,
     availableYears,
     trendData,
+    trendSubsidiaries,
   } = useDashboardMetrics(filteredAssets, selectedYear, bookValues);
 
   useEffect(() => {
@@ -221,6 +222,7 @@ export default function Dashboard() {
 
           <DashboardTrendChart
             data={trendData}
+            subsidiaries={trendSubsidiaries}
             selectedYear={selectedYear}
             availableYears={availableYears}
             onSelectYear={setSelectedYear}

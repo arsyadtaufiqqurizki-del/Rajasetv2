@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { DetailColumn } from '../../types/report';
 import { formatCurrency } from '../../lib/money';
 import { cn } from '../../lib/utils';
-import { id as copy } from '../../i18n/id';
+import { en as copy } from '../../i18n/en';
 import Pagination from '../ui/Pagination';
 
 const PAGE_SIZE = 25;
@@ -33,11 +33,11 @@ export default function ReportDetailTable({ columns, data }: ReportDetailTablePr
     <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="p-5 border-b border-outline-variant flex justify-between items-center">
         <h3 className="text-lg font-semibold text-on-surface">{heading}</h3>
-        <span className="text-sm text-on-surface-variant">{data.length.toLocaleString()} baris</span>
+        <span className="text-sm text-on-surface-variant">{data.length.toLocaleString()} rows</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[600px]">
-          <caption className="sr-only">{heading} · {data.length.toLocaleString()} baris</caption>
+          <caption className="sr-only">{heading} · {data.length.toLocaleString()} rows</caption>
           <thead className="bg-surface border-b border-outline-variant">
             <tr>
               {columns.map(col => (

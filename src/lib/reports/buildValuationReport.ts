@@ -1,7 +1,6 @@
 import type { Asset } from '../../types/asset';
 import type { AssetValuationReportPreview } from '../../types/report';
-import { formatCurrency, parseCost } from '../money';
-import { compactCurrencyAxisFormatter } from './shared';
+import { formatCompactCurrency, formatCurrency, parseCost } from '../money';
 
 export function buildValuationReport(
   assets: Asset[],
@@ -28,7 +27,8 @@ export function buildValuationReport(
     title: 'Asset Valuation by Category',
     data: Object.keys(grouped).map(k => ({ name: k, value: grouped[k] })),
     dataKey: 'value',
-    yAxisFormatter: compactCurrencyAxisFormatter,
+    yAxisFormatter: formatCompactCurrency,
+    methodologyNote: 'Assets without an acquisition date are included in every period selected, since there is no date to filter against.',
     summary: [
       { label: 'Total Asset Value', value: formatCurrency(totalValue) },
       { label: 'Total Assets', value: filteredAssets.length.toLocaleString() },

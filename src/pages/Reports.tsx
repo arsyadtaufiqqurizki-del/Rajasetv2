@@ -20,7 +20,7 @@ import ReportDetailTable from '../components/reports/ReportDetailTable';
 import ReportHistoryTable from '../components/reports/ReportHistoryTable';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import Toast from '../components/ui/Toast';
-import { id as copy } from '../i18n/id';
+import { en as copy } from '../i18n/en';
 
 const t = copy.reports;
 
@@ -29,9 +29,9 @@ function matchesMulti(value: string, selected: string[]) {
 }
 
 function describeSelection(values: string[]): string {
-  if (values.length === 0) return 'Semua Divisi';
+  if (values.length === 0) return 'All Divisions';
   if (values.length <= 2) return values.join(', ');
-  return `${values.length} Subsidiary`;
+  return `${values.length} Subsidiaries`;
 }
 
 export default function Reports() {
@@ -135,7 +135,7 @@ export default function Reports() {
     setLivePreviewData(generated);
     setLiveGeneratedAt(new Date());
     setGenerating(false);
-    announce(`${t.a11y.previewReadyPrefix}: ${generated.detailData.length.toLocaleString()} baris`);
+    announce(`${t.a11y.previewReadyPrefix}: ${generated.detailData.length.toLocaleString()} rows`);
     resultsHeadingRef.current?.focus();
   };
 

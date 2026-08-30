@@ -1,11 +1,12 @@
 import { forwardRef, type ReactNode } from 'react';
+import { Info } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line
 } from 'recharts';
 import type { ReportPreview } from '../../types/report';
 import { formatCurrency } from '../../lib/money';
-import { id as copy } from '../../i18n/id';
+import { en as copy } from '../../i18n/en';
 
 interface ReportChartProps {
   previewData: ReportPreview | null;
@@ -30,8 +31,14 @@ const ReportChart = forwardRef<HTMLDivElement, ReportChartProps>(function Report
           </h3>
           {previewData && generatedAt && (
             <span className="text-xs text-on-surface-variant">
-              {previewData.detailData.length.toLocaleString()} baris · {copy.reports.chart.generatedAtPrefix}{' '}
+              {previewData.detailData.length.toLocaleString()} rows · {copy.reports.chart.generatedAtPrefix}{' '}
               {generatedAt.toLocaleDateString()} {generatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          {previewData?.methodologyNote && (
+            <span className="flex items-start gap-1.5 text-xs text-on-surface-variant/80 max-w-2xl">
+              <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+              {previewData.methodologyNote}
             </span>
           )}
         </div>

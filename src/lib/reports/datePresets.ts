@@ -1,4 +1,4 @@
-import { id as copy } from '../../i18n/id';
+import { en as copy } from '../../i18n/en';
 
 export type DatePreset = 'ytd' | 'thisQuarter' | 'lastQuarter' | 'lastYear' | 'custom';
 

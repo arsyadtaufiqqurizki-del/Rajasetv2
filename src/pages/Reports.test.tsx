@@ -81,8 +81,8 @@ describe('Reports > Depreciation Schedule NBV per quarter', () => {
     });
     mockUseAuth.mockReturnValue({ userName: 'Test User' });
 
-    // Excel now writes two sheets (Ringkasan + Rincian); the chart's aggregate rows — the
-    // ones carrying the NBV-per-quarter formula under test — land in Ringkasan via
+    // Excel now writes two sheets (Summary + Detail); the chart's aggregate rows — the
+    // ones carrying the NBV-per-quarter formula under test — land in Summary via
     // sheet_add_json, appended after the summary block.
     const sheetAddJsonSpy = vi.spyOn(XLSX.utils, 'sheet_add_json');
 
@@ -97,19 +97,19 @@ describe('Reports > Depreciation Schedule NBV per quarter', () => {
     });
 
     // Date pickers are collapsed under a period preset dropdown; switch to Custom to reveal them.
-    fireEvent.change(screen.getByLabelText('Periode'), { target: { value: 'custom' } });
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: 'custom' } });
 
     const dateInputs = document.querySelectorAll('input[type="date"]');
     fireEvent.change(dateInputs[0], { target: { value: '2023-01-01' } });
     fireEvent.change(dateInputs[1], { target: { value: '2023-06-30' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /^tinjau$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^review$/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /ekspor ke excel/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /export to excel/i })).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /ekspor ke excel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /export to excel/i }));
 
     // exportReportXlsx dynamic-imports 'xlsx', so the call is now async.
     await waitFor(() => {

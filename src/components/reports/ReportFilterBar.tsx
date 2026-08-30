@@ -1,7 +1,7 @@
 import { AlertCircle, ChevronRight, Play } from 'lucide-react';
 import { REPORT_TYPES, type ReportType } from '../../types/report';
 import { DATE_PRESET_OPTIONS, type DatePreset } from '../../lib/reports/datePresets';
-import { id as copy } from '../../i18n/id';
+import { en as copy } from '../../i18n/en';
 import MultiSelectDropdown from '../ui/MultiSelectDropdown';
 import FilterChips, { type FilterChip } from '../ui/FilterChips';
 

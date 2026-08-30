@@ -61,10 +61,19 @@ export async function exportReportPdf(params: ExportPdfParams): Promise<ExportRe
 
   const summary: ReportSummaryItem[] = previewData.summary ?? [];
   let cursorY = 34;
+
+  if (previewData.methodologyNote) {
+    doc.setFontSize(7.5);
+    doc.setTextColor(140);
+    const noteLines = doc.splitTextToSize(previewData.methodologyNote, 180) as string[];
+    doc.text(noteLines, 14, cursorY);
+    cursorY += noteLines.length * 3.5 + 3;
+  }
+
   if (summary.length) {
     const boxWidth = 45;
     const boxGap = 3;
-    const summaryY = 40;
+    const summaryY = cursorY + 6;
     summary.forEach((item, idx) => {
       const x = 14 + idx * (boxWidth + boxGap);
       doc.setFontSize(7.5);
@@ -74,7 +83,7 @@ export async function exportReportPdf(params: ExportPdfParams): Promise<ExportRe
       doc.setTextColor(30);
       doc.text(item.value, x, summaryY + 6);
     });
-    cursorY = 54;
+    cursorY = summaryY + 14;
   }
 
   onChartRenderStart?.();

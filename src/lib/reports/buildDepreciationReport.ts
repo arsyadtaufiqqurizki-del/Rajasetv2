@@ -1,9 +1,8 @@
 import type { Asset } from '../../types/asset';
 import type { DepreciationReportPreview } from '../../types/report';
-import { formatCurrency, parseCost } from '../money';
+import { formatCompactCurrency, formatCurrency, parseCost } from '../money';
 import { getQuartersInRange } from '../dates';
 import { computeBookValue } from '../depreciation';
-import { compactCurrencyAxisFormatter } from './shared';
 
 export function buildDepreciationReport(
   assets: Asset[],
@@ -28,7 +27,8 @@ export function buildDepreciationReport(
     title: 'Depreciated Value Over Year',
     data,
     dataKey: 'value',
-    yAxisFormatter: compactCurrencyAxisFormatter,
+    yAxisFormatter: formatCompactCurrency,
+    methodologyNote: 'Book value is calculated for all assets regardless of the selected period — the date range only determines which quarters appear on the chart.',
     summary: [
       { label: 'Total Original Cost', value: formatCurrency(totalOriginalCost) },
       { label: `Net Book Value (${quarters[quarters.length - 1]?.label ?? 'End'})`, value: formatCurrency(netBookValue) },

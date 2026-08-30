@@ -31,8 +31,8 @@ export async function exportReportXlsx(params: ExportXlsxParams): Promise<Export
   const detailSheet = XLSX.utils.json_to_sheet(detailRows);
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, summarySheet, 'Ringkasan');
-  XLSX.utils.book_append_sheet(wb, detailSheet, 'Rincian');
+  XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+  XLSX.utils.book_append_sheet(wb, detailSheet, 'Detail');
   XLSX.writeFile(wb, `${fileName}.xlsx`);
   return { ok: true };
 }

@@ -1,7 +1,7 @@
 import { Eye, RotateCcw, Trash2 } from 'lucide-react';
 import type { ReportRecord } from '../../contexts/ReportContext';
 import { cn } from '../../lib/utils';
-import { id as copy } from '../../i18n/id';
+import { en as copy } from '../../i18n/en';
 import Pagination from '../ui/Pagination';
 import Skeleton from '../ui/Skeleton';
 

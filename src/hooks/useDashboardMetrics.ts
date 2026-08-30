@@ -33,6 +33,12 @@ export interface DashboardCategoryPoint extends DashboardSubsidiaryComparisonPoi
 export interface DashboardTrendPoint {
   month: string;
   value: number;
+  [subsidiaryOrOthers: string]: string | number;
+}
+
+export interface DashboardTrendSeries {
+  name: string;
+  color: string;
 }
 
 /** Returns null (no comparable baseline) rather than a misleading 100% when last month had no data. */
@@ -150,18 +156,50 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string, bookV
     };
   }, [assets, bookValues]);
 
+  const topSubsidiaryNames = useMemo(
+    () => summary.subsidiaryComparisonData.map(s => s.name),
+    [summary.subsidiaryComparisonData]
+  );
+  const hasOtherSubsidiaries = summary.allSubsidiaryComparisonData.length > topSubsidiaryNames.length;
+
+  const trendSubsidiaries = useMemo<DashboardTrendSeries[]>(() => {
+    const series = topSubsidiaryNames.map((name, index) => ({
+      name,
+      color: CHART_COLORS[index % CHART_COLORS.length],
+    }));
+    if (hasOtherSubsidiaries) {
+      series.push({ name: 'Others', color: CHART_COLORS[topSubsidiaryNames.length % CHART_COLORS.length] });
+    }
+    return series;
+  }, [topSubsidiaryNames, hasOtherSubsidiaries]);
+
   const trendData = useMemo<DashboardTrendPoint[]>(() => {
-    const trendDataMap = assets.reduce((acc, curr) => {
+    const totalByMonth: Record<number, number> = {};
+    const bySubsidiaryByMonth: Record<number, Record<string, number>> = {};
+
+    assets.forEach(curr => {
       const date = new Date(curr.datePlaceInService);
-      if (!isNaN(date.getTime()) && date.getFullYear().toString() === selectedYear) {
-        const monthIndex = date.getMonth();
-        acc[monthIndex] = (acc[monthIndex] || 0) + parseCost(curr.assetCost);
-      }
-      return acc;
-    }, {} as Record<number, number>);
+      if (isNaN(date.getTime()) || date.getFullYear().toString() !== selectedYear) return;
 
-    return MONTHS.map((month, index) => ({ month, value: trendDataMap[index] || 0 }));
-  }, [assets, selectedYear]);
+      const monthIndex = date.getMonth();
+      const cost = parseCost(curr.assetCost);
+      totalByMonth[monthIndex] = (totalByMonth[monthIndex] || 0) + cost;
 
-  return { ...summary, trendData };
+      const subsidiaryName = curr.subsidiary || 'Unknown';
+      const bucket = topSubsidiaryNames.includes(subsidiaryName) ? subsidiaryName : 'Others';
+      const monthBucket = bySubsidiaryByMonth[monthIndex] || {};
+      monthBucket[bucket] = (monthBucket[bucket] || 0) + cost;
+      bySubsidiaryByMonth[monthIndex] = monthBucket;
+    });
+
+    return MONTHS.map((month, index) => {
+      const point: DashboardTrendPoint = { month, value: totalByMonth[index] || 0 };
+      trendSubsidiaries.forEach(series => {
+        point[series.name] = bySubsidiaryByMonth[index]?.[series.name] || 0;
+      });
+      return point;
+    });
+  }, [assets, selectedYear, topSubsidiaryNames, trendSubsidiaries]);
+
+  return { ...summary, trendData, trendSubsidiaries };
 }

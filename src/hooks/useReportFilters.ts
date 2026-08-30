@@ -4,7 +4,7 @@ import { parseListParam } from '../lib/utils';
 import { REPORT_TYPES, type ReportType } from '../types/report';
 import { DATE_PRESET_OPTIONS, resolveDatePreset, type DatePreset } from '../lib/reports/datePresets';
 import type { FilterChip } from '../types/filters';
-import { id as copy } from '../i18n/id';
+import { en as copy } from '../i18n/en';
 
 function initDates(searchParams: URLSearchParams) {
   const rawPreset = searchParams.get('period');
