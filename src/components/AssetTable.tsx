@@ -1,14 +1,155 @@
+import type { ReactNode } from 'react';
 import { Edit2, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { formatCurrency } from '../lib/money';
 import { id as copy } from '../i18n/id';
 import type { Asset } from '../contexts/AssetContext';
 
+export interface AssetColumnDef {
+  id: string;
+  label: string;
+  headerClassName?: string;
+  cellClassName?: string | ((asset: Asset, bookValues: Map<string, number>) => string);
+  render: (asset: Asset, bookValues: Map<string, number>) => ReactNode;
+}
+
+export const ASSET_COLUMNS: AssetColumnDef[] = [
+  {
+    id: 'assetBook',
+    label: 'Asset Book',
+    cellClassName: 'py-4 px-4 font-mono text-secondary text-xs',
+    render: (asset) => asset.assetBook || asset.id,
+  },
+  {
+    id: 'subsidiary',
+    label: 'Subsidiaries',
+    cellClassName: 'py-4 px-4 text-on-surface text-xs',
+    render: (asset) => asset.subsidiary,
+  },
+  {
+    id: 'assetNumber',
+    label: 'Asset Number',
+    cellClassName: 'py-4 px-4 font-mono text-on-surface text-xs',
+    render: (asset) => asset.assetNumber,
+  },
+  {
+    id: 'assetDescription',
+    label: 'Asset Description',
+    cellClassName: 'py-4 px-4 font-semibold text-on-surface',
+    render: (asset) => asset.assetDescription,
+  },
+  {
+    id: 'assetCost',
+    label: 'Asset Cost',
+    headerClassName: 'text-right',
+    cellClassName: 'py-4 px-4 text-on-surface-variant text-right font-mono tabular-nums',
+    render: (asset) => formatCurrency(asset.assetCost),
+  },
+  {
+    id: 'bookValue',
+    label: 'Book Value',
+    headerClassName: 'text-right',
+    cellClassName: (asset, bookValues) => cn(
+      "py-4 px-4 text-right font-mono tabular-nums",
+      bookValues.get(asset.id) === 0 ? "text-on-surface-variant/60" : "text-on-surface-variant"
+    ),
+    render: (asset, bookValues) => asset.assetCost === '' ? '-' : formatCurrency(bookValues.get(asset.id) ?? 0),
+  },
+  {
+    id: 'datePlaceInService',
+    label: 'Date Place in Service',
+    cellClassName: 'py-4 px-4 text-on-surface font-mono text-xs',
+    render: (asset) => asset.datePlaceInService,
+  },
+  {
+    id: 'assetUnits',
+    label: 'Asset Units',
+    cellClassName: 'py-4 px-4 text-on-surface-variant',
+    render: (asset) => asset.assetUnits,
+  },
+  {
+    id: 'categorySegment1',
+    label: 'Asset Class',
+    cellClassName: 'py-4 px-4 text-on-surface',
+    render: (asset) => asset.categorySegment1,
+  },
+  {
+    id: 'categorySegment2',
+    label: 'Location',
+    cellClassName: 'py-4 px-4 text-on-surface',
+    render: (asset) => asset.categorySegment2,
+  },
+  {
+    id: 'depreciationMethod',
+    label: 'Depreciation Method',
+    cellClassName: 'py-4 px-4 text-on-surface-variant',
+    render: (asset) => asset.depreciationMethod,
+  },
+  {
+    id: 'lifeInMonths',
+    label: 'Life in Months',
+    cellClassName: 'py-4 px-4 text-on-surface text-center',
+    render: (asset) => asset.lifeInMonths,
+  },
+  {
+    id: 'listed',
+    label: 'Listed',
+    cellClassName: 'py-4 px-4 text-on-surface-variant',
+    render: (asset) => asset.listed,
+  },
+  {
+    id: 'status',
+    label: 'Status',
+    headerClassName: 'text-center',
+    cellClassName: 'py-4 px-4 text-center',
+    render: (asset) => (
+      <span className={cn(
+        "inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md border",
+        asset.statusLevel === 'success' ? "bg-emerald-50 border-emerald-200 text-emerald-800" :
+        asset.statusLevel === 'warning' ? "bg-amber-50 border-amber-200 text-amber-800" :
+        asset.statusLevel === 'error' ? "bg-error-container/40 border-error/20 text-on-error-container" :
+        "bg-surface-variant text-on-surface-variant border-outline-variant/50"
+      )}>
+        {asset.status}
+      </span>
+    ),
+  },
+  {
+    id: 'verification',
+    label: 'Verification',
+    headerClassName: 'text-center',
+    cellClassName: 'py-4 px-4 text-center',
+    render: (asset) => (
+      <span className={cn(
+        "inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md border",
+        asset.verification ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-surface-variant text-on-surface-variant border-outline-variant/50"
+      )}>
+        {asset.verification ? 'Yes' : 'No'}
+      </span>
+    ),
+  },
+  {
+    id: 'verificationDate',
+    label: 'Verification Date',
+    cellClassName: 'py-4 px-4 text-on-surface font-mono text-xs',
+    render: (asset) => asset.verificationDate,
+  },
+  {
+    id: 'itemStatus',
+    label: 'Item Status',
+    cellClassName: 'py-4 px-4 text-on-surface-variant',
+    render: (asset) => asset.itemStatus,
+  },
+];
+
+export const DEFAULT_VISIBLE_COLUMNS = ASSET_COLUMNS.map(c => c.id);
+
 interface AssetTableProps {
   paginatedAssets: Asset[];
   filteredAssets: Asset[];
   selectedAssets: Set<string>;
   bookValues: Map<string, number>;
+  visibleColumns: Set<string>;
   onSelectAll: (checked: boolean) => void;
   onSelectAsset: (assetId: string, checked: boolean) => void;
   onEditAsset: (asset: Asset) => void;
@@ -20,11 +161,15 @@ export default function AssetTable({
   filteredAssets,
   selectedAssets,
   bookValues,
+  visibleColumns,
   onSelectAll,
   onSelectAsset,
   onEditAsset,
   onDeleteAsset,
 }: AssetTableProps) {
+  const columns = ASSET_COLUMNS.filter(col => visibleColumns.has(col.id));
+  const colSpan = columns.length + 2; // + checkbox column + actions column
+
   return (
     <div className="overflow-x-auto flex-1">
       <table className="w-full text-left border-collapse">
@@ -39,23 +184,17 @@ export default function AssetTable({
               />
             </th>
             <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Actions</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Book</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Subsidiaries</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Number</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Description</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider text-right">Asset Cost</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider text-right">Book Value</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Date Place in Service</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Units</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Asset Class</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Location</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Depreciation Method</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Life in Months</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Listed</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap text-center tracking-wider">Status</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap text-center tracking-wider">Verification</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Verification Date</th>
-            <th className="py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider">Item Status</th>
+            {columns.map(col => (
+              <th
+                key={col.id}
+                className={cn(
+                  "py-3 px-4 text-xs font-semibold text-on-surface-variant uppercase whitespace-nowrap tracking-wider",
+                  col.headerClassName
+                )}
+              >
+                {col.label}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody className="text-sm divide-y divide-outline-variant/30">
@@ -87,49 +226,18 @@ export default function AssetTable({
                   </button>
                 </div>
               </td>
-              <td className="py-4 px-4 font-mono text-secondary text-xs">{asset.assetBook || asset.id}</td>
-              <td className="py-4 px-4 text-on-surface text-xs">{asset.subsidiary}</td>
-              <td className="py-4 px-4 font-mono text-on-surface text-xs">{asset.assetNumber}</td>
-              <td className="py-4 px-4 font-semibold text-on-surface">{asset.assetDescription}</td>
-              <td className="py-4 px-4 text-on-surface-variant text-right font-mono tabular-nums">{formatCurrency(asset.assetCost)}</td>
-              <td className={cn(
-                "py-4 px-4 text-right font-mono tabular-nums",
-                bookValues.get(asset.id) === 0 ? "text-on-surface-variant/60" : "text-on-surface-variant"
-              )}>
-                {asset.assetCost === '' ? '-' : formatCurrency(bookValues.get(asset.id) ?? 0)}
-              </td>
-              <td className="py-4 px-4 text-on-surface font-mono text-xs">{asset.datePlaceInService}</td>
-              <td className="py-4 px-4 text-on-surface-variant">{asset.assetUnits}</td>
-              <td className="py-4 px-4 text-on-surface">{asset.categorySegment1}</td>
-              <td className="py-4 px-4 text-on-surface">{asset.categorySegment2}</td>
-              <td className="py-4 px-4 text-on-surface-variant">{asset.depreciationMethod}</td>
-              <td className="py-4 px-4 text-on-surface text-center">{asset.lifeInMonths}</td>
-              <td className="py-4 px-4 text-on-surface-variant">{asset.listed}</td>
-              <td className="py-4 px-4 text-center">
-                <span className={cn(
-                  "inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md border",
-                  asset.statusLevel === 'success' ? "bg-emerald-50 border-emerald-200 text-emerald-800" :
-                  asset.statusLevel === 'warning' ? "bg-amber-50 border-amber-200 text-amber-800" :
-                  asset.statusLevel === 'error' ? "bg-error-container/40 border-error/20 text-on-error-container" :
-                  "bg-surface-variant text-on-surface-variant border-outline-variant/50"
-                )}>
-                  {asset.status}
-                </span>
-              </td>
-              <td className="py-4 px-4 text-center">
-                <span className={cn(
-                  "inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md border",
-                  asset.verification ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-surface-variant text-on-surface-variant border-outline-variant/50"
-                )}>
-                  {asset.verification ? 'Yes' : 'No'}
-                </span>
-              </td>
-              <td className="py-4 px-4 text-on-surface font-mono text-xs">{asset.verificationDate}</td>
-              <td className="py-4 px-4 text-on-surface-variant">{asset.itemStatus}</td>
+              {columns.map(col => (
+                <td
+                  key={col.id}
+                  className={typeof col.cellClassName === 'function' ? col.cellClassName(asset, bookValues) : col.cellClassName}
+                >
+                  {col.render(asset, bookValues)}
+                </td>
+              ))}
             </tr>
           )) : (
             <tr>
-              <td colSpan={19} className="py-8 text-center text-on-surface-variant">{copy.emptyState.noAssetData}</td>
+              <td colSpan={colSpan} className="py-8 text-center text-on-surface-variant">{copy.emptyState.noAssetData}</td>
             </tr>
           )}
         </tbody>

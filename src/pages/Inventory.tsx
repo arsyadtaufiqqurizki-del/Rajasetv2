@@ -9,8 +9,10 @@ import { computeBookValue } from '../lib/depreciation';
 import { startOfToday } from '../lib/dates';
 import AssetToolbar from '../components/AssetToolbar';
 import AssetFilters from '../components/AssetFilters';
-import AssetTable from '../components/AssetTable';
+import AssetTable, { ASSET_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from '../components/AssetTable';
 import AssetTablePagination from '../components/AssetTablePagination';
+import ColumnVisibilityDropdown from '../components/ColumnVisibilityDropdown';
+import { useColumnVisibility } from '../hooks/useColumnVisibility';
 import ImportProgressModal, { type ImportModalState } from '../components/ImportProgressModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DeleteProgressModal, { type DeleteProgressState } from '../components/DeleteProgressModal';
@@ -29,6 +31,11 @@ export default function Inventory() {
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const { visibleColumns, toggleColumn, showAll: showAllColumns } = useColumnVisibility(
+    'rajaset:inventory:columns',
+    DEFAULT_VISIBLE_COLUMNS
+  );
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -316,16 +323,24 @@ export default function Inventory() {
           <h2 className="text-3xl font-bold tracking-tight text-on-surface">Asset Inventory</h2>
           <p className="text-sm text-on-surface-variant mt-1">Manage and track enterprise assets across all subsidiaries.</p>
         </div>
-        <AssetToolbar
-          onImportCSV={handleImportCSV}
-          isImporting={importModal.isOpen && importModal.status === 'importing'}
-          onAddNew={() => setIsAddModalOpen(true)}
-          selectedCount={selectedAssets.size}
-          onDeleteSelectedClick={() => { setIsDeleteModalOpen(true); setDeleteConfirmText(""); }}
-          filteredCount={filteredAssets.length}
-          isExporting={isExporting}
-          onExport={handleExportCSV}
-        />
+        <div className="flex items-center gap-3">
+          <ColumnVisibilityDropdown
+            columns={ASSET_COLUMNS}
+            visibleColumns={visibleColumns}
+            onToggleColumn={toggleColumn}
+            onShowAll={showAllColumns}
+          />
+          <AssetToolbar
+            onImportCSV={handleImportCSV}
+            isImporting={importModal.isOpen && importModal.status === 'importing'}
+            onAddNew={() => setIsAddModalOpen(true)}
+            selectedCount={selectedAssets.size}
+            onDeleteSelectedClick={() => { setIsDeleteModalOpen(true); setDeleteConfirmText(""); }}
+            filteredCount={filteredAssets.length}
+            isExporting={isExporting}
+            onExport={handleExportCSV}
+          />
+        </div>
       </div>
 
       <AssetFilters
@@ -366,6 +381,7 @@ export default function Inventory() {
           filteredAssets={filteredAssets}
           selectedAssets={selectedAssets}
           bookValues={bookValues}
+          visibleColumns={visibleColumns}
           onSelectAll={handleSelectAll}
           onSelectAsset={handleSelectAsset}
           onEditAsset={handleEditAsset}
