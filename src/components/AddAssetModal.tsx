@@ -64,7 +64,7 @@ export default function AddAssetModal() {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleVerificationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleVerificationChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const value = e.target.value;
     setFormData(prev => ({
       ...prev,
@@ -251,29 +251,50 @@ export default function AddAssetModal() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Depreciation Method</label>
-              <select 
-                name="depreciationMethod"
-                value={formData.depreciationMethod}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                <option value="Straight Line">Straight Line</option>
-                <option value="Declining Balance">Declining Balance</option>
-                <option value="Units of Production">Units of Production</option>
-              </select>
+              <div role="radiogroup" aria-label="Depreciation Method" className="flex flex-col gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
+                {['Straight Line', 'Declining Balance', 'Units of Production'].map((method) => {
+                  const isUnderMaintenance = method === 'Units of Production';
+                  return (
+                    <label
+                      key={method}
+                      className={`flex items-center gap-2 text-sm ${isUnderMaintenance ? 'text-on-surface-variant cursor-not-allowed' : 'text-on-surface cursor-pointer'}`}
+                    >
+                      <input
+                        type="radio"
+                        name="depreciationMethod"
+                        value={method}
+                        checked={formData.depreciationMethod === method}
+                        onChange={handleChange}
+                        disabled={isUnderMaintenance}
+                        className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
+                      />
+                      {method}
+                      {isUnderMaintenance && (
+                        <span className="text-xs text-on-surface-variant">(Maintenance)</span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
             
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Listed</label>
-              <select 
-                name="listed"
-                value={formData.listed}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                <option value="Audited">Audited</option>
-                <option value="Non-Listed">Non-Listed</option>
-              </select>
+              <div role="radiogroup" aria-label="Listed" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
+                {['Audited', 'Non-Listed'].map((option) => (
+                  <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
+                    <input
+                      type="radio"
+                      name="listed"
+                      value={option}
+                      checked={formData.listed === option}
+                      onChange={handleChange}
+                      className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -294,15 +315,21 @@ export default function AddAssetModal() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Verification</label>
-              <select
-                name="verification"
-                value={formData.verification}
-                onChange={handleVerificationChange}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                <option value="No">No</option>
-                <option value="Yes">Yes</option>
-              </select>
+              <div role="radiogroup" aria-label="Verification" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
+                {['No', 'Yes'].map((option) => (
+                  <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
+                    <input
+                      type="radio"
+                      name="verification"
+                      value={option}
+                      checked={formData.verification === option}
+                      onChange={handleVerificationChange}
+                      className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Verification Date</label>
