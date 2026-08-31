@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { ChevronDown, Download, FileDown, Loader2, Plus, Trash2, Upload } from 'lucide-react';
 import { cn } from '../lib/utils';
+import DownloadTemplateModal from './DownloadTemplateModal';
 
 interface AssetToolbarProps {
   onImportCSV: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -26,6 +27,7 @@ export default function AssetToolbar({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -54,14 +56,17 @@ export default function AssetToolbar({
         <Upload className="h-4 w-4" />
         Import CSV
       </button>
-      <a
-        href="/asset_import_template.csv"
-        download="asset_import_template.csv"
+      <button
+        onClick={() => setIsTemplateModalOpen(true)}
         className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm"
       >
         <FileDown className="h-4 w-4" />
         Download Template
-      </a>
+      </button>
+      <DownloadTemplateModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
+      />
       <div ref={exportMenuRef} className="relative">
         <button
           onClick={() => setIsExportMenuOpen(prev => !prev)}
