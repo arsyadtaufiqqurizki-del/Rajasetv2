@@ -6,6 +6,7 @@ export type ActionType =
   | 'UPDATE_ASSET'
   | 'DELETE_ASSET'
   | 'BULK_DELETE'
+  | 'BULK_UPDATE'
   | 'ADD_MAINTENANCE'
   | 'UPDATE_MAINTENANCE'
   | 'ADD_RECLASSIFICATION'

@@ -16,13 +16,16 @@ import { useColumnVisibility } from '../hooks/useColumnVisibility';
 import ImportProgressModal, { type ImportModalState } from '../components/ImportProgressModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DeleteProgressModal, { type DeleteProgressState } from '../components/DeleteProgressModal';
+import BulkEditModal from '../components/BulkEditModal';
+import BulkEditProgressModal, { type BulkEditProgressState } from '../components/BulkEditProgressModal';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import type { AssetBulkPatch } from '../types/asset';
 import Toast from '../components/ui/Toast';
 import { en as copy } from '../i18n/en';
 import Papa from 'papaparse';
 
 export default function Inventory() {
-  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, itemStatuses, addAsset } = useAsset();
+  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, bulkUpdateAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, itemStatuses, addAsset } = useAsset();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [isExporting, setIsExporting] = useState(false);
@@ -44,6 +47,15 @@ export default function Inventory() {
   const [deleteProgressModal, setDeleteProgressModal] = useState<DeleteProgressState>({
     isOpen: false,
     status: 'deleting',
+    total: 0,
+    processed: 0,
+    failedCount: 0,
+  });
+
+  const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
+  const [bulkEditProgress, setBulkEditProgress] = useState<BulkEditProgressState>({
+    isOpen: false,
+    status: 'updating',
     total: 0,
     processed: 0,
     failedCount: 0,
@@ -316,6 +328,31 @@ export default function Inventory() {
     setDeleteProgressModal(prev => ({ ...prev, status: 'done' }));
   }, [deleteConfirmText, selectedAssets, filterSubsidiary, filterCategory, filterLocation, filterStatus, filterVerification, filterItemStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery, filteredAssets, deleteAllAssets, deleteMultipleAssets]);
 
+  const handleApplyBulkEdit = useCallback(async (patch: AssetBulkPatch) => {
+    const ids = Array.from(selectedAssets);
+    const total = ids.length;
+
+    setIsBulkEditModalOpen(false);
+    setBulkEditProgress({ isOpen: true, status: 'updating', total, processed: 0, failedCount: 0 });
+
+    const { updated, failed } = await bulkUpdateAssets(
+      ids,
+      patch,
+      (processed, failedCount) => {
+        setBulkEditProgress(prev => ({ ...prev, processed, failedCount }));
+      },
+    );
+
+    setBulkEditProgress(prev => ({ ...prev, status: 'done' }));
+    setSelectedAssets(new Set());
+
+    setNotice(
+      failed > 0
+        ? { message: `Updated ${updated} assets, ${failed} failed`, variant: 'error' }
+        : { message: `Updated ${updated} asset${updated === 1 ? '' : 's'}`, variant: 'success' },
+    );
+  }, [selectedAssets, bulkUpdateAssets]);
+
   return (
     <div className="flex flex-col gap-6 w-full h-[calc(100vh-[180px])] min-h-[600px]">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -335,6 +372,7 @@ export default function Inventory() {
             isImporting={importModal.isOpen && importModal.status === 'importing'}
             onAddNew={() => setIsAddModalOpen(true)}
             selectedCount={selectedAssets.size}
+            onBulkEditClick={() => setIsBulkEditModalOpen(true)}
             onDeleteSelectedClick={() => { setIsDeleteModalOpen(true); setDeleteConfirmText(""); }}
             filteredCount={filteredAssets.length}
             isExporting={isExporting}
@@ -415,6 +453,18 @@ export default function Inventory() {
       <DeleteProgressModal
         deleteProgressModal={deleteProgressModal}
         onClose={() => setDeleteProgressModal(prev => ({ ...prev, isOpen: false }))}
+      />
+
+      <BulkEditModal
+        isOpen={isBulkEditModalOpen}
+        selectedCount={selectedAssets.size}
+        onCancel={() => setIsBulkEditModalOpen(false)}
+        onApply={handleApplyBulkEdit}
+      />
+
+      <BulkEditProgressModal
+        bulkEditProgress={bulkEditProgress}
+        onClose={() => setBulkEditProgress(prev => ({ ...prev, isOpen: false }))}
       />
 
       <ConfirmModal

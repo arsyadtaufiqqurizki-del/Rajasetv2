@@ -56,6 +56,13 @@ function getActionMeta(log: ActivityLog) {
         title: `${name} menghapus ${Number(d.count ?? 0)} aset sekaligus`,
         subtitle: d.subsidiary ? `Dari ${d.subsidiary}` : '',
       }
+    case 'BULK_UPDATE':
+      return {
+        icon: <Pencil className="h-4 w-4 text-amber-500" />,
+        bg: 'bg-amber-50',
+        title: `${name} memperbarui ${Number(d.count ?? 0)} aset sekaligus`,
+        subtitle: Array.isArray(d.fields) ? d.fields.join(', ') : '',
+      }
     case 'ADD_MAINTENANCE':
       return {
         icon: <Wrench className="h-4 w-4 text-violet-500" />,

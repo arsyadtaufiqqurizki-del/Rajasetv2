@@ -1,7 +1,7 @@
 import { createContext, useState, useContext, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../lib/activityLogger';
-import type { Asset } from '../types/asset';
+import type { Asset, AssetBulkPatch } from '../types/asset';
 
 export type { Asset } from '../types/asset';
 
@@ -20,6 +20,11 @@ interface AssetContextType {
   deleteAsset: (id: string) => Promise<void>;
   deleteMultipleAssets: (ids: string[], onProgress?: (processed: number, failed: number) => void) => Promise<void>;
   deleteAllAssets: (onProgress?: (processed: number, failed: number) => void) => Promise<void>;
+  bulkUpdateAssets: (
+    ids: string[],
+    patch: AssetBulkPatch,
+    onProgress?: (processed: number, failed: number, total: number) => void,
+  ) => Promise<{ updated: number; failed: number }>;
   addSubsidiary: (name: string) => void;
   deleteSubsidiary: (name: string) => void;
   addCategory1: (name: string) => void;
@@ -86,6 +91,16 @@ const toDb = (asset: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>) => ({
   verification_date: asset.verificationDate || null,
   item_status: asset.itemStatus,
 });
+
+// Terpisah dari toDb: toDb membangun objek lengkap, jadi field yang tidak diisi
+// akan tertimpa null/''. Bulk edit hanya boleh menulis field yang di-enable user.
+const toDbPatch = (patch: AssetBulkPatch): Record<string, unknown> => {
+  const db: Record<string, unknown> = {};
+  if (patch.depreciationMethod !== undefined) db.depreciation_method = patch.depreciationMethod;
+  if (patch.listed !== undefined) db.listed = patch.listed;
+  if (patch.status !== undefined) db.status = patch.status;
+  return db;
+};
 
 export function AssetProvider({ children }: { children: ReactNode }) {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -263,11 +278,56 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     await deleteMultipleAssets(assets.map(a => a.id), onProgress);
   };
 
+  const bulkUpdateAssets = async (
+    ids: string[],
+    patch: AssetBulkPatch,
+    onProgress?: (processed: number, failed: number, total: number) => void,
+  ): Promise<{ updated: number; failed: number }> => {
+    const dbPatch = toDbPatch(patch);
+    const total = ids.length;
+    if (Object.keys(dbPatch).length === 0 || total === 0) return { updated: 0, failed: 0 };
+
+    const BATCH_SIZE = 100;
+    let processed = 0;
+    let failed = 0;
+    let updated = 0;
+
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = ids.slice(i, i + BATCH_SIZE);
+      const { data, error } = await supabase
+        .from('assets')
+        .update(dbPatch)
+        .in('id', batch)
+        .select();
+
+      if (error) {
+        failed += batch.length;
+      } else {
+        updated += batch.length;
+        const byId = new Map((data ?? []).map(row => [row.id, fromDb(row)]));
+        setAssets(prev => prev.map(a => byId.get(a.id) ?? a));
+      }
+      processed += batch.length;
+      onProgress?.(processed, failed, total);
+    }
+
+    if (updated > 0) {
+      setLastFetchedAt(new Date());
+      logActivity({
+        actionType: 'BULK_UPDATE',
+        entityType: 'asset',
+        details: { count: updated, fields: Object.keys(patch) },
+      });
+    }
+
+    return { updated, failed };
+  };
+
   return (
     <AssetContext.Provider value={{
       assets, loading, error, refetch: fetchAll, lastFetchedAt,
       subsidiaries, categories1, categories2, itemStatuses,
-      addAsset, updateAsset, deleteAsset, deleteMultipleAssets, deleteAllAssets,
+      addAsset, updateAsset, deleteAsset, deleteMultipleAssets, deleteAllAssets, bulkUpdateAssets,
       addSubsidiary, deleteSubsidiary, addCategory1, deleteCategory1, addCategory2, deleteCategory2,
       addItemStatus, deleteItemStatus,
       isAddModalOpen, setIsAddModalOpen,

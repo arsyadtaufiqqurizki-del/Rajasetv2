@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { ChevronDown, Download, FileDown, Loader2, Plus, Trash2, Upload } from 'lucide-react';
+import { ChevronDown, Download, Edit2, FileDown, Loader2, Plus, Trash2, Upload } from 'lucide-react';
 import { cn } from '../lib/utils';
 import DownloadTemplateModal from './DownloadTemplateModal';
 
@@ -8,6 +8,7 @@ interface AssetToolbarProps {
   isImporting: boolean;
   onAddNew: () => void;
   selectedCount: number;
+  onBulkEditClick: () => void;
   onDeleteSelectedClick: () => void;
   filteredCount: number;
   isExporting: boolean;
@@ -19,6 +20,7 @@ export default function AssetToolbar({
   isImporting,
   onAddNew,
   selectedCount,
+  onBulkEditClick,
   onDeleteSelectedClick,
   filteredCount,
   isExporting,
@@ -109,6 +111,15 @@ export default function AssetToolbar({
         <Plus className="h-4 w-4" />
         Add New Asset
       </button>
+      {selectedCount > 0 && (
+        <button
+          onClick={onBulkEditClick}
+          className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm"
+        >
+          <Edit2 className="h-4 w-4" />
+          Edit Selected ({selectedCount})
+        </button>
+      )}
       {selectedCount > 0 && (
         <button
           onClick={onDeleteSelectedClick}

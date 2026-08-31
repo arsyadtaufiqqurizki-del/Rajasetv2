@@ -115,22 +115,42 @@ bukan karena deteksi kedalaman trigger — jadi tidak bergantung pada perilaku
 | Item Status → `'Needs Review'` pada aset **verified** | tidak terjadi apa-apa; `verification` tetap true | `verification` → **false**, aset kembali ke antrean ✓ | C |
 | Verification + Item Status diubah sekaligus | input user dibuang | deterministik, input user menang ✓ | B |
 
-**Konsekuensi bagi bulk edit — lebih besar dari sekadar menyederhanakan warning.** Baris ketiga
-tabel di atas menghapus **seluruh** keterkaitan Item Status ⇄ Verification untuk setiap nilai
-selain `'Needs Review'`. Artinya, di rencana bulk edit:
+**Konsekuensi bagi bulk edit — lebih besar dari sekadar menyederhanakan warning.** Rencana bulk
+edit sekarang memuat **5 field**, termasuk `Verification`, jadi Opsi 1 menyentuh dua dari lima
+field itu sekaligus. Yang berubah di sana:
 
-- §2.2 kasus A beserta tabel perilaku 4 barisnya **dihapus** — tidak ada lagi cascade.
-- Panel penjelasan + hitungan "N aset akan jadi Verified" di §4 Fase 4 **dihapus**; Item Status
-  jadi field biasa seperti Status atau Listed.
-- `BulkEditModal` tidak lagi butuh baris aset penuh — props-nya kembali ke `selectedCount: number`.
-- `refetch()` setelah patch `itemStatus` berhenti jadi load-bearing (tidak ada writeback yang
-  membuat `.select()` basi). Boleh dipertahankan sebagai jaring pengaman murah.
-- §2.4 (Verification di luar scope) **tidak berubah** — alasannya soal jejak audit dan alur
-  kerja user, bukan soal trigger.
-- §2.5 (`'Needs Review'` tidak ditawarkan) **tetap berlaku, dan justru makin perlu**: hari ini
-  aksi itu setengah jalan (Cacat C), sesudah Opsi 1 ia berjalan penuh — jadi benar-benar
+- **§2.2 kasus A dihapus** beserta tabel perilaku 4 barisnya. Baris ketiga tabel di atas
+  menghapus seluruh keterkaitan Item Status ⇄ Verification untuk setiap nilai selain
+  `'Needs Review'` — tidak ada lagi cascade.
+- **§2.2 kasus B dihapus**, dan ini yang paling penting: bulk `Verification` berhenti menghapus
+  label `Item Status` ratusan baris sekaligus. Kasus B adalah satu-satunya risiko bulk edit yang
+  **tidak bisa dimitigasi dari front-end** — di sana modal hanya bisa memberi tahu label mana
+  yang akan hilang. Untuk field `Verification`, Opsi 1 bukan penyederhanaan, ia satu-satunya
+  perbaikan yang ada.
+- **§2.2 kasus C dihapus.** Trigger gabungan menghitung `target_category` sekali, jadi mengirim
+  `Verification` + `Item Status` dalam satu patch jadi deterministik dan kedua input bertahan di
+  `assets` — tidak ada lagi input user yang dibuang diam-diam.
+- Panel penjelasan + hitungan "N aset akan jadi Verified" untuk **Item Status** di §4 Fase 4
+  **dihapus**; Item Status jadi field biasa seperti Status atau Listed. Panel dampak
+  **Verification** hanya **menyusut**: bagian "label Item Status yang akan hilang" dibuang,
+  bagian hitungan baris yang benar-benar berpindah status tetap ada.
+- `BulkEditModal` **tetap** butuh baris aset penuh (`selectedAssets: Asset[]`) — bukan lagi untuk
+  cascade Item Status, tapi untuk menghitung berapa aset yang benar-benar berpindah status
+  verifikasi. Aturan "baris yang sudah berada di nilai target tidak disentuh" (§1 dan §2.4 poin 1
+  di sana) berdiri di atas alasan jejak audit, bukan trigger, jadi Opsi 1 tidak menyentuhnya.
+- `refetch()` setelah patch `itemStatus`/`verification` berhenti jadi load-bearing: guard
+  `IS DISTINCT FROM` di writeback membuat round-trip-nya 0 baris, jadi `.select()` tidak lagi
+  basi. Boleh dipertahankan sebagai jaring pengaman murah.
+- **§2.4 berubah judul, bukan isi.** Verification sekarang di dalam scope bulk edit; kekhawatiran
+  jejak audit di sana tidak diselesaikan Opsi 1 dan tidak dimaksudkan diselesaikan olehnya —
+  pemecahannya kolom `verification_source`, isu tersendiri.
+- **§2.5 (`'Needs Review'` tidak ditawarkan) tetap berlaku, dan justru makin perlu.** Hari ini
+  aksi itu setengah jalan (Cacat C); sesudah Opsi 1 ia berjalan penuh, jadi benar-benar
   meng-*unverify* ratusan aset sekaligus. Perbaikan ini membuat aksi tersebut **benar**, bukan
-  **aman**.
+  **aman** — dan jalur yang memang dirancang untuk itu, `Verification = No`, sudah ada di modal
+  yang sama. Satu aksi, satu kontrol.
+- **§2.6 (Verification ⇄ Item Status saling eksklusif) turun status** dari keharusan teknis jadi
+  pilihan UX, karena kasus C hilang. Boleh ditinjau ulang, tapi tidak wajib dibongkar.
 
 **Batasan yang tersisa (diterima sadar):** untuk aset yang belum terverifikasi tapi
 `item_status`-nya sudah diisi (mis. `'Inventory'`), baris reclassification tetap
@@ -454,9 +474,10 @@ select verification, count(*) from assets where item_status = 'Needs Review' gro
 
 ## 7. Rekomendasi urutan kerja
 
-Kuncinya: dari 4 field bulk edit, **hanya `Item Status` yang bersentuhan dengan trigger ini.**
-`Depreciation Method`, `Listed`, dan `Status` tidak muncul di klausa `WHEN` trigger mana pun —
-mengubahnya tidak memicu apa-apa. Jadi rencana bulk edit bisa dibelah, dan urutannya jadi:
+Kuncinya: dari 5 field bulk edit, **dua bersentuhan dengan trigger ini — `Item Status` dan
+`Verification`.** `Depreciation Method`, `Listed`, dan `Status` tidak muncul di klausa `WHEN`
+trigger mana pun — mengubahnya tidak memicu apa-apa. Jadi rencana bulk edit bisa dibelah, dan
+urutannya jadi:
 
 1. **Resume project Supabase**, jalankan inventaris trigger di §5 untuk memvalidasi asumsi
    dokumen ini terhadap database sebenarnya. Jalankan juga uji **3b** untuk memastikan Cacat C
@@ -472,19 +493,32 @@ mengubahnya tidak memicu apa-apa. Jadi rencana bulk edit bisa dibelah, dan uruta
    Opsi 1 yang membuka kondisi mandek itu, jadi keduanya harus mendarat bersama: hapus
    `'Needs Review'` dari opsi Item Status di `AddAssetModal`/`EditAssetModal`, dari seed
    `item_statuses`, dan jalankan migrasi datanya.
-6. **Bulk edit tahap 2 — tambahkan field `Item Status`.** Setelah Opsi 1 masuk, field ini jadi
-   field biasa: tanpa cascade, tanpa panel hitungan, tanpa `refetch()` yang load-bearing.
-   Aturan §2.5 (`'Needs Review'` tidak ditawarkan) tetap dipasang — dan setelah langkah 5,
-   aturan itu berlaku global, bukan khusus bulk edit.
+6. **Bulk edit tahap 2 — tambahkan field `Item Status` dan `Verification`.** Setelah Opsi 1
+   masuk, `Item Status` jadi field biasa: tanpa cascade, tanpa panel hitungan, tanpa `refetch()`
+   yang load-bearing. `Verification` jadi aman dikerjakan: writeback berhenti menghapus label
+   `Item Status` (Cacat B), yang merupakan satu-satunya risiko fitur itu yang tidak bisa
+   dimitigasi dari front-end. Yang **tetap dipasang** terlepas dari migrasi ini: aturan §2.5
+   (`'Needs Review'` tidak ditawarkan — dan setelah langkah 5 aturan itu berlaku global, bukan
+   khusus bulk edit) dan aturan §1/§2.4 bahwa baris yang sudah berada di nilai Verification
+   target tidak di-UPDATE sama sekali, supaya `verification_date` aslinya tidak tertimpa.
 7. **Catat Opsi 3 sebagai backlog arsitektur.** Selama `assets` dan `asset_reclassifications`
    sama-sama menyimpan klasifikasi yang sama, kelas bug ini bisa muncul lagi lewat jalur baru.
 
-**Kenapa `Item Status` sebaiknya menunggu, bukan sekadar "lebih rapi":** mengerjakannya lebih
-dulu berarti menulis panel penjelasan, hitungan aset-yang-akan-jadi-Verified, props
-`selectedAssets: Asset[]`, dan `refetch()` — lalu **membongkar semuanya** begitu Opsi 1 masuk.
-Itu bukan mitigasi yang dipertahankan, itu kode yang dibuang. Ditambah, sampai Opsi 1 masuk,
-fitur ini melipatgandakan pemakaian jalur yang sudah diketahui rusak dari 1 baris jadi ratusan.
+**Kenapa tahap 2 sebaiknya menunggu** — dua alasan yang berbeda untuk dua field:
 
-**Kalau Item Status memang harus rilis sekarang juga**, rencana bulk edit versi sekarang sudah
-lengkap memuat mitigasinya (§2.2, §2.5, panel di §4 Fase 4) — bisa dijalankan apa adanya, dengan
-catatan bahwa sebagiannya akan dihapus lagi nanti.
+- **`Item Status`: kode yang dibuang.** Mengerjakannya lebih dulu berarti menulis panel
+  penjelasan, hitungan aset-yang-akan-jadi-Verified, dan `refetch()` yang load-bearing — lalu
+  **membongkar semuanya** begitu Opsi 1 masuk. Itu bukan mitigasi yang dipertahankan, itu kode
+  yang dibuang. Ditambah, sampai Opsi 1 masuk, fitur ini melipatgandakan pemakaian jalur yang
+  sudah diketahui rusak dari 1 baris jadi ratusan.
+- **`Verification`: kerusakan yang tidak bisa ditambal.** Ini alasan yang lebih kuat. Sebelum
+  Opsi 1, setiap bulk `Verification` **menghapus label `Item Status`** pada tiap baris yang
+  berubah (Cacat B) — `'Asset'` saat Yes, `'Needs Review'` saat No — dan nilai lamanya tidak bisa
+  direkonstruksi dari mana pun. Front-end tidak punya cara mencegahnya; yang bisa dilakukan modal
+  hanyalah menampilkan daftar nilai yang akan hilang dan meminta user menerimanya. Merilis ini
+  lebih dulu berarti menukar data auditor dengan waktu tunggu satu migrasi.
+
+**Kalau tahap 2 memang harus rilis sekarang juga**, rencana bulk edit versi sekarang sudah
+lengkap memuat mitigasinya (§2.2 kasus A–D, §2.5, §2.6, panel dampak di §4 Fase 4) — bisa
+dijalankan apa adanya, dengan catatan bahwa sebagiannya akan dihapus lagi nanti, dan bahwa
+Cacat B tidak punya mitigasi, hanya pengungkapan.

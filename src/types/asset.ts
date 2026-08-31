@@ -23,3 +23,11 @@ export type Asset = {
 };
 
 export type AssetInput = Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>;
+
+/**
+ * Field yang boleh diubah lewat bulk edit — Tahap 1 saja (Depreciation Method, Listed, Status).
+ * `itemStatus` dan `verification` sengaja belum ada di sini: keduanya memicu trigger sync
+ * `assets` <-> `asset_reclassifications` dan menunggu Opsi 1 di "reclassification trigger fix.md"
+ * sebelum masuk scope. Lihat "bulk edit asset inventory.md" kotak di awal dokumen.
+ */
+export type AssetBulkPatch = Partial<Pick<Asset, 'depreciationMethod' | 'listed' | 'status'>>;
