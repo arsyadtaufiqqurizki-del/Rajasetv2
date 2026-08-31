@@ -29,19 +29,39 @@ Sejak `20260817000000` men-drop kolom `asset_reclassifications.verified`, dan
 praktis **tidak menyimpan informasi independen apa pun** selain `remarks`, `verified_by`, dan
 `verification_date`. Sisanya duplikat dari `assets`.
 
-## 2. Dua cacat yang berbeda
+## 2. Tiga cacat yang berbeda
 
 **Cacat A — konflasi (`verification` diturunkan dari `category`).**
 `sync_asset_verification_from_category()` menghitung `verification = (NEW.category <> 'Needs Review')`.
 Nilai `'Needs Review'` dipakai ganda: sebagai *nilai klasifikasi* sekaligus *sentinel "belum
 diverifikasi"*. Padahal "sudah diperiksa orang" dan "ini Asset atau Inventory" dua hal berbeda.
-→ Menyebabkan **kasus C** (ganti Item Status ⇒ Verification ter-flip jadi Yes).
+→ Mengubah Item Status pada aset unverified mem-flip Verification jadi Yes + stempel tanggal
+hari ini.
 
 **Cacat B — writeback yang kebablasan.**
 Fungsi yang sama menulis **ketiga** kolom (`verification`, `verification_date`, `item_status`)
 setiap kali `category` berubah, termasuk saat perubahan itu **berasal dari `assets` sendiri**.
 Round-trip-nya menimpa nilai yang baru saja di-set user.
-→ Menyebabkan **kasus A, B, D**.
+→ Mengubah Verification menimpa Item Status; mengubah keduanya sekaligus membuang input user.
+
+**Cacat C — arah `assets → reclass` mandek untuk aset yang sudah verified.**
+`sync_category_from_asset_item_status()` hanya menyentuh baris yang **sudah** `'Needs Review'`:
+
+```sql
+WHERE asset_id = NEW.id AND category = 'Needs Review';   -- guard-nya di sini
+```
+
+Untuk aset verified (`category = 'Asset'`), set `item_status = 'Needs Review'` tidak cocok
+dengan `WHERE` itu → 0 baris → tidak ada writeback → `verification` **tetap `true`**. Blok
+`IF NOT EXISTS` juga tidak menolong karena barisnya memang ada.
+
+Hasilnya inkonsisten di tiga tempat sekaligus: `assets.item_status = 'Needs Review'`,
+`assets.verification = true`, `asset_reclassifications.category = 'Asset'` — dan aset itu
+**tidak kembali ke antrean Needs Review** meski labelnya sudah berubah.
+
+Cacat ini kebalikan arah dari Cacat A, dan sama-sama berakar pada satu kolom `category` yang
+dipaksa memikul dua makna. Opsi 1 memperbaikinya sebagai efek dari mengganti guard itu dengan
+`target_category` + `IS DISTINCT FROM`.
 
 Bukti bahwa ini dianggap bug, bukan desain: `ReclassificationContext.syncFromAssets`
 (`src/contexts/ReclassificationContext.tsx:274-277`) sudah menambal gejala yang sama secara
@@ -85,19 +105,32 @@ bukan karena deteksi kedalaman trigger — jadi tidak bergantung pada perilaku
 | reclass: `category` → `'Asset'` (tombol Verify) | writeback: `verification`=true, `item_status`=`'Asset'` | assets trigger: `target_category` = `'Asset'`, sudah sama | guard `IS DISTINCT FROM` |
 | reclass: `category` → `'Needs Review'` (un-verify) | writeback: `verification`=false, `item_status` dipertahankan | assets trigger: `target` = `'Needs Review'`, sudah sama | guard `IS DISTINCT FROM` |
 
-**Hasil terhadap empat kasus di rencana bulk edit:**
+**Hasil terhadap tiap cacat:**
 
-| Kasus | Sebelum | Sesudah Opsi 1 |
-|---|---|---|
-| A — Verification=No menimpa Item Status | `item_status` → `'Needs Review'` | `item_status` **tidak disentuh** ✓ |
-| B — Verification=Yes menimpa Item Status | `item_status` → `'Asset'` | `item_status` **dipertahankan** ✓ |
-| C — Item Status mem-flip Verification | `verification` → true + stempel tanggal | `verification` **tidak berubah** ✓ |
-| D — dua field sekaligus saling menimpa | input user dibuang | deterministik, input user menang ✓ |
+| Skenario | Sebelum | Sesudah Opsi 1 | Cacat |
+|---|---|---|---|
+| Verification=No, Item Status punya nilai | `item_status` → `'Needs Review'` | `item_status` **dipertahankan** ✓ | B |
+| Verification=Yes | `item_status` → `'Asset'` | `item_status` **dipertahankan** ✓ | B |
+| Item Status diubah pada aset **unverified** | `verification` → true + stempel tanggal | `verification` **tidak berubah** ✓ | A |
+| Item Status → `'Needs Review'` pada aset **verified** | tidak terjadi apa-apa; `verification` tetap true | `verification` → **false**, aset kembali ke antrean ✓ | C |
+| Verification + Item Status diubah sekaligus | input user dibuang | deterministik, input user menang ✓ | B |
 
-**Konsekuensi bagi bulk edit:** aturan saling-eksklusif Verification ⇄ Item Status di modal
-(§4 Fase 4 rencana bulk edit) jadi **tidak perlu lagi** — kasus D hilang di level database.
-Warning cascade tetap perlu, tapi isinya menyusut jadi sekadar "baris Reclassification ikut
-ter-update", bukan "field lain ikut berubah".
+**Konsekuensi bagi bulk edit — lebih besar dari sekadar menyederhanakan warning.** Baris ketiga
+tabel di atas menghapus **seluruh** keterkaitan Item Status ⇄ Verification untuk setiap nilai
+selain `'Needs Review'`. Artinya, di rencana bulk edit:
+
+- §2.2 kasus A beserta tabel perilaku 4 barisnya **dihapus** — tidak ada lagi cascade.
+- Panel penjelasan + hitungan "N aset akan jadi Verified" di §4 Fase 4 **dihapus**; Item Status
+  jadi field biasa seperti Status atau Listed.
+- `BulkEditModal` tidak lagi butuh baris aset penuh — props-nya kembali ke `selectedCount: number`.
+- `refetch()` setelah patch `itemStatus` berhenti jadi load-bearing (tidak ada writeback yang
+  membuat `.select()` basi). Boleh dipertahankan sebagai jaring pengaman murah.
+- §2.4 (Verification di luar scope) **tidak berubah** — alasannya soal jejak audit dan alur
+  kerja user, bukan soal trigger.
+- §2.5 (`'Needs Review'` tidak ditawarkan) **tetap berlaku, dan justru makin perlu**: hari ini
+  aksi itu setengah jalan (Cacat C), sesudah Opsi 1 ia berjalan penuh — jadi benar-benar
+  meng-*unverify* ratusan aset sekaligus. Perbaikan ini membuat aksi tersebut **benar**, bukan
+  **aman**.
 
 **Batasan yang tersisa (diterima sadar):** untuk aset yang belum terverifikasi tapi
 `item_status`-nya sudah diisi (mis. `'Inventory'`), baris reclassification tetap
@@ -255,6 +288,9 @@ $$ LANGUAGE plpgsql;
    yang diverifikasi akan tetap `'Inventory'`.
 3. `verification_date` tetap dikosongkan (`NULL`) saat un-verify — sama seperti sekarang, dan
    konsisten dengan `EditAssetModal`.
+4. **`'Needs Review'` berhenti bisa dipilih sebagai Item Status di Asset Inventory.** Di halaman
+   Reclassification ia tetap ada. Ini bukan opsional — perubahan (1) yang membukanya jadi
+   kondisi mandek. Lihat §6.3 untuk telusuran dan migrasi datanya.
 
 ### Data lama
 
@@ -296,6 +332,7 @@ Lalu, pada branch Supabase (bukan production), uji tiap kasus pada satu baris:
 | 1 | `update assets set verification=false where id=X` (X verified, `item_status='Inventory'`) | `item_status` tetap `'Inventory'`; reclass `category='Needs Review'` |
 | 2 | `update assets set verification=true where id=X` (X unverified, `item_status='Inventory'`) | `item_status` tetap `'Inventory'`; reclass `category='Inventory'` |
 | 3 | `update assets set item_status='Inventory' where id=X` (X unverified) | `verification` tetap `false`; `verification_date` tetap `NULL` |
+| 3b | `update assets set item_status='Needs Review' where id=X` (X **verified**, `category='Asset'`) | **Cacat C:** `verification` → `false`, `verification_date` → `NULL`, reclass `category='Needs Review'`. Sebelum migrasi, ketiganya tidak berubah sama sekali — jalankan uji ini **dua kali**, sebelum dan sesudah apply, untuk membuktikan perbaikannya |
 | 4 | `update assets set verification=false, item_status='Inventory' where id=X` | `item_status='Inventory'` (input user menang); reclass `'Needs Review'` |
 | 5 | `update asset_reclassifications set category='Asset' where asset_id=X` | `verification=true`, `verification_date=today`, `item_status='Asset'` |
 | 6 | `update asset_reclassifications set category='Needs Review' where asset_id=X` | `verification=false`, `item_status` **tidak berubah** |
@@ -309,19 +346,145 @@ Regresi front-end yang wajib dijalankan setelahnya: `npm run test` (khususnya
 
 ---
 
-## 6. Rekomendasi urutan kerja
+## 6. UX journey sesudah perbaikan
+
+### 6.1 Model mentalnya berubah: dari satu sumbu jadi dua
+
+**Sebelum.** `verification` dan `item_status` praktis satu hal yang sama, karena keduanya
+disimpulkan dari `category`. Mengubah satu menyeret yang lain. Tidak ada cara mengatakan
+"aset ini **Inventory**, tapi **belum** saya periksa".
+
+**Sesudah.** Dua sumbu yang benar-benar independen:
+
+| Sumbu | Pertanyaan yang dijawab | Siapa yang mengubah |
+|---|---|---|
+| `verification` | *Sudah diperiksa fisik atau belum?* | Auditor, sengaja, per aset |
+| `item_status` | *Klasifikasinya apa — Asset, Inventory, …?* | Siapa pun yang mendata, kapan saja |
+
+`asset_reclassifications.category` berhenti jadi kolom mandiri dan jadi **proyeksi** dari
+keduanya:
+
+```
+category = verification ? item_status : 'Needs Review'
+```
+
+Konsekuensi yang harus dipahami tim: **halaman Reclassification bukan menampilkan klasifikasi
+aset, melainkan status antrean audit.** Aset unverified selalu tampil `Needs Review` di sana —
+berapa pun Item Status-nya di Asset Inventory. Itu bukan desync, itu definisi kolomnya.
+
+### 6.2 Lima jalur yang berubah
+
+**Jalur 1 — Aset baru masuk.**
+Aset dibuat dengan `verification = false` → otomatis muncul satu baris `Needs Review` di antrean.
+Aset yang diimpor sudah terverifikasi → **tidak** membuat baris reclassification. Tidak berubah
+dari sekarang, dan sengaja: impor CSV 5000 baris terverifikasi tidak boleh membanjiri antrean.
+
+**Jalur 2 — Mendata klasifikasi sebelum memeriksa.** ⭐ *baru, ini yang tadinya mustahil*
+Staf mengisi `Item Status = Inventory` pada aset yang belum diperiksa. Sesudah perbaikan:
+klasifikasi tersimpan, `Verification` **tetap No**, dan aset **tetap di antrean**.
+Sebelum perbaikan, aksi ini diam-diam menandai aset itu terverifikasi hari ini.
+
+Di halaman Reclassification aset itu masih tertulis `Needs Review` — benar, karena memang belum
+diperiksa. Klasifikasinya terlihat di Asset Inventory.
+
+**Jalur 3 — Auditor memverifikasi aset.**
+Set `Verification = Yes` di `EditAssetModal`. `verification_date` terisi hari ini,
+**`Item Status` tidak disentuh** — aset ber-Item Status `Inventory` tetap `Inventory`, tidak
+dipaksa jadi `Asset` seperti sekarang. Barisnya keluar dari antrean dan muncul dengan
+klasifikasi aslinya.
+
+**Jalur 4 — Auditor mengembalikan aset ke antrean.**
+Set `Verification = No`. Aset kembali ke antrean, `verification_date` dikosongkan, dan
+**`Item Status` dipertahankan** — tidak lagi dihapus jadi `Needs Review` seperti sekarang.
+Saat nanti diverifikasi ulang, klasifikasinya masih ada, tidak perlu diketik dari nol.
+
+**Jalur 5 — Tombol Verify di halaman Reclassification.**
+Tetap bekerja seperti sekarang: set `category` → `assets.verification = true` +
+`item_status = category`. Halaman Reclassification tetap jadi tempat yang sah untuk
+mem-*verify* dan meng-*unverify*, karena di sanalah `Needs Review` punya makna sebagai aksi.
+
+### 6.3 Jebakan baru yang harus ditutup bersamaan
+
+Perbaikan ini **membuka satu kondisi mandek** yang sekarang tersembunyi oleh bug.
+
+`item_statuses` di-seed dengan tiga nilai — `Asset`, `Inventory`, dan **`Needs Review`** — jadi
+`Needs Review` bisa dipilih sebagai Item Status di `AddAssetModal` / `EditAssetModal` hari ini.
+Telusuri aset ber-`item_status = 'Needs Review'` yang diverifikasi:
+
+```
+target_category = COALESCE(NULLIF('Needs Review',''), 'Asset') = 'Needs Review'
+→ category sudah 'Needs Review' → guard IS DISTINCT FROM menahan → tidak ada writeback
+```
+
+Hasilnya: `verification = true`, tapi `category = 'Needs Review'`. Aset itu **tampil terverifikasi
+di Asset Inventory sekaligus mendekam di antrean Needs Review** di halaman Reclassification, dan
+tidak ada aksi di UI yang bisa mengeluarkannya selain mengganti Item Status-nya.
+
+Sekarang kondisi ini tidak terjadi hanya karena bug: verifikasi menimpa `item_status` jadi
+`'Asset'`. Begitu penimpaan itu diperbaiki (dan memang harus), jebakannya terbuka.
+
+**Perbaikannya: `'Needs Review'` berhenti ditawarkan sebagai Item Status di mana pun di Asset
+Inventory** — bukan hanya di bulk edit (§2.5 rencana bulk edit), tapi juga di `AddAssetModal`,
+`EditAssetModal`, dan hapus dari seed `item_statuses`.
+
+Alasannya konsisten dengan seluruh dokumen ini: `'Needs Review'` adalah **sentinel verifikasi,
+bukan klasifikasi**. Di Asset Inventory ia cuma duplikat dari `Verification = No` — dan
+sekarang duplikat yang bisa berkonflik. Di halaman Reclassification ia **tetap ada** dan tetap
+bermakna, karena di sana memilihnya adalah aksi "kembalikan ke antrean".
+
+Cakupan kerjanya kecil: satu filter di sumber opsi Item Status, plus satu migrasi data untuk
+aset yang terlanjur ber-`item_status = 'Needs Review'`:
+
+```sql
+-- Aset unverified: 'Needs Review' redundan dengan verification=false -> kosongkan.
+-- Aset verified: sudah mandek hari ini -> beri klasifikasi default.
+update assets set item_status = case when verification then 'Asset' else '' end
+where item_status = 'Needs Review';
+
+delete from item_statuses where name = 'Needs Review';
+```
+
+Jalankan hitungannya dulu sebelum memutuskan default `'Asset'` itu tepat:
+
+```sql
+select verification, count(*) from assets where item_status = 'Needs Review' group by 1;
+```
+
+---
+
+## 7. Rekomendasi urutan kerja
+
+Kuncinya: dari 4 field bulk edit, **hanya `Item Status` yang bersentuhan dengan trigger ini.**
+`Depreciation Method`, `Listed`, dan `Status` tidak muncul di klausa `WHEN` trigger mana pun —
+mengubahnya tidak memicu apa-apa. Jadi rencana bulk edit bisa dibelah, dan urutannya jadi:
 
 1. **Resume project Supabase**, jalankan inventaris trigger di §5 untuk memvalidasi asumsi
-   dokumen ini terhadap database sebenarnya.
-2. **Konfirmasi tiga perubahan perilaku di §4** ke pemilik proses audit. Kalau salah satunya
-   ditolak, rancangan trigger perlu disesuaikan sebelum ditulis.
-3. **Apply Opsi 1** di branch Supabase, jalankan 9 uji di §5.
-4. **Baru kerjakan bulk edit.** Dengan Opsi 1 sudah masuk, aturan saling-eksklusif
-   Verification ⇄ Item Status di modal bisa dicoret dari rencana, dan warning-nya disederhanakan.
-5. **Catat Opsi 3 sebagai backlog arsitektur.** Selama `assets` dan `asset_reclassifications`
+   dokumen ini terhadap database sebenarnya. Jalankan juga uji **3b** untuk memastikan Cacat C
+   memang ada sebelum diperbaiki.
+2. **Bulk edit tahap 1 — 3 field non-trigger** (`Depreciation Method`, `Listed`, `Status`).
+   Bisa dikerjakan **paralel** dengan langkah 3, karena nol ketergantungan. Ini yang membuat
+   fitur bulk edit bisa sampai ke user tanpa menunggu keputusan proses bisnis.
+3. **Konfirmasi tiga perubahan perilaku di §4** ke pemilik proses audit. Ini langkah manusia,
+   bukan teknis — bisa memakan waktu, dan itulah alasan langkah 2 tidak menunggunya.
+4. **Apply Opsi 1** di branch Supabase, jalankan 10 uji di §5 (termasuk 3b sebagai pembuktian
+   Cacat C).
+5. **Tutup jebakan `'Needs Review'` (§6.3) di rilis yang sama dengan Opsi 1**, bukan sesudahnya.
+   Opsi 1 yang membuka kondisi mandek itu, jadi keduanya harus mendarat bersama: hapus
+   `'Needs Review'` dari opsi Item Status di `AddAssetModal`/`EditAssetModal`, dari seed
+   `item_statuses`, dan jalankan migrasi datanya.
+6. **Bulk edit tahap 2 — tambahkan field `Item Status`.** Setelah Opsi 1 masuk, field ini jadi
+   field biasa: tanpa cascade, tanpa panel hitungan, tanpa `refetch()` yang load-bearing.
+   Aturan §2.5 (`'Needs Review'` tidak ditawarkan) tetap dipasang — dan setelah langkah 5,
+   aturan itu berlaku global, bukan khusus bulk edit.
+7. **Catat Opsi 3 sebagai backlog arsitektur.** Selama `assets` dan `asset_reclassifications`
    sama-sama menyimpan klasifikasi yang sama, kelas bug ini bisa muncul lagi lewat jalur baru.
 
-Mengerjakan bulk edit lebih dulu tanpa perbaikan ini bukan blocker mutlak — rencana bulk edit
-sudah memuat mitigasi di level UI. Tapi artinya kita mengirim fitur yang **memperbanyak**
-pemakaian jalur yang sudah diketahui rusak, dan mitigasi UI-nya (saling eksklusif + warning)
-harus dibongkar lagi setelah trigger diperbaiki.
+**Kenapa `Item Status` sebaiknya menunggu, bukan sekadar "lebih rapi":** mengerjakannya lebih
+dulu berarti menulis panel penjelasan, hitungan aset-yang-akan-jadi-Verified, props
+`selectedAssets: Asset[]`, dan `refetch()` — lalu **membongkar semuanya** begitu Opsi 1 masuk.
+Itu bukan mitigasi yang dipertahankan, itu kode yang dibuang. Ditambah, sampai Opsi 1 masuk,
+fitur ini melipatgandakan pemakaian jalur yang sudah diketahui rusak dari 1 baris jadi ratusan.
+
+**Kalau Item Status memang harus rilis sekarang juga**, rencana bulk edit versi sekarang sudah
+lengkap memuat mitigasinya (§2.2, §2.5, panel di §4 Fase 4) — bisa dijalankan apa adanya, dengan
+catatan bahwa sebagiannya akan dihapus lagi nanti.
