@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { ChevronDown, Download, Edit2, FileDown, Loader2, Plus, Trash2, Upload } from 'lucide-react';
 import { cn } from '../lib/utils';
 import DownloadTemplateModal from './DownloadTemplateModal';
+import ImportCsvInfoModal from './ImportCsvInfoModal';
 
 interface AssetToolbarProps {
   onImportCSV: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -30,6 +31,7 @@ export default function AssetToolbar({
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isImportInfoModalOpen, setIsImportInfoModalOpen] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -51,13 +53,21 @@ export default function AssetToolbar({
         onChange={onImportCSV}
       />
       <button
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => setIsImportInfoModalOpen(true)}
         disabled={isImporting}
         className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Upload className="h-4 w-4" />
         Import CSV
       </button>
+      <ImportCsvInfoModal
+        isOpen={isImportInfoModalOpen}
+        onClose={() => setIsImportInfoModalOpen(false)}
+        onConfirm={() => {
+          setIsImportInfoModalOpen(false);
+          fileInputRef.current?.click();
+        }}
+      />
       <button
         onClick={() => setIsTemplateModalOpen(true)}
         className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm"

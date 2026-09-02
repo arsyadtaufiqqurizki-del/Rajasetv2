@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Link2 } from 'lucide-react';
+import { X, Link2, Loader2 } from 'lucide-react';
 import { useReclassification, RECLASSIFICATION_PRESET_CATEGORIES } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
 import AutocompleteInput from './ui/AutocompleteInput';
@@ -25,6 +25,7 @@ export default function EditReclassificationModal() {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [categorySelect, setCategorySelect] = useState<string>(RECLASSIFICATION_PRESET_CATEGORIES[1]);
   const [customCategory, setCustomCategory] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (editingReclassification) {
@@ -39,6 +40,7 @@ export default function EditReclassificationModal() {
       const isPreset = (RECLASSIFICATION_PRESET_CATEGORIES as readonly string[]).includes(editingReclassification.category);
       setCategorySelect(isPreset ? editingReclassification.category : 'Custom');
       setCustomCategory(isPreset ? '' : editingReclassification.category);
+      setIsSubmitting(false);
     }
   }, [editingReclassification]);
 
@@ -53,11 +55,22 @@ export default function EditReclassificationModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     const category = categorySelect === 'Custom' ? customCategory.trim() : categorySelect;
     if (!category) return;
 
-    await updateReclassification(editingReclassification.id, { ...formData, category });
-    handleClose();
+    setIsSubmitting(true);
+    try {
+      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
+      await Promise.all([
+        updateReclassification(editingReclassification.id, { ...formData, category }),
+        minDelay,
+      ]);
+      handleClose();
+    } catch (err) {
+      setIsSubmitting(false);
+      throw err;
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -208,15 +221,24 @@ export default function EditReclassificationModal() {
             <button
               type="button"
               onClick={handleClose}
-              className="px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors rounded-lg"
+              disabled={isSubmitting}
+              className="px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 text-sm font-medium text-on-primary bg-primary hover:bg-primary/90 transition-colors rounded-lg shadow-sm"
+              disabled={isSubmitting}
+              className="px-5 py-2.5 text-sm font-medium text-on-primary bg-primary hover:bg-primary/90 transition-colors rounded-lg shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[100px]"
             >
-              Update
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update'
+              )}
             </button>
           </div>
         </form>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface MultiSelectDropdownProps {
@@ -8,21 +8,31 @@ interface MultiSelectDropdownProps {
   selected: string[];
   onChange: (values: string[]) => void;
   className?: string;
+  searchable?: boolean;
 }
 
-export default function MultiSelectDropdown({ placeholder, options, selected, onChange, className }: MultiSelectDropdownProps) {
+export default function MultiSelectDropdown({ placeholder, options, selected, onChange, className, searchable }: MultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setSearchTerm('');
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (isOpen && searchable) {
+      searchInputRef.current?.focus();
+    }
+  }, [isOpen, searchable]);
 
   const toggleOption = (option: string) => {
     if (selected.includes(option)) {
@@ -37,6 +47,10 @@ export default function MultiSelectDropdown({ placeholder, options, selected, on
     : selected.length === 1
       ? selected[0]
       : `${selected.length} selected`;
+
+  const filteredOptions = searchable && searchTerm
+    ? options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()))
+    : options;
 
   return (
     <div ref={wrapperRef} className={cn("relative", className)}>
@@ -54,9 +68,27 @@ export default function MultiSelectDropdown({ placeholder, options, selected, on
 
       {isOpen && (
         <ul className="absolute z-50 mt-1 max-h-60 min-w-full w-max overflow-auto rounded-md bg-surface border border-outline-variant py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-          {options.length === 0 ? (
-            <li className="px-4 py-2 text-sm text-on-surface-variant">No options</li>
-          ) : options.map((option) => {
+          {searchable && (
+            <li className="sticky top-0 bg-surface px-2 py-1.5 border-b border-outline-variant">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-on-surface-variant pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Search..."
+                  className="w-full bg-surface border border-outline-variant rounded text-sm py-1 pl-7 pr-2 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
+                />
+              </div>
+            </li>
+          )}
+          {filteredOptions.length === 0 ? (
+            <li className="px-4 py-2 text-sm text-on-surface-variant">
+              {options.length === 0 ? "No options" : "No matches found"}
+            </li>
+          ) : filteredOptions.map((option) => {
             const isSelected = selected.includes(option);
             return (
               <li

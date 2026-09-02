@@ -67,6 +67,7 @@ export default function DashboardFilterBar({
         options={categories2}
         selected={filterLocation}
         onChange={onFilterLocationChange}
+        searchable
       />
       <MultiSelectDropdown
         placeholder="All Statuses"

@@ -93,6 +93,7 @@ export default function AssetFilters({
             options={categories2}
             selected={filterLocation}
             onChange={setFilterLocation}
+            searchable
           />
           <MultiSelectDropdown
             placeholder="All Statuses"
