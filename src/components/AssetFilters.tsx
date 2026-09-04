@@ -17,6 +17,8 @@ interface AssetFiltersProps {
   setFilterLocation: (v: string[]) => void;
   filterStatus: string[];
   setFilterStatus: (v: string[]) => void;
+  filterListed: string[];
+  setFilterListed: (v: string[]) => void;
   filterVerification: string[];
   setFilterVerification: (v: string[]) => void;
   filterItemStatus: string[];
@@ -43,6 +45,7 @@ export default function AssetFilters({
   filterCategory, setFilterCategory,
   filterLocation, setFilterLocation,
   filterStatus, setFilterStatus,
+  filterListed, setFilterListed,
   filterVerification, setFilterVerification,
   filterItemStatus, setFilterItemStatus,
   dateFrom, setDateFrom,
@@ -100,6 +103,12 @@ export default function AssetFilters({
             options={uniqueStatuses}
             selected={filterStatus}
             onChange={setFilterStatus}
+          />
+          <MultiSelectDropdown
+            placeholder="All Listed"
+            options={['Audited', 'Non-Listed']}
+            selected={filterListed}
+            onChange={setFilterListed}
           />
           <MultiSelectDropdown
             placeholder="All Verification"

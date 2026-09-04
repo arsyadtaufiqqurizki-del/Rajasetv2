@@ -15,6 +15,7 @@ export function useDashboardFilters(
       { kind: 'multi', key: 'category', label: 'Asset Class', accessor: (a) => a.categorySegment1 },
       { kind: 'multi', key: 'location', label: 'Location', accessor: (a) => a.categorySegment2 },
       { kind: 'multi', key: 'status', label: 'Status', accessor: (a) => a.status },
+      { kind: 'multi', key: 'listed', label: 'Listed', accessor: (a) => a.listed },
     ],
     []
   );
@@ -42,6 +43,8 @@ export function useDashboardFilters(
     setFilterLocation: (v: string[]) => list.setMulti('location', v),
     filterStatus: list.getMulti('status'),
     setFilterStatus: (v: string[]) => list.setMulti('status', v),
+    filterListed: list.getMulti('listed'),
+    setFilterListed: (v: string[]) => list.setMulti('listed', v),
     searchQuery: list.searchQuery,
     setSearchQuery: list.setSearchQuery,
     debouncedSearchQuery: list.debouncedSearchQuery,

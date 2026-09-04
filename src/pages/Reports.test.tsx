@@ -50,7 +50,7 @@ function makeAsset(overrides: Partial<Asset>): Asset {
     categorySegment2: 'HQ',
     depreciationMethod: 'Straight Line',
     lifeInMonths: '36',
-    listed: 'Yes',
+    listed: 'Audited',
     status: 'Active',
     statusLevel: 'success',
     verification: true,

@@ -24,6 +24,12 @@ import Toast from '../components/ui/Toast';
 import { en as copy } from '../i18n/en';
 import Papa from 'papaparse';
 
+function normalizeListed(value: string | undefined): string {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'audited' || normalized === 'yes') return 'Audited';
+  return 'Non-Listed';
+}
+
 export default function Inventory() {
   const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, bulkUpdateAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, itemStatuses, addAsset } = useAsset();
 
@@ -77,6 +83,7 @@ export default function Inventory() {
     filterCategory, setFilterCategory,
     filterLocation, setFilterLocation,
     filterStatus, setFilterStatus,
+    filterListed, setFilterListed,
     filterVerification, setFilterVerification,
     filterItemStatus, setFilterItemStatus,
     dateFrom, setDateFrom,
@@ -257,7 +264,7 @@ export default function Inventory() {
               categorySegment2: row['Asset Category Segment 2'] || row['categorySegment2'] || 'Uncategorized',
               depreciationMethod: row['Depreciation Method'] || row['depreciationMethod'] || '',
               lifeInMonths: row['Life in Months'] || row['lifeInMonths'] || '0',
-              listed: row['Listed'] || row['listed'] || 'No',
+              listed: normalizeListed(row['Listed'] || row['listed']),
               status: row['Status'] || row['status'] || 'Active',
               verification: String(row['Verification'] || row['verification'] || 'No').trim().toLowerCase() === 'yes',
               verificationDate: row['Verification Date'] || row['verificationDate'] || '',
@@ -307,7 +314,7 @@ export default function Inventory() {
   const handleConfirmDeleteSelected = useCallback(async () => {
     if (deleteConfirmText !== 'DELETE') return;
     const total = selectedAssets.size;
-    const noFilters = filterSubsidiary.length === 0 && filterCategory.length === 0 && filterLocation.length === 0 && filterStatus.length === 0 && filterVerification.length === 0 && filterItemStatus.length === 0 && !dateFrom && !dateTo && !costMin && !costMax && !debouncedSearchQuery;
+    const noFilters = filterSubsidiary.length === 0 && filterCategory.length === 0 && filterLocation.length === 0 && filterStatus.length === 0 && filterListed.length === 0 && filterVerification.length === 0 && filterItemStatus.length === 0 && !dateFrom && !dateTo && !costMin && !costMax && !debouncedSearchQuery;
     const allSelected = selectedAssets.size === filteredAssets.length;
 
     setIsDeleteModalOpen(false);
@@ -326,7 +333,7 @@ export default function Inventory() {
 
     setSelectedAssets(new Set());
     setDeleteProgressModal(prev => ({ ...prev, status: 'done' }));
-  }, [deleteConfirmText, selectedAssets, filterSubsidiary, filterCategory, filterLocation, filterStatus, filterVerification, filterItemStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery, filteredAssets, deleteAllAssets, deleteMultipleAssets]);
+  }, [deleteConfirmText, selectedAssets, filterSubsidiary, filterCategory, filterLocation, filterStatus, filterListed, filterVerification, filterItemStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery, filteredAssets, deleteAllAssets, deleteMultipleAssets]);
 
   const handleApplyBulkEdit = useCallback(async (patch: AssetBulkPatch) => {
     const ids = Array.from(selectedAssets);
@@ -395,6 +402,8 @@ export default function Inventory() {
         setFilterLocation={setFilterLocation}
         filterStatus={filterStatus}
         setFilterStatus={setFilterStatus}
+        filterListed={filterListed}
+        setFilterListed={setFilterListed}
         filterVerification={filterVerification}
         setFilterVerification={setFilterVerification}
         filterItemStatus={filterItemStatus}

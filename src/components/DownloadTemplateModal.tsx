@@ -20,7 +20,7 @@ const COLUMN_NOTES: { column: string; description: string }[] = [
   { column: 'Asset Category Segment 2', description: 'Fill in with the Location (e.g. "Jakarta HQ", "Kantor Cabang Bandung").' },
   { column: 'Depreciation Method', description: 'Depreciation method, e.g. "Straight Line".' },
   { column: 'Life in Months', description: 'Useful life in months, or "Unlimited".' },
-  { column: 'Listed', description: '"Yes" or "No" — whether the asset is listed.' },
+  { column: 'Listed', description: '"Audited" or "Non-Listed" — whether the asset is listed.' },
   { column: 'Status', description: 'Current asset status, e.g. "Active".' },
   { column: 'Verification', description: '"Yes" or "No" — whether the asset has been verified.' },
   { column: 'Verification Date', description: 'Date of verification (YYYY-MM-DD), if verified.' },

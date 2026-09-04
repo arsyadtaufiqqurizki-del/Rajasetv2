@@ -12,12 +12,13 @@ import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
 import DashboardFilterBar from '../components/DashboardFilterBar';
 import DashboardKpiRow from '../components/DashboardKpiRow';
 import DashboardAttentionRow from '../components/DashboardAttentionRow';
+import DashboardListedRow from '../components/DashboardListedRow';
 import DashboardSubsidiaryBarChart from '../components/DashboardSubsidiaryBarChart';
 import DashboardCategoryPieChart from '../components/DashboardCategoryPieChart';
 import DashboardTrendChart from '../components/DashboardTrendChart';
 import DashboardRecentAssetsPanel from '../components/DashboardRecentAssetsPanel';
 import DashboardSkeleton from '../components/DashboardSkeleton';
-import type { AssetStatusOption } from '../hooks/useDashboardMetrics';
+import type { AssetStatusOption, AssetListedOption } from '../hooks/useDashboardMetrics';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -38,6 +39,7 @@ export default function Dashboard() {
     filterCategory, setFilterCategory,
     filterLocation, setFilterLocation,
     filterStatus, setFilterStatus,
+    filterListed, setFilterListed,
     searchQuery, setSearchQuery,
     uniqueStatuses,
     activeFilters,
@@ -55,6 +57,7 @@ export default function Dashboard() {
     assetCountChange,
     assetCostChange,
     statusCounts,
+    listedCounts,
     totalValuation,
     formattedValuation,
     fullValuation,
@@ -98,6 +101,12 @@ export default function Dashboard() {
   const handleToggleStatus = (status: AssetStatusOption) => {
     setFilterStatus(
       filterStatus.includes(status) ? filterStatus.filter((s) => s !== status) : [...filterStatus, status]
+    );
+  };
+
+  const handleToggleListed = (listed: AssetListedOption) => {
+    setFilterListed(
+      filterListed.includes(listed) ? filterListed.filter((l) => l !== listed) : [...filterListed, listed]
     );
   };
 
@@ -213,6 +222,12 @@ export default function Dashboard() {
             statusCounts={statusCounts}
             filterStatus={filterStatus}
             onToggleStatus={handleToggleStatus}
+          />
+
+          <DashboardListedRow
+            listedCounts={listedCounts}
+            filterListed={filterListed}
+            onToggleListed={handleToggleListed}
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

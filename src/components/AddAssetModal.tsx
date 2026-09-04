@@ -73,6 +73,16 @@ export default function AddAssetModal() {
     }));
   };
 
+  const handleListedChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      listed: value,
+      verification: value === 'Audited' ? 'Yes' : prev.verification,
+      verificationDate: value === 'Audited' ? (prev.verificationDate || new Date().toISOString().split('T')[0]) : prev.verificationDate,
+    }));
+  };
+
   const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value;
     val = val.replace(/[^\d.]/g, '');
@@ -288,7 +298,7 @@ export default function AddAssetModal() {
                       name="listed"
                       value={option}
                       checked={formData.listed === option}
-                      onChange={handleChange}
+                      onChange={handleListedChange}
                       className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
                     />
                     {option}
@@ -316,19 +326,29 @@ export default function AddAssetModal() {
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Verification</label>
               <div role="radiogroup" aria-label="Verification" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
-                {['No', 'Yes'].map((option) => (
-                  <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
-                    <input
-                      type="radio"
-                      name="verification"
-                      value={option}
-                      checked={formData.verification === option}
-                      onChange={handleVerificationChange}
-                      className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
-                    />
-                    {option}
-                  </label>
-                ))}
+                {['No', 'Yes'].map((option) => {
+                  const isLockedByAudited = option === 'No' && formData.listed === 'Audited';
+                  return (
+                    <label
+                      key={option}
+                      className={`flex items-center gap-2 text-sm ${isLockedByAudited ? 'text-on-surface-variant cursor-not-allowed' : 'text-on-surface cursor-pointer'}`}
+                    >
+                      <input
+                        type="radio"
+                        name="verification"
+                        value={option}
+                        checked={formData.verification === option}
+                        onChange={handleVerificationChange}
+                        disabled={isLockedByAudited}
+                        className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
+                      />
+                      {option}
+                      {isLockedByAudited && (
+                        <span className="text-xs text-on-surface-variant">(Audited requires Yes)</span>
+                      )}
+                    </label>
+                  );
+                })}
               </div>
             </div>
             <div className="flex flex-col gap-1.5">

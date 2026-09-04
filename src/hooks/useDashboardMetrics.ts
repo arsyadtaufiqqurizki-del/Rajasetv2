@@ -17,6 +17,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export const ASSET_STATUS_OPTIONS = ['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Retired'] as const;
 export type AssetStatusOption = typeof ASSET_STATUS_OPTIONS[number];
 
+export const ASSET_LISTED_OPTIONS = ['Audited', 'Non-Listed'] as const;
+export type AssetListedOption = typeof ASSET_LISTED_OPTIONS[number];
+
 export interface DashboardSubsidiaryComparisonPoint {
   name: string;
   assetCost: number;
@@ -75,6 +78,11 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string, bookV
       acc[statusOption] = assets.filter(a => a.status.trim().toLowerCase() === statusOption.toLowerCase()).length;
       return acc;
     }, {} as Record<AssetStatusOption, number>);
+
+    const listedCounts = ASSET_LISTED_OPTIONS.reduce((acc, listedOption) => {
+      acc[listedOption] = assets.filter(a => a.listed.trim().toLowerCase() === listedOption.toLowerCase()).length;
+      return acc;
+    }, {} as Record<AssetListedOption, number>);
 
     const totalValuation = assets.reduce((acc, curr) => acc + parseCost(curr.assetCost), 0);
     const formattedValuation = formatCompactCurrency(totalValuation);
@@ -146,6 +154,7 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string, bookV
       assetCountChange,
       assetCostChange,
       statusCounts,
+      listedCounts,
       totalValuation,
       formattedValuation,
       fullValuation,
