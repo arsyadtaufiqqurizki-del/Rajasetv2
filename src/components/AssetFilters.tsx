@@ -125,6 +125,7 @@ export default function AssetFilters({
           <div className="flex items-center gap-1.5">
             <input
               type="date"
+              lang="en-GB"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               aria-label="Date place in service from"
@@ -133,6 +134,7 @@ export default function AssetFilters({
             <span className="text-xs text-on-surface-variant">to</span>
             <input
               type="date"
+              lang="en-GB"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
               aria-label="Date place in service to"

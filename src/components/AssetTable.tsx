@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Edit2, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { formatCurrency } from '../lib/money';
+import { formatDateDMY } from '../lib/dates';
 import { id as copy } from '../i18n/id';
 import type { Asset } from '../contexts/AssetContext';
 
@@ -59,7 +60,7 @@ export const ASSET_COLUMNS: AssetColumnDef[] = [
     id: 'datePlaceInService',
     label: 'Date Place in Service',
     cellClassName: 'py-4 px-4 text-on-surface font-mono text-xs',
-    render: (asset) => asset.datePlaceInService,
+    render: (asset) => formatDateDMY(asset.datePlaceInService),
   },
   {
     id: 'assetUnits',

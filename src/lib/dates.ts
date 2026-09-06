@@ -1,3 +1,11 @@
+/** Formats a "YYYY-MM-DD" string (e.g. from a native date input) as "DD/MM/YYYY". Returns the input unchanged if it doesn't match. */
+export function formatDateDMY(isoDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate);
+  if (!match) return isoDate;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
 /** Formats a Date as "Weekday, Month day, year · HH:mm". */
 export function formatLastUpdate(date: Date): string {
   const datePart = new Intl.DateTimeFormat('en-US', {
