@@ -76,6 +76,16 @@ export default function Reclassification() {
     errors: [],
   });
 
+  // Rows whose linked asset was deleted from Asset Inventory (see migration
+  // 20260906000000) but the reclassification row itself was intentionally kept
+  // as an audit snapshot. Surfaced to the user when they click Sync from Asset.
+  const deletedAssetRows = useMemo(
+    () => reclassifications.filter(r => r.assetDeletedAt),
+    [reclassifications]
+  );
+  const [isDeleteOrphansModalOpen, setIsDeleteOrphansModalOpen] = useState(false);
+  const [deleteOrphansConfirmText, setDeleteOrphansConfirmText] = useState('');
+
   const stats = useMemo(() => {
     const total = reclassifications.length;
     const verified = reclassifications.filter(r => r.verified).length;
@@ -186,6 +196,26 @@ export default function Reclassification() {
     setDeleteProgressModal(prev => ({ ...prev, status: 'done' }));
   }, [deleteConfirmText, selectedItems, filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery, filteredItems, deleteAllReclassifications, deleteMultipleReclassifications]);
 
+  // Deliberately calls deleteMultipleReclassifications directly (never
+  // deleteAllReclassifications) so this action can never widen into a full-table
+  // delete just because its count happens to match the current filtered list.
+  const handleConfirmDeleteOrphans = useCallback(async () => {
+    if (deleteOrphansConfirmText !== 'DELETE') return;
+    const ids = deletedAssetRows.map(r => r.id);
+    const total = ids.length;
+
+    setIsDeleteOrphansModalOpen(false);
+    setDeleteOrphansConfirmText('');
+    setSyncModal(prev => ({ ...prev, isOpen: false }));
+    setDeleteProgressModal({ isOpen: true, status: 'deleting', total, processed: 0, failedCount: 0 });
+
+    await deleteMultipleReclassifications(ids, (processed, failedCount) => {
+      setDeleteProgressModal(prev => ({ ...prev, processed, failedCount }));
+    });
+
+    setDeleteProgressModal(prev => ({ ...prev, status: 'done' }));
+  }, [deleteOrphansConfirmText, deletedAssetRows, deleteMultipleReclassifications]);
+
   return (
     <div className="flex flex-col gap-6 w-full h-[calc(100vh-[180px])] min-h-[600px]">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -281,14 +311,14 @@ export default function Reclassification() {
         processed={syncModal.processed}
         unit="assets processed"
         doneTitle="Sync Complete"
-        hasWarning={syncModal.failedCount > 0}
+        hasWarning={syncModal.failedCount > 0 || deletedAssetRows.length > 0}
         stats={syncModal.total === 0 ? [] : [
           { label: 'Berhasil ditautkan', value: `${syncModal.successCount} asset`, tone: 'success' },
           ...(syncModal.failedCount > 0 ? [{ label: 'Gagal', value: `${syncModal.failedCount} asset`, tone: 'error' as const }] : []),
         ]}
         onClose={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
       >
-        {syncModal.status === 'done' && syncModal.total === 0 && (
+        {syncModal.status === 'done' && syncModal.total === 0 && deletedAssetRows.length === 0 && (
           <p className="text-sm text-on-surface-variant mb-4">Semua asset sudah tertaut ke Reclassification.</p>
         )}
         {syncModal.errors.length > 0 && (
@@ -301,7 +331,41 @@ export default function Reclassification() {
             </div>
           </div>
         )}
+        {syncModal.status === 'done' && deletedAssetRows.length > 0 && (
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-amber-600 mb-1.5">
+              {deletedAssetRows.length} asset telah dihapus dari Asset Inventory
+            </p>
+            <p className="text-xs text-on-surface-variant mb-2">
+              Baris reclassification-nya masih tersimpan sebagai jejak audit, tapi asset sumbernya sudah tidak ada.
+            </p>
+            <div className="max-h-40 overflow-y-auto bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 space-y-1.5 mb-3">
+              {deletedAssetRows.map(r => (
+                <p key={r.id} className="text-xs text-on-surface break-words">
+                  {r.assetDescription || '(tanpa deskripsi)'}
+                </p>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setDeleteOrphansConfirmText(''); setIsDeleteOrphansModalOpen(true); }}
+              className="px-4 py-2 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors shadow-sm"
+            >
+              Hapus baris ini
+            </button>
+          </div>
+        )}
       </ProgressModal>
+
+      <DeleteConfirmModal
+        isOpen={isDeleteOrphansModalOpen}
+        selectedCount={deletedAssetRows.length}
+        confirmText={deleteOrphansConfirmText}
+        onConfirmTextChange={setDeleteOrphansConfirmText}
+        onCancel={() => { setIsDeleteOrphansModalOpen(false); setDeleteOrphansConfirmText(''); }}
+        onConfirm={handleConfirmDeleteOrphans}
+        itemLabel="reclassification entries with a deleted asset"
+      />
 
       <DeleteConfirmModal
         isOpen={isDeleteModalOpen}

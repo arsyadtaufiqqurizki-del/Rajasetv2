@@ -55,6 +55,7 @@ const fromDb = (row: any): Reclassification => {
     ownership: linked ? (linked.subsidiary ?? '') : (row.ownership ?? ''),
     category: row.category ?? 'Needs Review',
     remarks: row.remarks ?? '',
+    assetDeletedAt: row.asset_deleted_at ?? null,
     // Derived from category, not a stored flag: Needs Review = Unverified,
     // anything else = Verified. Stays consistent with the bidirectional
     // category <-> assets.verification sync (see migration 20260815020000).

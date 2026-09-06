@@ -13,6 +13,8 @@ export type Reclassification = {
   ownership: string;
   category: ReclassificationCategory;
   remarks: string;
+  /** set when the linked asset was deleted from Asset Inventory (null otherwise) */
+  assetDeletedAt: string | null;
   verified: boolean;
   verificationDate: string;
   verifiedBy: string;
@@ -21,5 +23,5 @@ export type Reclassification = {
 
 export type ReclassificationInput = Omit<
   Reclassification,
-  'id' | 'assetId' | 'linkedAssetNumber' | 'verified' | 'verificationDate' | 'verifiedBy' | 'createdAt'
+  'id' | 'assetId' | 'linkedAssetNumber' | 'assetDeletedAt' | 'verified' | 'verificationDate' | 'verifiedBy' | 'createdAt'
 >;
