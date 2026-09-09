@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import AutocompleteInput from './ui/AutocompleteInput';
+import Modal from './ui/Modal';
+
+const TITLE_ID = 'edit-asset-modal-title';
 
 export default function EditAssetModal() {
   const { isEditModalOpen, setIsEditModalOpen, updateAsset, editingAsset, setEditingAsset, subsidiaries, categories1, categories2, itemStatuses } = useAsset();
@@ -26,6 +29,8 @@ export default function EditAssetModal() {
   });
 
   const [isUnlimitedLife, setIsUnlimitedLife] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingAsset) {
@@ -66,21 +71,37 @@ export default function EditAssetModal() {
         itemStatus: editingAsset.itemStatus || '',
       });
       setIsUnlimitedLife(editingAsset.lifeInMonths === 'Unlimited');
+      setIsSaving(false);
+      setSaveError(null);
     }
   }, [editingAsset]);
 
-  if (!isEditModalOpen || !editingAsset) return null;
+  if (!editingAsset) return null;
+
+  const handleClose = () => {
+    if (isSaving) return;
+    setIsEditModalOpen(false);
+    setEditingAsset(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const dataToSave = {
-      ...formData,
-      assetCost: formData.assetCost.replace(/,/g, ''),
-      verification: formData.verification === 'Yes',
-    };
-    await updateAsset(editingAsset.id, dataToSave);
-    setIsEditModalOpen(false);
-    setEditingAsset(null);
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      const dataToSave = {
+        ...formData,
+        assetCost: formData.assetCost.replace(/,/g, ''),
+        verification: formData.verification === 'Yes',
+      };
+      await updateAsset(editingAsset.id, dataToSave);
+      setIsEditModalOpen(false);
+      setEditingAsset(null);
+    } catch (err) {
+      setSaveError('Failed to update asset: ' + (err instanceof Error ? err.message : 'An unexpected error occurred.'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -143,22 +164,26 @@ export default function EditAssetModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-surface w-full max-w-2xl rounded-2xl shadow-xl border border-outline-variant overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-6 border-b border-outline-variant/30">
-          <h2 className="text-xl font-bold text-on-surface">Edit Asset</h2>
-          <button 
-            onClick={() => {
-              setIsEditModalOpen(false);
-              setEditingAsset(null);
-            }}
-            className="p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+    <Modal
+      isOpen={isEditModalOpen}
+      onClose={handleClose}
+      labelledBy={TITLE_ID}
+      closeOnEscape={!isSaving}
+      className="max-w-2xl max-h-[90vh] flex flex-col"
+    >
+      <div className="flex items-center justify-between p-6 border-b border-outline-variant/30 shrink-0">
+        <h2 id={TITLE_ID} className="text-xl font-bold text-on-surface">Edit Asset</h2>
+        <button
+          type="button"
+          onClick={handleClose}
+          disabled={isSaving}
+          className="p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="flex flex-col gap-1.5 sm:col-span-1">
               <label className="text-sm font-semibold text-on-surface">Asset Book *</label>
@@ -400,26 +425,37 @@ export default function EditAssetModal() {
             </div>
           </div>
 
+          {saveError && (
+            <p className="text-sm text-error bg-error-container/20 border border-error/20 rounded-lg px-3 py-2">
+              {saveError}
+            </p>
+          )}
+
           <div className="mt-4 pt-4 border-t border-outline-variant/30 flex justify-end gap-3">
             <button
               type="button"
-              onClick={() => {
-                setIsEditModalOpen(false);
-                setEditingAsset(null);
-              }}
-              className="px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors rounded-lg"
+              onClick={handleClose}
+              disabled={isSaving}
+              className="px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
-            <button 
+            <button
               type="submit"
-              className="px-5 py-2.5 text-sm font-medium text-on-primary bg-primary hover:bg-primary/90 transition-colors rounded-lg shadow-sm"
+              disabled={isSaving}
+              className="px-5 py-2.5 text-sm font-medium text-on-primary bg-primary hover:bg-primary/90 transition-colors rounded-lg shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
             >
-              Update Asset
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Update Asset'
+              )}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

@@ -377,6 +377,7 @@ export default function Reports() {
       <Toast
         message={toast?.message ?? null}
         icon={toast?.variant === 'error' ? <AlertCircle className="h-4 w-4 text-error shrink-0" /> : undefined}
+        onClose={() => setToast(null)}
       />
     </div>
   );

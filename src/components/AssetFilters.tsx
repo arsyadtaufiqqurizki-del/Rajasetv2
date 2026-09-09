@@ -1,4 +1,5 @@
-import { Filter, Search, X } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronUp, ChevronDown, Filter, Search, X } from 'lucide-react';
 import MultiSelectDropdown from './ui/MultiSelectDropdown';
 import type { FilterChip } from '../hooks/useAssetFilters';
 
@@ -55,6 +56,17 @@ export default function AssetFilters({
   searchQuery, setSearchQuery,
   activeFilters, onClearFilters,
 }: AssetFiltersProps) {
+  const hiddenActiveCount = [
+    filterLocation.length > 0,
+    filterListed.length > 0,
+    filterVerification.length > 0,
+    filterItemStatus.length > 0,
+    Boolean(dateFrom || dateTo),
+    Boolean(costMin || costMax),
+  ].filter(Boolean).length;
+
+  const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(() => hiddenActiveCount > 0);
+
   return (
     <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant flex flex-col gap-3 shadow-sm">
       <div className="flex flex-wrap gap-4 items-center">
@@ -92,17 +104,44 @@ export default function AssetFilters({
             onChange={setFilterCategory}
           />
           <MultiSelectDropdown
+            placeholder="All Statuses"
+            options={uniqueStatuses}
+            selected={filterStatus}
+            onChange={setFilterStatus}
+          />
+          <button
+            type="button"
+            onClick={() => setIsMoreFiltersOpen(prev => !prev)}
+            aria-expanded={isMoreFiltersOpen}
+            aria-controls="asset-more-filters-panel"
+            className="flex items-center gap-1.5 bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
+          >
+            More filters
+            {hiddenActiveCount > 0 && (
+              <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold">
+                {hiddenActiveCount}
+              </span>
+            )}
+            {isMoreFiltersOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+        </div>
+        <button
+          onClick={onClearFilters}
+          disabled={activeFilters.length === 0}
+          className="text-sm font-medium text-secondary hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-secondary"
+        >
+          Clear Filters
+        </button>
+      </div>
+
+      {isMoreFiltersOpen && (
+        <div id="asset-more-filters-panel" className="flex flex-wrap gap-2.5 items-center p-3 rounded-lg bg-surface-container-low border border-outline-variant">
+          <MultiSelectDropdown
             placeholder="All Locations"
             options={categories2}
             selected={filterLocation}
             onChange={setFilterLocation}
             searchable
-          />
-          <MultiSelectDropdown
-            placeholder="All Statuses"
-            options={uniqueStatuses}
-            selected={filterStatus}
-            onChange={setFilterStatus}
           />
           <MultiSelectDropdown
             placeholder="All Listed"
@@ -123,12 +162,15 @@ export default function AssetFilters({
             onChange={setFilterItemStatus}
           />
           <div className="flex items-center gap-1.5">
+            <span className="text-xs text-on-surface-variant whitespace-nowrap" title="This field shows dates using your browser/OS date format, which may not match the DD/MM/YYYY used in the table">
+              In service (MM/DD/YYYY):
+            </span>
             <input
               type="date"
               lang="en-GB"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              aria-label="Date place in service from"
+              aria-label="Date place in service from (MM/DD/YYYY)"
               className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
             />
             <span className="text-xs text-on-surface-variant">to</span>
@@ -137,7 +179,7 @@ export default function AssetFilters({
               lang="en-GB"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              aria-label="Date place in service to"
+              aria-label="Date place in service to (MM/DD/YYYY)"
               className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
             />
           </div>
@@ -159,13 +201,8 @@ export default function AssetFilters({
             />
           </div>
         </div>
-        <button
-          onClick={onClearFilters}
-          className="text-sm font-medium text-secondary hover:text-primary transition-colors"
-        >
-          Clear Filters
-        </button>
-      </div>
+      )}
+
       {activeFilters.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {activeFilters.map(chip => (

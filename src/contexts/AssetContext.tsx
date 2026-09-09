@@ -214,7 +214,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       .select()
       .single();
 
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     setAssets(prev => [fromDb(data), ...prev]);
     setLastFetchedAt(new Date());
     if (!skipLog) {
@@ -235,7 +235,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       .select()
       .single();
 
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     setAssets(prev => prev.map(a => a.id === id ? fromDb(data) : a));
     setLastFetchedAt(new Date());
     logActivity({ actionType: 'UPDATE_ASSET', entityType: 'asset', entityId: id, details: { assetName: updatedData.assetDescription } });

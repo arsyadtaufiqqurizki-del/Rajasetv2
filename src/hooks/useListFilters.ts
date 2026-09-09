@@ -38,8 +38,10 @@ export interface UseListFiltersOptions<T> {
   searchFields: (row: T) => string[];
   searchParams: URLSearchParams;
   setSearchParams: SetURLSearchParams;
-  /** called whenever any filter or the debounced search query changes, e.g. to reset pagination */
+  /** called whenever any filter, the debounced search query, or the sort changes, e.g. to reset pagination */
   onFiltersChanged?: () => void;
+  /** column id -> value accessor; presence of a key here is what makes that column sortable */
+  sortAccessors?: Record<string, (row: T) => string | number>;
 }
 
 type DateRange = { from: string; to: string };
@@ -60,6 +62,7 @@ export function useListFilters<T>({
   searchParams,
   setSearchParams,
   onFiltersChanged,
+  sortAccessors,
 }: UseListFiltersOptions<T>) {
   const multiDefs = useMemo(() => defs.filter((d): d is MultiFilterDef<T> => d.kind === 'multi'), [defs]);
   const dateDefs = useMemo(() => defs.filter((d): d is DateRangeFilterDef<T> => d.kind === 'dateRange'), [defs]);
@@ -95,6 +98,24 @@ export function useListFilters<T>({
 
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() => searchParams.get('q') || '');
+
+  const [sortKey, setSortKey] = useState<string | null>(() => {
+    const key = searchParams.get('sort');
+    return key && sortAccessors?.[key] ? key : null;
+  });
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(() =>
+    searchParams.get('dir') === 'desc' ? 'desc' : 'asc'
+  );
+
+  /** Clicking the active column flips direction; clicking a new column starts ascending. */
+  const toggleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDirection((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
 
   // Debounce search
   useEffect(() => {
@@ -135,7 +156,7 @@ export function useListFilters<T>({
 
   // Content-based signature so the two effects below fire once per actual filter change,
   // regardless of how many (dynamically-configured) filter defs a page declares.
-  const filterSignature = JSON.stringify({ multiValues, dateRanges, numberRanges, debouncedSearchQuery });
+  const filterSignature = JSON.stringify({ multiValues, dateRanges, numberRanges, debouncedSearchQuery, sortKey, sortDirection });
 
   // Reset page to 1 when filters change
   useEffect(() => {
@@ -161,6 +182,10 @@ export function useListFilters<T>({
       if (r.max) params.set(`${def.key}Max`, r.max);
     }
     if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
+    if (sortKey) {
+      params.set('sort', sortKey);
+      if (sortDirection === 'desc') params.set('dir', 'desc');
+    }
     setSearchParams(params, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterSignature, setSearchParams]);
@@ -214,7 +239,7 @@ export function useListFilters<T>({
       };
     });
 
-    return rows.filter((row) => {
+    const result = rows.filter((row) => {
       for (const def of multiDefs) {
         const selected = multiValues[def.key] ?? [];
         if (selected.length > 0 && !selected.includes(def.accessor(row))) return false;
@@ -236,8 +261,21 @@ export function useListFilters<T>({
       }
       return true;
     });
+
+    const accessor = sortKey ? sortAccessors?.[sortKey] : undefined;
+    if (accessor) {
+      const dir = sortDirection === 'asc' ? 1 : -1;
+      result.sort((a, b) => {
+        const va = accessor(a);
+        const vb = accessor(b);
+        if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+        return String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+      });
+    }
+
+    return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, multiValues, dateRanges, numberRanges, debouncedSearchQuery, searchFields]);
+  }, [rows, multiValues, dateRanges, numberRanges, debouncedSearchQuery, searchFields, sortKey, sortDirection, sortAccessors]);
 
   const clearFilters = () => {
     setMultiValues(Object.fromEntries(multiDefs.map((d) => [d.key, []])));
@@ -260,6 +298,9 @@ export function useListFilters<T>({
     searchQuery,
     setSearchQuery,
     debouncedSearchQuery,
+    sortKey,
+    sortDirection,
+    toggleSort,
     chips,
     filtered,
     clearFilters,

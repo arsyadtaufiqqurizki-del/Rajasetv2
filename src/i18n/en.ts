@@ -1,6 +1,11 @@
 export const en = {
+  csvImport: {
+    missingAssetNumber: 'Asset Number is empty',
+    missingAssetDescription: 'Asset Description is empty',
+  },
   emptyState: {
     noAssetData: 'No asset data yet',
+    noAssetDataFiltered: 'No assets match the current filters',
     noReclassificationData: 'No reclassification data yet',
     noMaintenanceData: 'No maintenance activity yet',
     noMaintenanceFiltered: 'No data matches the current filters',

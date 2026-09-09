@@ -1,18 +1,21 @@
 import { useState, useMemo, useEffect, useCallback, type ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { logActivity } from '../lib/activityLogger';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Edit2, Trash2 } from 'lucide-react';
 import { useAsset, type Asset } from '../contexts/AssetContext';
 import { useAssetFilters } from '../hooks/useAssetFilters';
 import { sanitizeCell, toCsvBlob, downloadBlob } from '../lib/csv';
 import { computeBookValue } from '../lib/depreciation';
 import { startOfToday } from '../lib/dates';
+import { parseCost, formatCurrency } from '../lib/money';
 import AssetToolbar from '../components/AssetToolbar';
 import AssetFilters from '../components/AssetFilters';
-import AssetTable, { ASSET_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from '../components/AssetTable';
-import AssetTablePagination from '../components/AssetTablePagination';
+import AssetTable, { ASSET_COLUMNS, DEFAULT_VISIBLE_COLUMNS, ASSET_CSV_FIELDS } from '../components/AssetTable';
+import AssetDetailPanel from '../components/AssetDetailPanel';
+import Pagination from '../components/ui/Pagination';
 import ColumnVisibilityDropdown from '../components/ColumnVisibilityDropdown';
 import { useColumnVisibility } from '../hooks/useColumnVisibility';
+import InventorySkeleton from '../components/InventorySkeleton';
 import ImportProgressModal, { type ImportModalState } from '../components/ImportProgressModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DeleteProgressModal, { type DeleteProgressState } from '../components/DeleteProgressModal';
@@ -30,8 +33,20 @@ function normalizeListed(value: string | undefined): string {
   return 'Non-Listed';
 }
 
+const PAGE_SIZE_KEY = 'rajaset:inventory:pageSize';
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
+function loadPageSize(): number {
+  try {
+    const parsed = Number(localStorage.getItem(PAGE_SIZE_KEY));
+    return PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : 10;
+  } catch {
+    return 10;
+  }
+}
+
 export default function Inventory() {
-  const { assets, deleteAsset, deleteMultipleAssets, deleteAllAssets, bulkUpdateAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, itemStatuses, addAsset } = useAsset();
+  const { assets, loading, error, refetch, deleteAsset, deleteMultipleAssets, deleteAllAssets, bulkUpdateAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, itemStatuses, addAsset } = useAsset();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [isExporting, setIsExporting] = useState(false);
@@ -39,7 +54,20 @@ export default function Inventory() {
 
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(() => loadPageSize());
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PAGE_SIZE_KEY, String(itemsPerPage));
+    } catch {
+      // localStorage unavailable (private mode, etc.) — page size just won't persist
+    }
+  }, [itemsPerPage]);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setItemsPerPage(size);
+    setCurrentPage(1);
+  }, []);
 
   const { visibleColumns, toggleColumn, showAll: showAllColumns } = useColumnVisibility(
     'rajaset:inventory:columns',
@@ -49,6 +77,7 @@ export default function Inventory() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
 
   const [deleteProgressModal, setDeleteProgressModal] = useState<DeleteProgressState>({
     isOpen: false,
@@ -78,6 +107,12 @@ export default function Inventory() {
     invalidRows: [],
   });
 
+  const asOf = useMemo(() => startOfToday(), []);
+  const bookValues = useMemo(
+    () => new Map(assets.map(a => [a.id, computeBookValue(a, asOf).bookValue])),
+    [assets, asOf]
+  );
+
   const {
     filterSubsidiary, setFilterSubsidiary,
     filterCategory, setFilterCategory,
@@ -92,11 +127,18 @@ export default function Inventory() {
     costMax, setCostMax,
     searchQuery, setSearchQuery,
     debouncedSearchQuery,
+    sortKey,
+    sortDirection,
+    toggleSort,
+    sortableColumns,
     uniqueStatuses,
     activeFilters,
     filteredAssets,
     clearFilters,
-  } = useAssetFilters(assets, searchParams, setSearchParams, () => setCurrentPage(1));
+  } = useAssetFilters(assets, searchParams, setSearchParams, () => {
+    setCurrentPage(1);
+    setSelectedAssets(new Set());
+  }, bookValues);
 
   // Auto-dismiss notice toast
   useEffect(() => {
@@ -110,18 +152,29 @@ export default function Inventory() {
   const paginatedAssets = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredAssets.slice(start, start + itemsPerPage);
-  }, [filteredAssets, currentPage]);
+  }, [filteredAssets, currentPage, itemsPerPage]);
 
-  const asOf = useMemo(() => startOfToday(), []);
-  const bookValues = useMemo(
-    () => new Map(assets.map(a => [a.id, computeBookValue(a, asOf).bookValue])),
-    [assets, asOf]
-  );
+  const filteredTotals = useMemo(() => {
+    let cost = 0;
+    let bookValue = 0;
+    let units = 0;
+    for (const a of filteredAssets) {
+      cost += parseCost(a.assetCost);
+      bookValue += bookValues.get(a.id) ?? 0;
+      units += Number(a.assetUnits) || 0;
+    }
+    return { count: filteredAssets.length, units, cost, bookValue };
+  }, [filteredAssets, bookValues]);
 
   const handleEditAsset = useCallback((asset: Asset) => {
     setEditingAsset(asset);
     setIsEditModalOpen(true);
   }, [setEditingAsset, setIsEditModalOpen]);
+
+  const handleEditFromDetail = useCallback((asset: Asset) => {
+    setDetailAsset(null);
+    handleEditAsset(asset);
+  }, [handleEditAsset]);
 
   const handleDeleteAsset = useCallback((assetId: string) => {
     setPendingDeleteId(assetId);
@@ -152,7 +205,7 @@ export default function Inventory() {
     });
   }, []);
 
-  const handleExportCSV = useCallback((scope: 'all' | 'selected') => {
+  const handleExportCSV = useCallback((scope: 'all' | 'selected', columnsScope: 'visible' | 'all') => {
     const sourceAssets = scope === 'selected'
       ? filteredAssets.filter(a => selectedAssets.has(a.id))
       : filteredAssets;
@@ -161,27 +214,20 @@ export default function Inventory() {
 
     setIsExporting(true);
 
+    const exportColumnIds = columnsScope === 'all'
+      ? ASSET_COLUMNS.map(c => c.id)
+      : ASSET_COLUMNS.filter(c => visibleColumns.has(c.id)).map(c => c.id);
+
     // Let the spinner paint before the synchronous CSV build blocks the thread
     setTimeout(() => {
-      const dataToExport = sourceAssets.map(asset => ({
-        'Asset Number': sanitizeCell(asset.assetNumber),
-        'Asset Description': sanitizeCell(asset.assetDescription),
-        'Asset Book': sanitizeCell(asset.assetBook),
-        'Subsidiary': sanitizeCell(asset.subsidiary),
-        'Asset Cost': asset.assetCost,
-        'Book Value': bookValues.get(asset.id) ?? 0,
-        'Date Place In Service': asset.datePlaceInService,
-        'Asset Units': asset.assetUnits,
-        'Asset Category Segment 1': sanitizeCell(asset.categorySegment1),
-        'Asset Category Segment 2': sanitizeCell(asset.categorySegment2),
-        'Depreciation Method': sanitizeCell(asset.depreciationMethod),
-        'Life in Months': asset.lifeInMonths,
-        'Listed': asset.listed,
-        'Status': sanitizeCell(asset.status),
-        'Verification': asset.verification ? 'Yes' : 'No',
-        'Verification Date': asset.verificationDate,
-        'Item Status': sanitizeCell(asset.itemStatus)
-      }));
+      const dataToExport = sourceAssets.map(asset => {
+        const row: Record<string, unknown> = {};
+        for (const columnId of exportColumnIds) {
+          const field = ASSET_CSV_FIELDS[columnId];
+          row[field.header] = sanitizeCell(field.value(asset, bookValues));
+        }
+        return row;
+      });
 
       downloadBlob(
         `Asset_Inventory_${scope === 'selected' ? 'Selected_' : ''}${new Date().toISOString().split('T')[0]}.csv`,
@@ -191,7 +237,7 @@ export default function Inventory() {
       setIsExporting(false);
       setNotice({ message: `Exported ${sourceAssets.length} row${sourceAssets.length === 1 ? '' : 's'} to CSV`, variant: 'success' });
     }, 0);
-  }, [filteredAssets, selectedAssets, bookValues]);
+  }, [filteredAssets, selectedAssets, bookValues, visibleColumns]);
 
   const handleImportCSV = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -220,8 +266,8 @@ export default function Inventory() {
 
           if (missingNumber || missingDescription) {
             const reasons = [];
-            if (missingNumber) reasons.push('Asset Number kosong');
-            if (missingDescription) reasons.push('Asset Description kosong');
+            if (missingNumber) reasons.push(copy.csvImport.missingAssetNumber);
+            if (missingDescription) reasons.push(copy.csvImport.missingAssetDescription);
             invalidRows.push({
               rowNumber: index + 2, // +2 karena baris 1 = header
               assetNumber,
@@ -361,13 +407,13 @@ export default function Inventory() {
   }, [selectedAssets, bulkUpdateAssets]);
 
   return (
-    <div className="flex flex-col gap-6 w-full h-[calc(100vh-[180px])] min-h-[600px]">
+    <div className="flex flex-col gap-6 w-full h-[calc(100vh-11rem)] min-h-[600px]">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-on-surface">Asset Inventory</h2>
           <p className="text-sm text-on-surface-variant mt-1">Manage and track enterprise assets across all subsidiaries.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <ColumnVisibilityDropdown
             columns={ASSET_COLUMNS}
             visibleColumns={visibleColumns}
@@ -379,8 +425,6 @@ export default function Inventory() {
             isImporting={importModal.isOpen && importModal.status === 'importing'}
             onAddNew={() => setIsAddModalOpen(true)}
             selectedCount={selectedAssets.size}
-            onBulkEditClick={() => setIsBulkEditModalOpen(true)}
-            onDeleteSelectedClick={() => { setIsDeleteModalOpen(true); setDeleteConfirmText(""); }}
             filteredCount={filteredAssets.length}
             isExporting={isExporting}
             onExport={handleExportCSV}
@@ -388,61 +432,137 @@ export default function Inventory() {
         </div>
       </div>
 
-      <AssetFilters
-        subsidiaries={subsidiaries}
-        categories1={categories1}
-        categories2={categories2}
-        itemStatuses={itemStatuses}
-        uniqueStatuses={uniqueStatuses}
-        filterSubsidiary={filterSubsidiary}
-        setFilterSubsidiary={setFilterSubsidiary}
-        filterCategory={filterCategory}
-        setFilterCategory={setFilterCategory}
-        filterLocation={filterLocation}
-        setFilterLocation={setFilterLocation}
-        filterStatus={filterStatus}
-        setFilterStatus={setFilterStatus}
-        filterListed={filterListed}
-        setFilterListed={setFilterListed}
-        filterVerification={filterVerification}
-        setFilterVerification={setFilterVerification}
-        filterItemStatus={filterItemStatus}
-        setFilterItemStatus={setFilterItemStatus}
-        dateFrom={dateFrom}
-        setDateFrom={setDateFrom}
-        dateTo={dateTo}
-        setDateTo={setDateTo}
-        costMin={costMin}
-        setCostMin={setCostMin}
-        costMax={costMax}
-        setCostMax={setCostMax}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        activeFilters={activeFilters}
-        onClearFilters={clearFilters}
-      />
+      {loading ? (
+        <InventorySkeleton />
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center gap-4 py-24 text-center rounded-xl border border-outline-variant bg-surface-container-lowest flex-1">
+          <AlertTriangle className="h-10 w-10 text-error" aria-hidden="true" />
+          <div>
+            <p className="text-lg font-semibold text-on-surface">Failed to load asset data</p>
+            <p className="mt-1 text-sm text-on-surface-variant">{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:opacity-90 transition-opacity"
+          >
+            Try again
+          </button>
+        </div>
+      ) : (
+        <>
+          <AssetFilters
+            subsidiaries={subsidiaries}
+            categories1={categories1}
+            categories2={categories2}
+            itemStatuses={itemStatuses}
+            uniqueStatuses={uniqueStatuses}
+            filterSubsidiary={filterSubsidiary}
+            setFilterSubsidiary={setFilterSubsidiary}
+            filterCategory={filterCategory}
+            setFilterCategory={setFilterCategory}
+            filterLocation={filterLocation}
+            setFilterLocation={setFilterLocation}
+            filterStatus={filterStatus}
+            setFilterStatus={setFilterStatus}
+            filterListed={filterListed}
+            setFilterListed={setFilterListed}
+            filterVerification={filterVerification}
+            setFilterVerification={setFilterVerification}
+            filterItemStatus={filterItemStatus}
+            setFilterItemStatus={setFilterItemStatus}
+            dateFrom={dateFrom}
+            setDateFrom={setDateFrom}
+            dateTo={dateTo}
+            setDateTo={setDateTo}
+            costMin={costMin}
+            setCostMin={setCostMin}
+            costMax={costMax}
+            setCostMax={setCostMax}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            activeFilters={activeFilters}
+            onClearFilters={clearFilters}
+          />
 
-      <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex-1 flex flex-col overflow-hidden">
-        <AssetTable
-          paginatedAssets={paginatedAssets}
-          filteredAssets={filteredAssets}
-          selectedAssets={selectedAssets}
-          bookValues={bookValues}
-          visibleColumns={visibleColumns}
-          onSelectAll={handleSelectAll}
-          onSelectAsset={handleSelectAsset}
-          onEditAsset={handleEditAsset}
-          onDeleteAsset={handleDeleteAsset}
-        />
-        <AssetTablePagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          paginatedCount={paginatedAssets.length}
-          filteredCount={filteredAssets.length}
-          onPrevPage={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-          onNextPage={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-        />
-      </div>
+          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex-1 flex flex-col overflow-hidden">
+            {selectedAssets.size > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-primary/5 border-b border-outline-variant text-sm">
+                <span className="text-on-surface">
+                  <strong>{selectedAssets.size}</strong> asset{selectedAssets.size === 1 ? '' : 's'} selected
+                  {selectedAssets.size > paginatedAssets.filter(a => selectedAssets.has(a.id)).length && (
+                    <span className="text-on-surface-variant"> across all filtered pages</span>
+                  )}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsBulkEditModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                    Edit Selected
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsDeleteModalOpen(true); setDeleteConfirmText(""); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete Selected
+                  </button>
+                  <span className="w-px self-stretch bg-outline-variant" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAssets(new Set())}
+                    className="font-medium text-secondary hover:text-primary transition-colors"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 bg-surface-container-low border-b border-outline-variant text-xs text-on-surface-variant">
+              <span><strong className="text-on-surface">{filteredTotals.count.toLocaleString()}</strong> asset{filteredTotals.count === 1 ? '' : 's'}</span>
+              <span><strong className="text-on-surface">{filteredTotals.units.toLocaleString()}</strong> units</span>
+              <span>Total Asset Cost <strong className="font-mono text-on-surface">{formatCurrency(filteredTotals.cost)}</strong></span>
+              <span>Total Book Value <strong className="font-mono text-on-surface">{formatCurrency(filteredTotals.bookValue)}</strong></span>
+            </div>
+            <AssetTable
+              paginatedAssets={paginatedAssets}
+              filteredAssets={filteredAssets}
+              selectedAssets={selectedAssets}
+              bookValues={bookValues}
+              visibleColumns={visibleColumns}
+              onSelectAll={handleSelectAll}
+              onSelectAsset={handleSelectAsset}
+              onEditAsset={handleEditAsset}
+              onDeleteAsset={handleDeleteAsset}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSort={toggleSort}
+              sortableColumns={sortableColumns}
+              hasActiveFilters={activeFilters.length > 0}
+              onClearFilters={clearFilters}
+              onAddNew={() => setIsAddModalOpen(true)}
+              onRowClick={setDetailAsset}
+            />
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              visibleCount={paginatedAssets.length}
+              totalCount={filteredAssets.length}
+              onPrev={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              onPageChange={setCurrentPage}
+              pageSize={itemsPerPage}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageSizeChange={handlePageSizeChange}
+              itemLabel="assets"
+            />
+          </div>
+        </>
+      )}
 
       <ImportProgressModal
         importModal={importModal}
@@ -490,6 +610,14 @@ export default function Inventory() {
       <Toast
         message={notice?.message ?? null}
         icon={notice?.variant === 'error' ? <AlertCircle className="h-4 w-4 text-error shrink-0" /> : undefined}
+        onClose={() => setNotice(null)}
+      />
+
+      <AssetDetailPanel
+        asset={detailAsset}
+        bookValue={detailAsset ? bookValues.get(detailAsset.id) ?? 0 : 0}
+        onClose={() => setDetailAsset(null)}
+        onEdit={handleEditFromDetail}
       />
     </div>
   );

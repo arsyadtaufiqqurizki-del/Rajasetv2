@@ -69,8 +69,8 @@ describe('Inventory CSV import row validation', () => {
     expect(screen.getByText('1 assets')).toBeInTheDocument(); // Successfully imported
     expect(screen.getByText('3 rows')).toBeInTheDocument(); // Skipped (invalid rows)
 
-    expect(screen.getByText('Asset Number kosong')).toBeInTheDocument();
-    expect(screen.getByText('Asset Description kosong')).toBeInTheDocument();
-    expect(screen.getByText('Asset Number kosong, Asset Description kosong')).toBeInTheDocument();
+    expect(screen.getByText('Asset Number is empty')).toBeInTheDocument();
+    expect(screen.getByText('Asset Description is empty')).toBeInTheDocument();
+    expect(screen.getByText('Asset Number is empty, Asset Description is empty')).toBeInTheDocument();
   });
 });

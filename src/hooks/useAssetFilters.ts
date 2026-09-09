@@ -6,11 +6,14 @@ import type { Asset } from '../contexts/AssetContext';
 
 export type { FilterChip } from '../types/filters';
 
+const EMPTY_BOOK_VALUES: Map<string, number> = new Map();
+
 export function useAssetFilters(
   assets: Asset[],
   searchParams: URLSearchParams,
   setSearchParams: SetURLSearchParams,
-  onFiltersChanged: () => void
+  onFiltersChanged: () => void,
+  bookValues: Map<string, number> = EMPTY_BOOK_VALUES
 ) {
   const defs = useMemo<FilterDef<Asset>[]>(
     () => [
@@ -29,7 +32,30 @@ export function useAssetFilters(
 
   const searchFields = useMemo(() => (a: Asset) => [a.assetDescription, a.assetNumber], []);
 
-  const list = useListFilters({ rows: assets, defs, searchFields, searchParams, setSearchParams, onFiltersChanged });
+  const sortAccessors = useMemo<Record<string, (a: Asset) => string | number>>(
+    () => ({
+      assetBook: (a) => a.assetBook || '',
+      subsidiary: (a) => a.subsidiary,
+      assetNumber: (a) => a.assetNumber,
+      assetDescription: (a) => a.assetDescription,
+      assetCost: (a) => parseCost(a.assetCost),
+      bookValue: (a) => bookValues.get(a.id) ?? 0,
+      datePlaceInService: (a) => a.datePlaceInService,
+      assetUnits: (a) => Number(a.assetUnits) || 0,
+      categorySegment1: (a) => a.categorySegment1,
+      categorySegment2: (a) => a.categorySegment2,
+      depreciationMethod: (a) => a.depreciationMethod,
+      lifeInMonths: (a) => Number(a.lifeInMonths) || 0,
+      listed: (a) => a.listed,
+      status: (a) => a.status,
+      verification: (a) => (a.verification ? 1 : 0),
+      verificationDate: (a) => a.verificationDate,
+      itemStatus: (a) => a.itemStatus,
+    }),
+    [bookValues]
+  );
+
+  const list = useListFilters({ rows: assets, defs, searchFields, searchParams, setSearchParams, onFiltersChanged, sortAccessors });
 
   const uniqueStatuses = useMemo(() => Array.from(new Set(assets.map((a) => a.status).filter(Boolean))), [assets]);
 
@@ -62,6 +88,10 @@ export function useAssetFilters(
     searchQuery: list.searchQuery,
     setSearchQuery: list.setSearchQuery,
     debouncedSearchQuery: list.debouncedSearchQuery,
+    sortKey: list.sortKey,
+    sortDirection: list.sortDirection,
+    toggleSort: list.toggleSort,
+    sortableColumns: sortAccessors,
     uniqueStatuses,
     activeFilters: list.chips,
     filteredAssets: list.filtered,

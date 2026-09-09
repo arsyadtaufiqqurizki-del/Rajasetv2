@@ -1,6 +1,11 @@
 export const id = {
+  csvImport: {
+    missingAssetNumber: 'Asset Number kosong',
+    missingAssetDescription: 'Asset Description kosong',
+  },
   emptyState: {
     noAssetData: 'Belum ada data asset',
+    noAssetDataFiltered: 'Tidak ada aset yang sesuai dengan filter',
     noReclassificationData: 'Belum ada data reclassification',
     noMaintenanceData: 'Belum ada aktivitas maintenance',
     noMaintenanceFiltered: 'Tidak ada data yang sesuai dengan filter',

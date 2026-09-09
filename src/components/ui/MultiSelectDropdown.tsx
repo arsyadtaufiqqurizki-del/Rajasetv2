@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId, type KeyboardEvent } from 'react';
 import { ChevronDown, Check, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useListNav } from '../../hooks/useListNav';
 
 interface MultiSelectDropdownProps {
   placeholder: string;
@@ -16,12 +17,17 @@ export default function MultiSelectDropdown({ placeholder, options, selected, on
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listId = useId();
+
+  const close = () => {
+    setIsOpen(false);
+    setSearchTerm('');
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setSearchTerm('');
+        close();
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -52,11 +58,39 @@ export default function MultiSelectDropdown({ placeholder, options, selected, on
     ? options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()))
     : options;
 
+  const { activeIndex, setActiveIndex, handleKeyDown, reset } = useListNav(
+    filteredOptions.length,
+    (index) => toggleOption(filteredOptions[index]),
+    close,
+  );
+
+  useEffect(() => {
+    if (isOpen) reset();
+  }, [isOpen, searchTerm, reset]);
+
+  const optionId = (index: number) => `${listId}-option-${index}`;
+
+  const onTriggerKeyDown = (e: KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+    handleKeyDown(e);
+  };
+
   return (
     <div ref={wrapperRef} className={cn("relative", className)}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={searchable ? undefined : onTriggerKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listId}
+        aria-activedescendant={isOpen && !searchable && activeIndex >= 0 ? optionId(activeIndex) : undefined}
         className={cn(
           "flex items-center justify-between gap-2 bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-3 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer",
           selected.length > 0 ? "text-on-surface" : "text-on-surface-variant"
@@ -67,9 +101,9 @@ export default function MultiSelectDropdown({ placeholder, options, selected, on
       </button>
 
       {isOpen && (
-        <ul className="absolute z-50 mt-1 max-h-60 min-w-full w-max overflow-auto rounded-md bg-surface border border-outline-variant py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <ul id={listId} role="listbox" aria-multiselectable="true" className="absolute z-50 mt-1 max-h-60 min-w-full w-max overflow-auto rounded-md bg-surface border border-outline-variant py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
           {searchable && (
-            <li className="sticky top-0 bg-surface px-2 py-1.5 border-b border-outline-variant">
+            <li className="sticky top-0 bg-surface px-2 py-1.5 border-b border-outline-variant" role="presentation">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-on-surface-variant pointer-events-none" />
                 <input
@@ -78,6 +112,11 @@ export default function MultiSelectDropdown({ placeholder, options, selected, on
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
+                  onKeyDown={onTriggerKeyDown}
+                  role="combobox"
+                  aria-expanded={isOpen}
+                  aria-controls={listId}
+                  aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
                   placeholder="Search..."
                   className="w-full bg-surface border border-outline-variant rounded text-sm py-1 pl-7 pr-2 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
                 />
@@ -85,16 +124,23 @@ export default function MultiSelectDropdown({ placeholder, options, selected, on
             </li>
           )}
           {filteredOptions.length === 0 ? (
-            <li className="px-4 py-2 text-sm text-on-surface-variant">
+            <li className="px-4 py-2 text-sm text-on-surface-variant" role="presentation">
               {options.length === 0 ? "No options" : "No matches found"}
             </li>
-          ) : filteredOptions.map((option) => {
+          ) : filteredOptions.map((option, index) => {
             const isSelected = selected.includes(option);
             return (
               <li
                 key={option}
+                id={optionId(index)}
+                role="option"
+                aria-selected={isSelected}
                 onClick={() => toggleOption(option)}
-                className="flex items-center gap-2 cursor-pointer select-none py-2 px-3 text-sm text-on-surface hover:bg-surface-container-low transition-colors"
+                onMouseEnter={() => setActiveIndex(index)}
+                className={cn(
+                  "flex items-center gap-2 cursor-pointer select-none py-2 px-3 text-sm text-on-surface transition-colors",
+                  index === activeIndex ? "bg-surface-container-low" : "hover:bg-surface-container-low"
+                )}
               >
                 <span className={cn(
                   "flex items-center justify-center h-4 w-4 rounded border shrink-0",
