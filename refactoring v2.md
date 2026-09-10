@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7 SELESAI (2026-09-10). Berikutnya: Step 7a (B1).**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a SELESAI (2026-09-10). Berikutnya: Step 7b (B2).**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **441** (32 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-10
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **494** (34 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-10
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -751,7 +751,7 @@ keempatnya (±50 baris masing-masing) diganti `FormModal`.
 
 ---
 
-### Step 7a — ⚠️ B1: migrasi 6 modal ke `ui/Modal` *(±2 jam — MENGUBAH BEHAVIOR, commit terpisah)*
+### Step 7a — ⚠️ B1: migrasi 6 modal ke `ui/Modal` ✅ **SELESAI 2026-09-10** *(±2 jam — MENGUBAH BEHAVIOR, commit terpisah)*
 `AddMaintenanceModal`, `EditMaintenanceModal`, `AddReclassificationModal`, `EditReclassificationModal`,
 `VerifyReclassificationModal`, `MaintenanceCalendarModal` — buang markup `fixed inset-0` buatan sendiri,
 pakai `ui/Modal`.
@@ -776,6 +776,73 @@ lebar maksimum yang sekarang.
 
 **Gate:** setiap modal — buka, tekan Esc, Tab sampai putar balik, klik overlay · bandingkan screenshot.
 
+**Hasil (2026-09-10):** 6 modal dimigrasi, 1 prop baru di `FormModal`, 2 file test baru,
+**441 → 494 test** (34 file), semuanya hijau. Golden file CSV tetap identik.
+
+| Modal | Chrome baru | Catatan |
+|---|---|---|
+| `AddMaintenanceModal` | `ui/FormModal` | 184 → 153 |
+| `EditMaintenanceModal` | `ui/FormModal` | 153 → 122 |
+| `AddReclassificationModal` | `ui/FormModal` | 174 → 141 |
+| `EditReclassificationModal` | `ui/FormModal` | 231 → 199 |
+| `VerifyReclassificationModal` | `ui/Modal` | 113 → 122 — bukan modal form, chrome ditulis di tempat |
+| `MaintenanceCalendarModal` | `ui/Modal` | 253 → 263 — idem, panel `max-w-3xl` dipertahankan lewat prop `className` |
+
+**Satu prop baru di `FormModal`: `submitDisabled`.** `AddReclassificationModal` menonaktifkan tombol
+Simpan sampai ada asset terpilih (`disabled={isSaving || !assetId}`). Itu aturan milik pemanggil, bukan
+milik chrome — jadi ia jadi prop terpisah dari `isSaving`, bukan diseragamkan atau dibuang.
+
+⚠️ **Risiko autofokus yang didaftarkan di atas tidak terjadi.** `FormModal` merender header sebelum
+`<form>`, jadi elemen fokusable pertama di panel adalah tombol X — bukan search box asset picker.
+Dropdown-nya tetap tertutup saat modal dibuka. Dipin test eksplisit di `AddMaintenanceModal` dan
+`AddReclassificationModal` (`puts the initial focus on the close button, leaving the asset dropdown shut`).
+
+**Perbedaan visual yang sengaja diseragamkan** (inilah harga dari chrome bersama — keenam modal kini
+seragam dengan `AddAssetModal`/`EditAssetModal` yang sudah memakai `FormModal` sejak Step 5–6):
+
+| Yang berubah | Dari | Ke |
+|---|---|---|
+| Panel modal Maintenance & Calendar | `bg-surface-container-lowest rounded-xl` | `bg-surface rounded-2xl` (dari `ui/Modal`) |
+| Panel modal Reclassification | `+ border border-outline-variant` | tanpa border |
+| Overlay modal Reclassification | `z-[100]` | `z-50` — aman karena portal menaruh dialog di akhir `<body>`, jadi ia tetap di atas sidebar `z-50` |
+| Body form Maintenance | `p-6 flex flex-col gap-6`, seluruh panel yang scroll | `flex-1 overflow-y-auto p-6 flex flex-col gap-5`, header tetap terpaku |
+| Tombol footer Maintenance | `px-6 py-2` / `min-w-[130px]`–`[140px]` | `px-5 py-2.5` / `min-w-[120px]` |
+| Tombol Simpan/Update Reclassification | `min-w-[100px]` | `min-w-[120px]` |
+| Tombol X di header keempat modal form | selalu aktif | ikut nonaktif saat menyimpan |
+| Header `MaintenanceCalendarModal` | ikut ter-scroll bersama isi | terpaku, hanya isi yang scroll |
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **494 test / 34 file — semua lulus** (441 lama + 53 baru) |
+| 62 test characterization pra-kerja Step 7 | **lulus** — 8 di antaranya diperbarui, lihat catatan di bawah |
+| Golden file CSV | **identik** — lulus tanpa `UPDATE_GOLDEN` |
+| `npx eslint .` | **24 problems (15 error, 9 warning)** — tidak berubah dari Step 7; tidak ada lint baru |
+| `npm run build` | sukses (11,76 s) |
+| Gate manual (buka tiap modal, Esc, Tab putar balik, klik overlay, screenshot) | ⬜ **belum dijalankan** — sesi ini tanpa browser; digantikan test di bawah |
+
+⚠️ **Delapan test lama harus diperbarui — dan alasannya penting.** Assertion kondisi mount berbunyi
+`expect(container).toBeEmptyDOMElement()`. Begitu dialog pindah ke portal, `container` **selalu** kosong —
+test itu jadi lulus baik dialognya muncul maupun tidak, alias berhenti menjaga apa pun. Keduanya diganti
+`expect(screen.queryByRole('dialog')).not.toBeInTheDocument()`, mengikuti konvensi `EditAssetModal.test.tsx:97`.
+Ini satu-satunya perubahan pada 62 test pra-kerja; sisanya lulus tanpa disentuh.
+
+**Pengganti gate manual.**
+
+| Lapis | File | Test | Yang dipin |
+|---|---|---|---|
+| Chrome 4 modal form | 4 blok `— ui/FormModal chrome` | 22 | `aria-labelledby` ↔ id heading · tutup lewat X · tutup lewat Esc · Esc diabaikan saat menyimpan · scroll body terkunci saat buka dan pulih saat tutup · fokus awal di tombol X dengan dropdown picker tetap tertutup (2 modal picker) · X & Esc di Edit-Reclassification ikut membersihkan `editingReclassification`, sama seperti Cancel |
+| Modal verify | `VerifyReclassificationModal.test.tsx` (baru) | 15 | kondisi mount, identitas baris read-only, fallback `-`, arah toggle `verify(id, !verified)` di dua arah, kedua tombol nonaktif saat in-flight, **tiga** jalur tutup yang semuanya membersihkan flag + baris, Esc diabaikan saat in-flight, scroll lock |
+| Modal kalender | `MaintenanceCalendarModal.test.tsx` (baru) | 16 | navigasi bulan + Today, hanya hari berjadwal yang bisa diklik, record dengan tanggal kosong/tak terbaca diabaikan, daftar per hari + toggle, paginasi 5-per-halaman, pilih record → `onSelectRecord` + tutup, seleksi hari direset saat ganti bulan dan saat tutup-buka, panel `max-w-3xl` bertahan, X & Esc, scroll lock |
+
+Yang **tidak** tercakup test dan masih perlu dilihat mata: putaran Tab sungguhan di dalam dialog,
+klik overlay, dan perbandingan screenshot untuk delapan perbedaan visual di tabel di atas.
+
+**Delta LOC:** 6 modal **1.108 → 1.000 (−108)**, +3 baris di `ui/FormModal` (prop `submitDisabled`).
+Keempat modal form turun 742 → 615 (−127); kedua modal non-form justru naik +19, karena `<Modal …>`
+dengan empat prop lebih panjang daripada dua `<div>` dan tombol X-nya ikut dapat `type`/`disabled`.
+
+
 ---
 
 ### Step 7b — ⚠️ B2: hentikan kegagalan simpan yang senyap *(±3 jam — MENGUBAH BEHAVIOR, commit terpisah)*
@@ -785,8 +852,9 @@ menelan error: `if (error) { setError(error.message); return; }`. Modal tetap te
 dan user mengira datanya tersimpan.
 
 - Samakan dengan pola `AssetContext.addAsset`: `setError(...)` **lalu `throw error`**.
-- Modal pemanggil menangkapnya lewat `saveError` dari `useEntityForm` (sudah tersedia sejak Step 7)
-  dan menampilkan banner error, modal tetap terbuka.
+- Modal pemanggil menangkapnya lewat `saveError` dari `useEntityForm` (sudah tersedia sejak Step 7,
+  dan sejak Step 7a bannernya dirender oleh `ui/FormModal` lewat prop `error`) dan menampilkan banner
+  error, modal tetap terbuka.
 - `Reclassification.tsx` belum punya `Toast` — tambahkan untuk kegagalan delete & verify (pola sama
   seperti `Inventory.tsx:610–614`).
 
@@ -911,7 +979,7 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
 5 ui/FormModal ✅ ─► 5a ⚠️ B6 fokus ui/Modal ✅
   └─► 6 🎯 Add/EditAssetModal ✅ ─► 7 Modal Maintenance & Reclassification ✅
                                         │
-              7a ⚠️ B1 chrome → FormModal ◄── di sini ─► 7b ⚠️ B2 error handling
+              7a ⚠️ B1 chrome → FormModal ✅ ─► 7b ⚠️ B2 error handling ◄── di sini
                                         │
 8 Hook halaman list ─► 8a ⚠️ B5 copy ke Inggris ─► [9 ditunda] ─► 10 Gate akhir
 ```
@@ -928,7 +996,7 @@ Semua ditemukan saat analisis. Status per 2026-09-09 setelah konfirmasi:
 
 | # | Temuan | Dampak ke user | Status |
 |---|---|---|---|
-| B1 | 6 modal tanpa focus trap / Esc / scroll lock (F2) | Esc jadi menutup modal; fokus terperangkap di dialog | ✅ **DISETUJUI** → Step 7a |
+| B1 | 6 modal tanpa focus trap / Esc / scroll lock (F2) | Esc jadi menutup modal; fokus terperangkap di dialog | ✅ **DISETUJUI** → Step 7a **SELESAI 2026-09-10**. Empat modal form lewat `ui/FormModal`, dua sisanya langsung `ui/Modal` |
 | B2 | Error handling context tidak konsisten: `addAsset` melempar, `addRecord`/`addReclassification` menelan | Kegagalan simpan di Maintenance/Reclassification saat ini **senyap** — user mengira tersimpan | ✅ **DISETUJUI** → Step 7b |
 | B3 | 4 provider data mount di root `App.tsx`, semuanya fetch saat mount — termasuk saat user di halaman Login | Fetch penuh sebelum login; waktu muat awal | ⏸️ ditunda — sesi terpisah |
 | B4 | `Reclassification.tsx:220` — `h-[calc(100vh-[180px])]` (kurung siku bersarang, kelas Tailwind invalid) | Tinggi container tidak sesuai maksud | ⏸️ ditunda — tata letak akan bergeser |
@@ -954,7 +1022,7 @@ dibiarkan Indonesia.
 | Progress bar melompat / granularitas berubah | Step 3 | Konstanta chunk 1000 & batch 100 dipertahankan |
 | Refactor bertabrakan dengan pekerjaan fitur (RBAC ada di antrean) | Menyeluruh | Satu step = satu commit; jangan campur dengan fitur |
 | `throw` baru tidak tertangkap → layar putih dari ErrorBoundary | Step 7b (B2) | Telusuri setiap call site sebelum ubah tanda tangan; uji dengan jaringan mati |
-| Autofokus `ui/Modal` membuka dropdown asset picker | Step 7a (B1) | Periksa tiap modal satu per satu setelah migrasi |
+| Autofokus `ui/Modal` membuka dropdown asset picker | Step 7a (B1) | ✅ tidak terjadi — header `FormModal` mendahului `<form>`, jadi elemen fokusable pertama adalah tombol X. Dipin test di kedua modal picker |
 | Effect `ui/Modal` berjalan ulang di tengah pengetikan dan mencuri fokus | Step 5a (B6) | Dep array menyusut jadi `[isOpen]`; `onClose`/`closeOnEscape` dibaca lewat ref. Dipin 5 test di `Modal.test.tsx` |
 | Nilai DB ikut diterjemahkan → trigger sync & filter putus | Step 8a (B5) | Daftar terlarang eksplisit di Step 8a: preset kategori, status, listed, itemStatus |
 | Baris `report_history` lama tak cocok lagi dengan label baru | Step 8a (B5) | Pertahankan cek dua-bentuk di `Reports.tsx:166`; uji "Run again" pada laporan lama |
