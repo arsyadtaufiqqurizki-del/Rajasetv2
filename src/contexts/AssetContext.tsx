@@ -1,5 +1,7 @@
 import { createContext, useState, useContext, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { fetchAllRows } from '../lib/supabase/fetchAllRows';
+import { batchDelete, batchUpdate } from '../lib/supabase/batchWrite';
 import { logActivity } from '../lib/activityLogger';
 import type { Asset, AssetBulkPatch } from '../types/asset';
 
@@ -120,24 +122,16 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
 
-    // Fetch all assets in chunks to bypass Supabase's default 1000-row limit
-    const CHUNK = 1000;
-    let allRows: any[] = [];
-    let from = 0;
-    while (true) {
-      const { data, error } = await supabase
-        .from('assets')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, from + CHUNK - 1);
-      if (error) { setError(error.message); break; }
-      allRows = allRows.concat(data ?? []);
-      if (!data || data.length < CHUNK) break;
-      from += CHUNK;
-    }
-    setAssets(allRows.map(fromDb));
+    // fetchAllRows pages past Supabase's default 1000-row limit; on a mid-page
+    // failure it still returns the chunks that already succeeded, which is what
+    // the hand-rolled loop did too.
+    const { rows, error: fetchError } = await fetchAllRows<{ updated_at?: string | null }>('assets', {
+      orderBy: { column: 'created_at', ascending: false },
+    });
+    if (fetchError) setError(fetchError);
+    setAssets(rows.map(fromDb));
 
-    const latestUpdateMs = allRows.reduce((max, row) => {
+    const latestUpdateMs = rows.reduce((max, row) => {
       const t = row.updated_at ? new Date(row.updated_at).getTime() : 0;
       return t > max ? t : max;
     }, 0);
@@ -251,26 +245,16 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteMultipleAssets = async (ids: string[], onProgress?: (processed: number, failed: number) => void) => {
-    const BATCH_SIZE = 100;
-    let processed = 0;
-    let failed = 0;
-    let deletedCount = 0;
-    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-      const batch = ids.slice(i, i + BATCH_SIZE);
-      const { error } = await supabase.from('assets').delete().in('id', batch);
-      if (error) {
-        failed += batch.length;
-      } else {
-        deletedCount += batch.length;
+    const { succeeded } = await batchDelete('assets', ids, {
+      onBatchDeleted: batch => {
         const batchSet = new Set(batch);
         setAssets(prev => prev.filter(a => !batchSet.has(a.id)));
-      }
-      processed += batch.length;
-      onProgress?.(processed, failed);
-    }
-    if (deletedCount > 0) {
+      },
+      onProgress,
+    });
+    if (succeeded > 0) {
       setLastFetchedAt(new Date());
-      logActivity({ actionType: 'BULK_DELETE', entityType: 'asset', details: { count: deletedCount } });
+      logActivity({ actionType: 'BULK_DELETE', entityType: 'asset', details: { count: succeeded } });
     }
   };
 
@@ -287,29 +271,13 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     const total = ids.length;
     if (Object.keys(dbPatch).length === 0 || total === 0) return { updated: 0, failed: 0 };
 
-    const BATCH_SIZE = 100;
-    let processed = 0;
-    let failed = 0;
-    let updated = 0;
-
-    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-      const batch = ids.slice(i, i + BATCH_SIZE);
-      const { data, error } = await supabase
-        .from('assets')
-        .update(dbPatch)
-        .in('id', batch)
-        .select();
-
-      if (error) {
-        failed += batch.length;
-      } else {
-        updated += batch.length;
-        const byId = new Map((data ?? []).map(row => [row.id, fromDb(row)]));
+    const { succeeded: updated, failed } = await batchUpdate<{ id: string }>('assets', ids, dbPatch, {
+      onBatchUpdated: rows => {
+        const byId = new Map(rows.map(row => [row.id, fromDb(row)]));
         setAssets(prev => prev.map(a => byId.get(a.id) ?? a));
-      }
-      processed += batch.length;
-      onProgress?.(processed, failed, total);
-    }
+      },
+      onProgress,
+    });
 
     if (updated > 0) {
       setLastFetchedAt(new Date());

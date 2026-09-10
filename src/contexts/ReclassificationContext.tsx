@@ -1,5 +1,7 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { fetchAllRows } from '../lib/supabase/fetchAllRows';
+import { batchDelete } from '../lib/supabase/batchWrite';
 import { logActivity } from '../lib/activityLogger';
 import type { Reclassification, ReclassificationInput } from '../types/reclassification';
 
@@ -91,21 +93,12 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
     const fetchAll = async () => {
       setLoading(true);
 
-      const CHUNK = 1000;
-      let allRows: any[] = [];
-      let from = 0;
-      while (true) {
-        const { data, error } = await supabase
-          .from('asset_reclassifications')
-          .select(RECLASSIFICATION_SELECT)
-          .order('created_at', { ascending: false })
-          .range(from, from + CHUNK - 1);
-        if (error) { setError(error.message); break; }
-        allRows = allRows.concat(data ?? []);
-        if (!data || data.length < CHUNK) break;
-        from += CHUNK;
-      }
-      setReclassifications(allRows.map(fromDb));
+      const { rows, error: fetchError } = await fetchAllRows('asset_reclassifications', {
+        select: RECLASSIFICATION_SELECT,
+        orderBy: { column: 'created_at', ascending: false },
+      });
+      if (fetchError) setError(fetchError);
+      setReclassifications(rows.map(fromDb));
       setLoading(false);
     };
     fetchAll();
@@ -193,25 +186,15 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
   };
 
   const deleteMultipleReclassifications = async (ids: string[], onProgress?: (processed: number, failed: number) => void) => {
-    const BATCH_SIZE = 100;
-    let processed = 0;
-    let failed = 0;
-    let deletedCount = 0;
-    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-      const batch = ids.slice(i, i + BATCH_SIZE);
-      const { error } = await supabase.from('asset_reclassifications').delete().in('id', batch);
-      if (error) {
-        failed += batch.length;
-      } else {
-        deletedCount += batch.length;
+    const { succeeded } = await batchDelete('asset_reclassifications', ids, {
+      onBatchDeleted: batch => {
         const batchSet = new Set(batch);
         setReclassifications(prev => prev.filter(r => !batchSet.has(r.id)));
-      }
-      processed += batch.length;
-      onProgress?.(processed, failed);
-    }
-    if (deletedCount > 0) {
-      logActivity({ actionType: 'BULK_DELETE', entityType: 'reclassification', details: { count: deletedCount } });
+      },
+      onProgress,
+    });
+    if (succeeded > 0) {
+      logActivity({ actionType: 'BULK_DELETE', entityType: 'reclassification', details: { count: succeeded } });
     }
   };
 

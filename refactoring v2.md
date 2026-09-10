@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2 SELESAI (2026-09-10). Berikutnya: Step 3.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3 SELESAI (2026-09-10). Berikutnya: Step 4.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **201** (16 file) · lint: 46 → **44 problems** · gate terakhir dijalankan 2026-09-10
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **241** (20 file) · lint: 46 → **42 problems** · gate terakhir dijalankan 2026-09-10
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -303,7 +303,7 @@ Test baru: `lib/money.test.ts` (16) · `lib/assetRules.test.ts` (12) · `lib/ass
 
 ---
 
-### Step 3 — Helper Supabase: `fetchAllRows` + `batchWrite` *(±3 jam)*
+### Step 3 — Helper Supabase: `fetchAllRows` + `batchWrite` ✅ **SELESAI 2026-09-10** *(±3 jam)*
 - `lib/supabase/fetchAllRows.ts` — loop chunk 1000, mengembalikan `{ rows, error }`.
 - `lib/supabase/batchWrite.ts` — `batchDelete(table, ids, onProgress)` dengan chunk 100.
 - Adopsi di `AssetContext` dan `ReclassificationContext`.
@@ -318,6 +318,63 @@ request ke Supabase dan granularitas progress bar. Mitigasi: pertahankan konstan
 
 **Gate:** buka Inventory & Reclassification dengan >1000 baris → jumlah baris sama · bulk delete →
 progress bar bergerak dengan langkah yang sama seperti sebelumnya.
+
+**Hasil (2026-09-10):** 2 modul lib baru + 4 file test baru, **201 → 241 test** (20 file), semuanya hijau.
+Golden file CSV tetap identik. Konstanta dipertahankan sebagai konstanta bernama:
+`FETCH_CHUNK_SIZE = 1000` dan `WRITE_BATCH_SIZE = 100`.
+
+| Yang dipindah | Dari | Ke |
+|---|---|---|
+| Loop fetch chunked 1000-baris (2 salinan identik) | `AssetContext:123–137`, `ReclassificationContext:94–107` | `lib/supabase/fetchAllRows.ts` → `fetchAllRows(table, { select, orderBy, chunkSize })` |
+| Loop batch-delete 100-baris + `onProgress` (2 salinan identik) | `AssetContext:253–275`, `ReclassificationContext:195–216` | `lib/supabase/batchWrite.ts` → `batchDelete(table, ids, { onProgress, onBatchDeleted, batchSize })` |
+| Loop batch-update 100-baris + `onProgress` (1 salinan) | `AssetContext:290–312` (`bulkUpdateAssets`) | `lib/supabase/batchWrite.ts` → `batchUpdate(table, ids, patch, { onProgress, onBatchUpdated, batchSize })` |
+
+**Empat keputusan bentuk API** (semuanya untuk mempertahankan behavior persis):
+- `fetchAllRows` **mengembalikan** `{ rows, error }` alih-alih melempar, dan pada kegagalan di tengah
+  tetap mengembalikan chunk yang sudah berhasil — persis seperti loop lama yang `break` lalu tetap
+  memanggil `setAssets(allRows.map(fromDb))`. Halaman tetap menampilkan data parsial + pesan error.
+- Rekonsiliasi state optimistic dipindah ke callback `onBatchDeleted` / `onBatchUpdated`, dipanggil
+  **sebelum** `onProgress` — urutan yang sama seperti loop lama, jadi baris hilang dari tabel sebelum
+  progress bar bergerak. Diuji eksplisit di `batchWrite.test.ts` ("removes rows from local state
+  before advancing the progress bar").
+- `batchUpdate` ikut diekstrak meskipun hanya punya **satu** call site: file bernama `batchWrite`
+  (tulis = delete + update), dan loopnya identik bentuk dengan `batchDelete`. Ini menambah cakupan
+  Step 3 satu fungsi di luar teks aslinya — LOC turun 20 baris di `AssetContext` dan `bulkUpdateAssets`
+  jadi punya test.
+- Nama field hasil diseragamkan jadi `{ processed, failed, succeeded }`. `bulkUpdateAssets` tetap
+  mengembalikan `{ updated, failed }` ke pemanggil — **public API context tidak berubah**.
+
+⚠️ **Error handling sengaja tidak diseragamkan**, sesuai peringatan di atas: `addAsset` tetap melempar,
+`addRecord`/`addReclassification` tetap menelan. Step 3 tidak menyentuh satu pun fungsi itu.
+
+**Catatan resolusi modul:** `src/lib/supabase.ts` (file) dan `src/lib/supabase/` (direktori) hidup
+berdampingan. Baik TypeScript maupun Vite memilih file `.ts` lebih dulu, jadi `import { supabase } from
+'../supabase'` di dalam `lib/supabase/*.ts` tetap menunjuk ke klien tunggal — bukan ke direktori.
+Terverifikasi lewat `tsc --noEmit`, `vitest`, dan `vite build`.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **241 test / 20 file — semua lulus** (201 lama + 40 baru) |
+| Golden file CSV | **identik** — lulus tanpa `UPDATE_GOLDEN` |
+| `npx eslint .` | **42 problems (33 error, 9 warning)** — turun 2 error dari 44/35; keduanya `no-explicit-any` yang hilang bersama `let allRows: any[]` di kedua context |
+| `npm run build` | sukses (8,35 s) |
+| Gate manual (>1000 baris, progress bar) | ⬜ **belum dijalankan** — butuh sesi browser terhadap data produksi; digantikan sementara oleh test di bawah |
+
+**Pengganti gate manual.** Gate Step 3 aslinya manual (buka halaman dengan >1000 baris, perhatikan
+progress bar). Karena sesi ini tanpa browser, jaminannya dipindah ke dua lapis test:
+
+| Lapis | File | Test | Yang dipin |
+|---|---|---|---|
+| Semantik loop | `lib/supabase/fetchAllRows.test.ts` | 8 | ukuran & urutan `range()` (`[0,999]`, `[1000,1999]`, …), berhenti pada chunk pendek **dan** pada chunk kosong (kelipatan pas), baris parsial + pesan error saat gagal di tengah, `select`/`orderBy` diteruskan di **setiap** chunk |
+| Semantik loop | `lib/supabase/batchWrite.test.ts` | 9 | pemecahan 250 id → 100/100/50, `onProgress` = `[100,0] [200,0] [250,0]`, batch gagal dihitung tapi tidak menghentikan sisa batch, urutan `onBatchDeleted` → `onProgress`, id kosong = nol request |
+| Wiring context | `contexts/AssetContext.test.tsx` | 15 | tabel & opsi yang diminta, 2500 baris masuk utuh, error fetch tampil tanpa mengosongkan list, `lastFetchedAt` dari `updated_at` terbaru, `onProgress` pemanggil diteruskan apa adanya, `deleteAll` mengirim seluruh id, patch kosong / seleksi kosong = nol request |
+| Wiring context | `contexts/ReclassificationContext.test.tsx` | 8 | idem, plus **join `linked_asset` harus tetap ada di select** — ini yang menjaga baris linked tetap mirror Asset Inventory |
+
+Yang **tidak** tercakup test dan masih perlu dilihat mata di sesi berikutnya: rendering progress bar
+sungguhan dan jumlah baris terhadap database produksi.
+
+**Delta LOC:** kode produksi **−49 baris** di 2 context (−80/+31), +154 baris di 2 modul lib baru.
 
 ---
 
@@ -524,7 +581,7 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
 ```
 0 Test ✅     ─► 1 Dead code ✅ ─► 2 lib/ (assetCsv, assetRules, money) ✅
                                         │
-3 Supabase helpers ─► 4 useLookupTable + useEntityModals   ◄── di sini
+3 Supabase helpers ✅ ─► 4 useLookupTable + useEntityModals   ◄── di sini
                                         │
 5 ui/FormModal ─► 6 🎯 Add/EditAssetModal ─► 7 Modal Maintenance & Reclassification
                                         │
