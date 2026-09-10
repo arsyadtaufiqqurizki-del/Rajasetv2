@@ -166,3 +166,73 @@ describe('ReclassificationContext — bulk delete', () => {
     );
   });
 });
+
+// Step 4 replaced the five hand-rolled modal useStates with useEntityModals
+// (add + edit) and a useModalState for verify. This context is the only one with
+// three modals, so what matters is that the third stays separate from the pair.
+describe('ReclassificationContext — modal state', () => {
+  beforeEach(() => {
+    vi.mocked(fetchAllRows).mockResolvedValue({
+      rows: [dbRow('a'), dbRow('b')],
+      error: null,
+    });
+  });
+
+  it('starts with all three modals closed and no row selected', async () => {
+    await renderProvider();
+
+    expect(ctx.isAddModalOpen).toBe(false);
+    expect(ctx.isEditModalOpen).toBe(false);
+    expect(ctx.isVerifyModalOpen).toBe(false);
+    expect(ctx.editingReclassification).toBeNull();
+    expect(ctx.verifyingReclassification).toBeNull();
+  });
+
+  it('keeps the edit row and the verify row apart', async () => {
+    await renderProvider();
+
+    act(() => {
+      ctx.setEditingReclassification(ctx.reclassifications[0]);
+      ctx.setVerifyingReclassification(ctx.reclassifications[1]);
+    });
+
+    expect(ctx.editingReclassification?.id).toBe('a');
+    expect(ctx.verifyingReclassification?.id).toBe('b');
+  });
+
+  it('opening verify leaves add and edit closed', async () => {
+    await renderProvider();
+
+    act(() => {
+      ctx.setVerifyingReclassification(ctx.reclassifications[0]);
+      ctx.setIsVerifyModalOpen(true);
+    });
+
+    expect(ctx.isVerifyModalOpen).toBe(true);
+    expect(ctx.isAddModalOpen).toBe(false);
+    expect(ctx.isEditModalOpen).toBe(false);
+  });
+
+  it('opening add leaves edit and verify closed', async () => {
+    await renderProvider();
+
+    act(() => ctx.setIsAddModalOpen(true));
+
+    expect(ctx.isAddModalOpen).toBe(true);
+    expect(ctx.isEditModalOpen).toBe(false);
+    expect(ctx.isVerifyModalOpen).toBe(false);
+  });
+
+  it('clearing the verify row does not clear the edit row', async () => {
+    await renderProvider();
+
+    act(() => {
+      ctx.setEditingReclassification(ctx.reclassifications[0]);
+      ctx.setVerifyingReclassification(ctx.reclassifications[1]);
+    });
+    act(() => ctx.setVerifyingReclassification(null));
+
+    expect(ctx.verifyingReclassification).toBeNull();
+    expect(ctx.editingReclassification?.id).toBe('a');
+  });
+});

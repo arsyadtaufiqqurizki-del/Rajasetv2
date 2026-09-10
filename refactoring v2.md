@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3 SELESAI (2026-09-10). Berikutnya: Step 4.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4 SELESAI (2026-09-10). Berikutnya: Step 5.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **241** (20 file) · lint: 46 → **42 problems** · gate terakhir dijalankan 2026-09-10
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **281** (22 file) · lint: 46 → **42 problems** · gate terakhir dijalankan 2026-09-10
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -378,7 +378,7 @@ sungguhan dan jumlah baris terhadap database produksi.
 
 ---
 
-### Step 4 — `useLookupTable` + `useEntityModals` *(±3 jam)*
+### Step 4 — `useLookupTable` + `useEntityModals` ✅ **SELESAI 2026-09-10** *(±3 jam)*
 - 4 blok master-data di `AssetContext:165–203` → 4 pemanggilan `useLookupTable('subsidiaries')` dst.
 - Trio state modal di 2 context → `useEntityModals<T>()`.
 - Bentuk objek yang di-*provide* tidak berubah sedikit pun.
@@ -388,6 +388,64 @@ ke Supabase) — `addAsset` bergantung pada `addSubsidiary` yang mendaftarkan ni
 
 **Gate:** tambah asset dengan subsidiary/kategori/item status baru → langsung muncul di dropdown
 Autocomplete tanpa refresh (perilaku sekarang).
+
+**Hasil (2026-09-10):** 2 hook baru + 2 file test baru, **241 → 281 test** (22 file), semuanya hijau.
+Golden file CSV tetap identik. Public API kedua context **tidak berubah satu field pun**.
+
+| Yang dipindah | Dari | Ke |
+|---|---|---|
+| 4 blok CRUD master-data optimistic (identik, beda tabel & setter) | `AssetContext:159–197` | `hooks/useLookupTable.ts` → `useLookupTable(table)` → `{ values, hydrate, add, remove }` |
+| Trio state modal add/edit/editing | `AssetContext:117–119`, `ReclassificationContext:86–88` | `hooks/useEntityModals.ts` → `useEntityModals<T>()` |
+| Pasangan state modal verify | `ReclassificationContext:89–90` | `hooks/useEntityModals.ts` → `useModalState<T>()` |
+
+**Tiga keputusan bentuk API:**
+- **Nama publik dipulihkan di tempat destructuring**, bukan di dalam hook:
+  `const { values: subsidiaries, add: addSubsidiary, remove: deleteSubsidiary } = useLookupTable('subsidiaries')`.
+  Objek yang di-*provide* karena itu tersusun dari variabel dengan nama yang persis sama seperti sebelumnya —
+  `MasterData.tsx` dan seluruh konsumen lain tidak disentuh.
+- **`hydrate(names)` dipisah dari `add`.** Fetch master data tetap satu `Promise.all` di `fetchAll`
+  (4 request paralel, urutan sama seperti sebelumnya); hook hanya menerima hasilnya. Memindahkan fetch
+  ke dalam hook akan mengubah pola request jadi 4 effect terpisah — di luar cakupan step ini.
+  Dedupe `[...new Set(...)]` yang tadinya ditulis 4 kali sekarang hidup di `hydrate`.
+- **`useModalState<T>()` diekspor terpisah** dan dipakai `useEntityModals` untuk bagian edit-nya.
+  Modal verify di Reclassification punya bentuk yang sama (flag + baris) tapi bukan pasangan add/edit,
+  jadi memaksanya masuk `useEntityModals` akan menghasilkan hook bercabang. `RECLASSIFICATION` jadi
+  satu-satunya context dengan tiga modal; test memastikan yang ketiga tetap terpisah dari dua lainnya.
+
+⚠️ **Urutan optimistic dipertahankan persis:** `setValues(...)` dipanggil lebih dulu, lalu request
+`upsert`/`delete` dikirim **tanpa di-`await`**. `add('')` tetap no-op; `remove('')` tetap **tidak**
+dijaga — keduanya persis seperti kode lama. `add` pada nama yang sudah terdaftar tidak menduplikasi
+di state tapi tetap mengirim upsert (idempoten), juga seperti kode lama.
+
+Callback `hydrate`/`add`/`remove` sekarang stabil (`useCallback`), jadi `fetchAll` bisa
+mencantumkan keempat `hydrate` di dependency array-nya tanpa membuat `refetch` berubah identitas
+tiap render.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **281 test / 22 file — semua lulus** (241 lama + 40 baru) |
+| Golden file CSV | **identik** — lulus tanpa `UPDATE_GOLDEN` |
+| `npx eslint .` | **42 problems (33 error, 9 warning)** — tidak berubah dari Step 3; tidak ada lint baru |
+| `npm run build` | sukses (9,20 s) |
+| Gate manual (dropdown Autocomplete tanpa refresh) | ⬜ **belum dijalankan** — sesi ini tanpa browser; digantikan test di bawah |
+
+**Pengganti gate manual.** Gate Step 4 aslinya manual (tambah asset dengan subsidiary baru, lihat
+dropdown). Jaminannya dipindah ke dua lapis test:
+
+| Lapis | File | Test | Yang dipin |
+|---|---|---|---|
+| Semantik hook | `hooks/useLookupTable.test.ts` | 16 | dedupe `hydrate`, append tanpa re-sort, `add('')` no-op, `remove('')` tetap mengirim delete, tabel yang benar per instance, callback stabil, **dan** nilai tetap muncul walau request menggantung selamanya (bukti fire-and-forget) |
+| Semantik hook | `hooks/useEntityModals.test.ts` | 11 | flag add/edit saling bebas, baris edit bertahan saat modal ditutup, tiap `useModalState` punya state sendiri |
+| Wiring context | `contexts/AssetContext.test.tsx` | +8 | 4 list terbit di bawah nama publiknya masing-masing & ter-dedupe, add/delete tiap list menuju tabelnya sendiri, list saling bebas, **`addAsset` mendaftarkan subsidiary/kategori/item status baru dalam call yang sama** (= gate Step 4), field kosong tidak mengirim upsert, state modal awal & saling bebas |
+| Wiring context | `contexts/ReclassificationContext.test.tsx` | +5 | tiga modal mulai tertutup, baris edit vs baris verify tidak saling mengganggu, membersihkan baris verify tidak menghapus baris edit |
+
+Yang **tidak** tercakup test dan masih perlu dilihat mata: dropdown Autocomplete sungguhan di
+`AddAssetModal`, dan halaman Master Data terhadap database produksi.
+
+**Delta LOC:** kode produksi **−14 baris** di 2 context (−57/+43), +93 baris di 2 hook baru.
+Sama seperti Step 2–3, nilainya bukan di jumlah baris melainkan di 4 salinan yang jadi 1 dan
+27 test baru yang jalan tanpa render provider.
 
 ---
 
@@ -581,9 +639,10 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
 ```
 0 Test ✅     ─► 1 Dead code ✅ ─► 2 lib/ (assetCsv, assetRules, money) ✅
                                         │
-3 Supabase helpers ✅ ─► 4 useLookupTable + useEntityModals   ◄── di sini
+3 Supabase helpers ✅ ─► 4 useLookupTable + useEntityModals ✅
                                         │
-5 ui/FormModal ─► 6 🎯 Add/EditAssetModal ─► 7 Modal Maintenance & Reclassification
+5 ui/FormModal   ◄── di sini
+  └─► 6 🎯 Add/EditAssetModal ─► 7 Modal Maintenance & Reclassification
                                         │
                               7a ⚠️ B1 ui/Modal ─► 7b ⚠️ B2 error handling
                                         │

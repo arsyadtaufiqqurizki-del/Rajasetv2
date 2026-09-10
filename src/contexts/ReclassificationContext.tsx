@@ -2,6 +2,7 @@ import { createContext, useState, useContext, useEffect, ReactNode } from 'react
 import { supabase } from '../lib/supabase';
 import { fetchAllRows } from '../lib/supabase/fetchAllRows';
 import { batchDelete } from '../lib/supabase/batchWrite';
+import { useEntityModals, useModalState } from '../hooks/useEntityModals';
 import { logActivity } from '../lib/activityLogger';
 import type { Reclassification, ReclassificationInput } from '../types/reclassification';
 
@@ -83,11 +84,17 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingReclassification, setEditingReclassification] = useState<Reclassification | null>(null);
-  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
-  const [verifyingReclassification, setVerifyingReclassification] = useState<Reclassification | null>(null);
+  const {
+    isAddModalOpen, setIsAddModalOpen,
+    isEditModalOpen, setIsEditModalOpen,
+    editing: editingReclassification, setEditing: setEditingReclassification,
+  } = useEntityModals<Reclassification>();
+
+  // Verify is a third modal with the same flag-plus-row shape as edit.
+  const {
+    isOpen: isVerifyModalOpen, setIsOpen: setIsVerifyModalOpen,
+    entity: verifyingReclassification, setEntity: setVerifyingReclassification,
+  } = useModalState<Reclassification>();
 
   useEffect(() => {
     const fetchAll = async () => {

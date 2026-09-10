@@ -6,20 +6,46 @@ import { fetchAllRows } from '../lib/supabase/fetchAllRows';
 import { batchDelete, batchUpdate } from '../lib/supabase/batchWrite';
 
 // Step 3 of "refactoring v2.md" moved AssetContext's chunked fetch and batch
-// write loops into lib/supabase/. The loop semantics (chunk 1000, batch 100,
-// progress ordering) are pinned in those modules' own unit tests; what is
-// pinned here is the wiring — which table and options the context asks for, and
-// how it reconciles local state from the callbacks.
+// write loops into lib/supabase/; Step 4 moved the four master-data blocks into
+// useLookupTable and the modal trio into useEntityModals. Those modules' own
+// unit tests pin their semantics (chunk 1000, batch 100, progress ordering,
+// optimistic writes); what is pinned here is the wiring — which table and
+// options the context asks for, and how it reconciles local state.
 
 vi.mock('../lib/supabase/fetchAllRows', () => ({ fetchAllRows: vi.fn() }));
 vi.mock('../lib/supabase/batchWrite', () => ({ batchDelete: vi.fn(), batchUpdate: vi.fn() }));
 vi.mock('../lib/activityLogger', () => ({ logActivity: vi.fn() }));
 
 // Lookup tables are still plain selects: .from(t).select('name').order('name').
+// Their writes are the fire-and-forget upsert/delete useLookupTable issues.
+const db = vi.hoisted(() => ({
+  /** Rows each lookup table returns on the initial fetch, keyed by table name. */
+  lookupRows: {} as Record<string, { name: string }[]>,
+  /** Row the next assets insert resolves with. */
+  savedAsset: null as Record<string, unknown> | null,
+  upserts: [] as { table: string; name: unknown }[],
+  deletes: [] as { table: string; name: unknown }[],
+}));
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+    from: vi.fn((table: string) => ({
+      select: () => ({
+        order: () => Promise.resolve({ data: db.lookupRows[table] ?? [], error: null }),
+      }),
+      upsert: (payload: { name: string }) => {
+        db.upserts.push({ table, name: payload.name });
+        return Promise.resolve({ error: null });
+      },
+      insert: () => ({
+        select: () => ({ single: () => Promise.resolve({ data: db.savedAsset, error: null }) }),
+      }),
+      delete: () => ({
+        eq: (_column: string, value: unknown) => {
+          db.deletes.push({ table, name: value });
+          return Promise.resolve({ error: null });
+        },
+      }),
     })),
   },
 }));
@@ -30,6 +56,29 @@ const dbRow = (id: string, overrides: Record<string, unknown> = {}) => ({
   asset_description: `Asset ${id}`,
   asset_cost: 1000,
   status: 'Active',
+  ...overrides,
+});
+
+/** A blank addAsset payload; overrides carry whatever the test is about. */
+const assetInput = (
+  overrides: Partial<Parameters<ReturnType<typeof useAsset>['addAsset']>[0]> = {},
+) => ({
+  assetBook: '',
+  subsidiary: '',
+  assetNumber: 'AN-new',
+  assetDescription: 'Asset new',
+  assetCost: '',
+  datePlaceInService: '',
+  assetUnits: '',
+  categorySegment1: '',
+  categorySegment2: '',
+  depreciationMethod: '',
+  lifeInMonths: '',
+  listed: '',
+  status: 'Active',
+  verification: false,
+  verificationDate: '',
+  itemStatus: '',
   ...overrides,
 });
 
@@ -57,6 +106,10 @@ async function renderProvider() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  db.lookupRows = {};
+  db.savedAsset = null;
+  db.upserts.length = 0;
+  db.deletes.length = 0;
   vi.mocked(fetchAllRows).mockResolvedValue({ rows: [], error: null });
   vi.mocked(batchDelete).mockResolvedValue({ processed: 0, failed: 0, succeeded: 0 });
   vi.mocked(batchUpdate).mockResolvedValue({ processed: 0, failed: 0, succeeded: 0 });
@@ -268,5 +321,135 @@ describe('AssetContext — bulk update', () => {
 
     expect(onProgress).toHaveBeenCalledTimes(1);
     expect(onProgress).toHaveBeenCalledWith(2, 0, 2);
+  });
+});
+
+describe('AssetContext — master data', () => {
+  it('publishes each lookup table under its own name, deduped', async () => {
+    db.lookupRows = {
+      subsidiaries: [{ name: 'PT A' }, { name: 'PT B' }, { name: 'PT A' }],
+      category_segments_1: [{ name: 'Vehicles' }],
+      category_segments_2: [{ name: 'Jakarta' }],
+      item_statuses: [{ name: 'Asset' }],
+    };
+
+    await renderProvider();
+
+    expect(ctx.subsidiaries).toEqual(['PT A', 'PT B']);
+    expect(ctx.categories1).toEqual(['Vehicles']);
+    expect(ctx.categories2).toEqual(['Jakarta']);
+    expect(ctx.itemStatuses).toEqual(['Asset']);
+  });
+
+  it('routes add and delete of each list to its own table', async () => {
+    await renderProvider();
+
+    act(() => {
+      ctx.addSubsidiary('PT Baru');
+      ctx.addCategory1('Machinery');
+      ctx.addCategory2('Bandung');
+      ctx.addItemStatus('Needs Review');
+    });
+    act(() => {
+      ctx.deleteSubsidiary('PT Baru');
+      ctx.deleteCategory1('Machinery');
+      ctx.deleteCategory2('Bandung');
+      ctx.deleteItemStatus('Needs Review');
+    });
+
+    expect(db.upserts).toEqual([
+      { table: 'subsidiaries', name: 'PT Baru' },
+      { table: 'category_segments_1', name: 'Machinery' },
+      { table: 'category_segments_2', name: 'Bandung' },
+      { table: 'item_statuses', name: 'Needs Review' },
+    ]);
+    expect(db.deletes).toEqual([
+      { table: 'subsidiaries', name: 'PT Baru' },
+      { table: 'category_segments_1', name: 'Machinery' },
+      { table: 'category_segments_2', name: 'Bandung' },
+      { table: 'item_statuses', name: 'Needs Review' },
+    ]);
+  });
+
+  it('keeps the lists independent of one another', async () => {
+    db.lookupRows = {
+      subsidiaries: [{ name: 'PT A' }],
+      category_segments_1: [{ name: 'Vehicles' }],
+    };
+    await renderProvider();
+
+    act(() => ctx.deleteSubsidiary('PT A'));
+
+    expect(ctx.subsidiaries).toEqual([]);
+    expect(ctx.categories1).toEqual(['Vehicles']);
+  });
+
+  // The Step 4 gate, minus the browser: saving an asset with values that are not
+  // in the lists yet must leave them selectable in the Autocompletes straight
+  // away, with no refetch. Nothing in this path awaits the lookup writes.
+  it('registers a new subsidiary, category and item status while saving an asset', async () => {
+    db.savedAsset = dbRow('new');
+    await renderProvider();
+
+    await act(async () => {
+      await ctx.addAsset(assetInput({
+        subsidiary: 'PT Baru',
+        categorySegment1: 'Machinery',
+        categorySegment2: 'Bandung',
+        itemStatus: 'Needs Review',
+      }));
+    });
+
+    expect(ctx.subsidiaries).toContain('PT Baru');
+    expect(ctx.categories1).toContain('Machinery');
+    expect(ctx.categories2).toContain('Bandung');
+    expect(ctx.itemStatuses).toContain('Needs Review');
+    expect(ctx.assets.map(a => a.id)).toEqual(['new']);
+  });
+
+  it('leaves the lists alone for an asset whose lookup fields are blank', async () => {
+    db.savedAsset = dbRow('new');
+    await renderProvider();
+
+    await act(async () => {
+      await ctx.addAsset(assetInput());
+    });
+
+    expect(db.upserts).toEqual([]);
+    expect(ctx.subsidiaries).toEqual([]);
+  });
+});
+
+describe('AssetContext — modal state', () => {
+  it('starts with both modals closed and nothing being edited', async () => {
+    await renderProvider();
+
+    expect(ctx.isAddModalOpen).toBe(false);
+    expect(ctx.isEditModalOpen).toBe(false);
+    expect(ctx.editingAsset).toBeNull();
+  });
+
+  it('opens the edit modal on a chosen asset without touching the add modal', async () => {
+    vi.mocked(fetchAllRows).mockResolvedValue({ rows: [dbRow('a')], error: null });
+    await renderProvider();
+
+    act(() => {
+      ctx.setEditingAsset(ctx.assets[0]);
+      ctx.setIsEditModalOpen(true);
+    });
+
+    expect(ctx.editingAsset?.id).toBe('a');
+    expect(ctx.isEditModalOpen).toBe(true);
+    expect(ctx.isAddModalOpen).toBe(false);
+  });
+
+  it('opens the add modal without touching the edit modal', async () => {
+    await renderProvider();
+
+    act(() => ctx.setIsAddModalOpen(true));
+
+    expect(ctx.isAddModalOpen).toBe(true);
+    expect(ctx.isEditModalOpen).toBe(false);
+    expect(ctx.editingAsset).toBeNull();
   });
 });

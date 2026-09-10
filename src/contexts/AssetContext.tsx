@@ -2,6 +2,8 @@ import { createContext, useState, useContext, useEffect, useCallback, ReactNode 
 import { supabase } from '../lib/supabase';
 import { fetchAllRows } from '../lib/supabase/fetchAllRows';
 import { batchDelete, batchUpdate } from '../lib/supabase/batchWrite';
+import { useLookupTable } from '../hooks/useLookupTable';
+import { useEntityModals } from '../hooks/useEntityModals';
 import { logActivity } from '../lib/activityLogger';
 import type { Asset, AssetBulkPatch } from '../types/asset';
 
@@ -109,14 +111,31 @@ export function AssetProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
-  const [subsidiaries, setSubsidiaries] = useState<string[]>([]);
-  const [categories1, setCategories1] = useState<string[]>([]);
-  const [categories2, setCategories2] = useState<string[]>([]);
-  const [itemStatuses, setItemStatuses] = useState<string[]>([]);
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  // Four identical master-data tables. The names below are the context's public
+  // API; useLookupTable owns the optimistic add/remove.
+  const {
+    values: subsidiaries, hydrate: hydrateSubsidiaries,
+    add: addSubsidiary, remove: deleteSubsidiary,
+  } = useLookupTable('subsidiaries');
+  const {
+    values: categories1, hydrate: hydrateCategories1,
+    add: addCategory1, remove: deleteCategory1,
+  } = useLookupTable('category_segments_1');
+  const {
+    values: categories2, hydrate: hydrateCategories2,
+    add: addCategory2, remove: deleteCategory2,
+  } = useLookupTable('category_segments_2');
+  const {
+    values: itemStatuses, hydrate: hydrateItemStatuses,
+    add: addItemStatus, remove: deleteItemStatus,
+  } = useLookupTable('item_statuses');
+
+  const {
+    isAddModalOpen, setIsAddModalOpen,
+    isEditModalOpen, setIsEditModalOpen,
+    editing: editingAsset, setEditing: setEditingAsset,
+  } = useEntityModals<Asset>();
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -144,57 +163,17 @@ export function AssetProvider({ children }: { children: ReactNode }) {
       supabase.from('item_statuses').select('name').order('name'),
     ]);
 
-    if (!subRes.error) setSubsidiaries([...new Set((subRes.data ?? []).map(r => r.name))]);
-    if (!cat1Res.error) setCategories1([...new Set((cat1Res.data ?? []).map(r => r.name))]);
-    if (!cat2Res.error) setCategories2([...new Set((cat2Res.data ?? []).map(r => r.name))]);
-    if (!itemStatusRes.error) setItemStatuses([...new Set((itemStatusRes.data ?? []).map(r => r.name))]);
+    if (!subRes.error) hydrateSubsidiaries((subRes.data ?? []).map(r => r.name));
+    if (!cat1Res.error) hydrateCategories1((cat1Res.data ?? []).map(r => r.name));
+    if (!cat2Res.error) hydrateCategories2((cat2Res.data ?? []).map(r => r.name));
+    if (!itemStatusRes.error) hydrateItemStatuses((itemStatusRes.data ?? []).map(r => r.name));
 
     setLoading(false);
-  }, []);
+  }, [hydrateSubsidiaries, hydrateCategories1, hydrateCategories2, hydrateItemStatuses]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
-
-  const addSubsidiary = (name: string) => {
-    if (!name) return;
-    setSubsidiaries(prev => prev.includes(name) ? prev : [...prev, name]);
-    supabase.from('subsidiaries').upsert({ name }, { onConflict: 'name' }).then();
-  };
-  const deleteSubsidiary = (name: string) => {
-    setSubsidiaries(prev => prev.filter(s => s !== name));
-    supabase.from('subsidiaries').delete().eq('name', name).then();
-  };
-
-  const addCategory1 = (name: string) => {
-    if (!name) return;
-    setCategories1(prev => prev.includes(name) ? prev : [...prev, name]);
-    supabase.from('category_segments_1').upsert({ name }, { onConflict: 'name' }).then();
-  };
-  const deleteCategory1 = (name: string) => {
-    setCategories1(prev => prev.filter(c => c !== name));
-    supabase.from('category_segments_1').delete().eq('name', name).then();
-  };
-
-  const addCategory2 = (name: string) => {
-    if (!name) return;
-    setCategories2(prev => prev.includes(name) ? prev : [...prev, name]);
-    supabase.from('category_segments_2').upsert({ name }, { onConflict: 'name' }).then();
-  };
-  const deleteCategory2 = (name: string) => {
-    setCategories2(prev => prev.filter(c => c !== name));
-    supabase.from('category_segments_2').delete().eq('name', name).then();
-  };
-
-  const addItemStatus = (name: string) => {
-    if (!name) return;
-    setItemStatuses(prev => prev.includes(name) ? prev : [...prev, name]);
-    supabase.from('item_statuses').upsert({ name }, { onConflict: 'name' }).then();
-  };
-  const deleteItemStatus = (name: string) => {
-    setItemStatuses(prev => prev.filter(s => s !== name));
-    supabase.from('item_statuses').delete().eq('name', name).then();
-  };
 
   const addAsset = async (newAssetData: Omit<Asset, 'id' | 'statusLevel' | 'createdAt'>, skipLog = false) => {
     if (newAssetData.subsidiary) addSubsidiary(newAssetData.subsidiary);
