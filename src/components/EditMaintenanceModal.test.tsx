@@ -47,18 +47,18 @@ beforeEach(() => {
 
 describe('EditMaintenanceModal — mount condition', () => {
   it('renders nothing while closed', () => {
-    const { container } = render(<EditMaintenanceModal isOpen={false} onClose={mockOnClose} recordId="m1" />);
-    expect(container).toBeEmptyDOMElement();
+    render(<EditMaintenanceModal isOpen={false} onClose={mockOnClose} recordId="m1" />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('renders nothing when the id matches no record', () => {
-    const { container } = render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId="nope" />);
-    expect(container).toBeEmptyDOMElement();
+    render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId="nope" />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('renders nothing when no record is selected at all', () => {
-    const { container } = render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId={null} />);
-    expect(container).toBeEmptyDOMElement();
+    render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId={null} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 
@@ -152,5 +152,51 @@ describe('EditMaintenanceModal — save flow', () => {
 
     release();
     await waitFor(() => expect(mockOnClose).toHaveBeenCalled(), { timeout: 3000 });
+  });
+});
+
+// Step 7a (B1) — hand-rolled chrome replaced by ui/FormModal: portal, Esc, focus trap,
+// body scroll lock. Pins the two close paths that did not exist before.
+describe('EditMaintenanceModal — ui/FormModal chrome', () => {
+  const closeButton = () => screen.getAllByRole('button').find(b => b.textContent === '') as HTMLElement;
+
+  it('labels the dialog with the heading it renders', () => {
+    render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId="m1" />);
+    const heading = screen.getByRole('heading', { name: 'Edit Maintenance Record' });
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby', heading.id);
+  });
+
+  it('closes when the header X button is pressed', () => {
+    render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId="m1" />);
+    fireEvent.click(closeButton());
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+    expect(mockUpdateRecord).not.toHaveBeenCalled();
+  });
+
+  it('closes when Esc is pressed', () => {
+    render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId="m1" />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores Esc while a save is in flight', async () => {
+    let release!: () => void;
+    mockUpdateRecord.mockImplementation(() => new Promise<void>(res => { release = () => res(); }));
+    render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId="m1" />);
+    submit();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockOnClose).not.toHaveBeenCalled();
+
+    release();
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled(), { timeout: 3000 });
+  });
+
+  it('locks body scroll while open and restores it on close', () => {
+    const { unmount } = render(<EditMaintenanceModal isOpen onClose={mockOnClose} recordId="m1" />);
+    expect(document.body.style.overflow).toBe('hidden');
+    unmount();
+    expect(document.body.style.overflow).not.toBe('hidden');
   });
 });

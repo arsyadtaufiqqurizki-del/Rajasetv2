@@ -77,8 +77,8 @@ beforeEach(() => {
 
 describe('AddMaintenanceModal — chrome', () => {
   it('renders nothing while closed', () => {
-    const { container } = render(<AddMaintenanceModal isOpen={false} onClose={mockOnClose} />);
-    expect(container).toBeEmptyDOMElement();
+    render(<AddMaintenanceModal isOpen={false} onClose={mockOnClose} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('shows the add title and the Save Record button', () => {
@@ -258,5 +258,61 @@ describe('AddMaintenanceModal — save flow', () => {
 
     expect(screen.getByRole('button', { name: 'Select an asset' })).toBeInTheDocument();
     expect(byPlaceholder('e.g. Oil Change, Repair')).toHaveValue('');
+  });
+});
+
+// Step 7a (B1) — the hand-rolled `fixed inset-0` chrome was replaced by ui/FormModal,
+// so the dialog now renders through a portal and gains Esc, a focus trap and a body
+// scroll lock. These pin the three close paths and the autofocus target: the header's
+// X button, NOT the asset picker (which would otherwise pop its dropdown open on mount).
+describe('AddMaintenanceModal — ui/FormModal chrome', () => {
+  const closeButton = () => screen.getAllByRole('button').find(b => b.textContent === '') as HTMLElement;
+
+  it('labels the dialog with the heading it renders', () => {
+    render(<AddMaintenanceModal isOpen onClose={mockOnClose} />);
+    const heading = screen.getByRole('heading', { name: 'Add Maintenance Record' });
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby', heading.id);
+  });
+
+  it('closes when the header X button is pressed', () => {
+    render(<AddMaintenanceModal isOpen onClose={mockOnClose} />);
+    fireEvent.click(closeButton());
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+    expect(mockAddRecord).not.toHaveBeenCalled();
+  });
+
+  it('closes when Esc is pressed', () => {
+    render(<AddMaintenanceModal isOpen onClose={mockOnClose} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores Esc while a save is in flight', async () => {
+    let release!: () => void;
+    mockAddRecord.mockReturnValue(new Promise<void>(r => { release = r; }));
+    render(<AddMaintenanceModal isOpen onClose={mockOnClose} />);
+    pickAsset('AST-001');
+    fireEvent.change(byPlaceholder('e.g. Oil Change, Repair'), { target: { value: 'Oil Change' } });
+    submit();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockOnClose).not.toHaveBeenCalled();
+
+    release();
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled(), { timeout: 3000 });
+  });
+
+  it('locks body scroll while open and restores it on close', () => {
+    const { unmount } = render(<AddMaintenanceModal isOpen onClose={mockOnClose} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    unmount();
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
+
+  it('puts the initial focus on the close button, leaving the asset dropdown shut', () => {
+    render(<AddMaintenanceModal isOpen onClose={mockOnClose} />);
+    expect(document.activeElement).toBe(closeButton());
+    expect(screen.queryByPlaceholderText(SEARCH_PLACEHOLDER)).not.toBeInTheDocument();
   });
 });

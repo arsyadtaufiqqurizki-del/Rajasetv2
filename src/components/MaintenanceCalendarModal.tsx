@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MaintenanceRecord } from '../contexts/MaintenanceContext';
+import Modal from './ui/Modal';
 
 interface MaintenanceCalendarModalProps {
   isOpen: boolean;
@@ -9,6 +10,8 @@ interface MaintenanceCalendarModalProps {
   records: MaintenanceRecord[];
   onSelectRecord: (id: string) => void;
 }
+
+const TITLE_ID = 'maintenance-calendar-modal-title';
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -97,157 +100,164 @@ export default function MaintenanceCalendarModal({ isOpen, onClose, records, onS
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-surface-container-lowest rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-outline-variant">
-          <h2 className="text-xl font-bold text-on-surface">Maintenance Calendar</h2>
-          <button onClick={handleClose} className="p-2 hover:bg-surface-container-low rounded-full transition-colors">
-            <X className="h-5 w-5 text-on-surface-variant" />
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      labelledBy={TITLE_ID}
+      className="max-w-3xl max-h-[90vh] flex flex-col"
+    >
+      <div className="flex items-center justify-between p-6 border-b border-outline-variant/30 shrink-0">
+        <h2 id={TITLE_ID} className="text-xl font-bold text-on-surface">Maintenance Calendar</h2>
+        <button
+          type="button"
+          onClick={handleClose}
+          className="p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => goToMonth(-1)}
+              className="p-1.5 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-colors"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-semibold text-on-surface w-44 text-center">{monthLabel}</h3>
+            <button
+              onClick={() => goToMonth(1)}
+              className="p-1.5 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-colors"
+              aria-label="Next month"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+          <button
+            onClick={goToToday}
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Today
           </button>
         </div>
 
-        <div className="p-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => goToMonth(-1)}
-                className="p-1.5 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-colors"
-                aria-label="Previous month"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <h3 className="text-lg font-semibold text-on-surface w-44 text-center">{monthLabel}</h3>
-              <button
-                onClick={() => goToMonth(1)}
-                className="p-1.5 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-colors"
-                aria-label="Next month"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
+        <div className="grid grid-cols-7 gap-1">
+          {WEEKDAY_LABELS.map(label => (
+            <div key={label} className="text-center text-xs font-semibold text-on-surface-variant uppercase py-1">
+              {label}
             </div>
-            <button
-              onClick={goToToday}
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Today
-            </button>
-          </div>
+          ))}
+          {weeks.map(week => (
+            week.map(day => {
+              const key = toDateKey(day);
+              const dayRecords = recordsByDay.get(key) ?? [];
+              const isCurrentMonth = day.getMonth() === viewDate.getMonth();
+              const isToday = toDateKey(day) === toDateKey(today);
+              const isSelected = key === selectedDateKey;
 
-          <div className="grid grid-cols-7 gap-1">
-            {WEEKDAY_LABELS.map(label => (
-              <div key={label} className="text-center text-xs font-semibold text-on-surface-variant uppercase py-1">
-                {label}
-              </div>
-            ))}
-            {weeks.map(week => (
-              week.map(day => {
-                const key = toDateKey(day);
-                const dayRecords = recordsByDay.get(key) ?? [];
-                const isCurrentMonth = day.getMonth() === viewDate.getMonth();
-                const isToday = toDateKey(day) === toDateKey(today);
-                const isSelected = key === selectedDateKey;
-
-                return (
-                  <button
-                    key={key}
-                    onClick={() => selectDay(key)}
-                    disabled={dayRecords.length === 0}
-                    className={cn(
-                      "flex flex-col items-center gap-1 rounded-lg p-2 min-h-[64px] border transition-colors text-left",
-                      isSelected ? "border-primary bg-primary/10" : "border-transparent",
-                      dayRecords.length > 0 ? "hover:bg-surface-container-low cursor-pointer" : "cursor-default",
-                      !isCurrentMonth && "opacity-40"
-                    )}
-                  >
-                    <span className={cn(
-                      "text-sm w-6 h-6 flex items-center justify-center rounded-full",
-                      isToday ? "bg-primary text-on-primary font-semibold" : "text-on-surface"
-                    )}>
-                      {day.getDate()}
-                    </span>
-                    {dayRecords.length > 0 && (
-                      <div className="flex items-center gap-0.5 flex-wrap justify-center">
-                        {dayRecords.slice(0, 3).map(r => (
-                          <span key={r.id} className={cn("w-1.5 h-1.5 rounded-full", statusDotClass(r.status))} />
-                        ))}
-                        {dayRecords.length > 3 && (
-                          <span className="text-[10px] text-on-surface-variant leading-none">+{dayRecords.length - 3}</span>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                );
-              })
-            ))}
-          </div>
-
-          {selectedDateKey && (
-            <div className="border-t border-outline-variant pt-4 flex flex-col gap-2">
-              <h4 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wide">
-                {new Date(weeks.flat().find(d => toDateKey(d) === selectedDateKey)!).toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
-              </h4>
-              {selectedRecords.length === 0 ? (
-                <p className="text-sm text-on-surface-variant">Tidak ada jadwal maintenance pada tanggal ini.</p>
-              ) : (
-                <>
-                  {paginatedDayRecords.map(record => (
-                    <button
-                      key={record.id}
-                      onClick={() => {
-                        onSelectRecord(record.id);
-                        handleClose();
-                      }}
-                      className="flex items-center justify-between gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface-container-low transition-colors text-left"
-                    >
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-semibold text-on-surface truncate" title={record.assetDescription}>
-                          {record.assetDescription}
-                        </span>
-                        <span className="text-sm text-on-surface-variant truncate">{record.serviceType}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
-                          {record.assetNumber}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant">
-                          <span className={cn("w-1.5 h-1.5 rounded-full", statusDotClass(record.status))} />
-                          {record.status}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                  {dayTotalPages > 1 && (
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs text-on-surface-variant">
-                        Showing {paginatedDayRecords.length} of {selectedRecords.length} entries
-                      </span>
-                      <div className="flex items-center gap-1 text-sm font-medium">
-                        <button
-                          onClick={() => setDayPage(prev => Math.max(1, prev - 1))}
-                          disabled={dayPage === 1}
-                          className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <span className="px-3 py-1 rounded bg-surface-container-high text-on-surface font-semibold text-xs">
-                          Page {dayPage} of {dayTotalPages}
-                        </span>
-                        <button
-                          onClick={() => setDayPage(prev => Math.min(dayTotalPages, prev + 1))}
-                          disabled={dayPage === dayTotalPages}
-                          className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </div>
+              return (
+                <button
+                  key={key}
+                  onClick={() => selectDay(key)}
+                  disabled={dayRecords.length === 0}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-lg p-2 min-h-[64px] border transition-colors text-left",
+                    isSelected ? "border-primary bg-primary/10" : "border-transparent",
+                    dayRecords.length > 0 ? "hover:bg-surface-container-low cursor-pointer" : "cursor-default",
+                    !isCurrentMonth && "opacity-40"
+                  )}
+                >
+                  <span className={cn(
+                    "text-sm w-6 h-6 flex items-center justify-center rounded-full",
+                    isToday ? "bg-primary text-on-primary font-semibold" : "text-on-surface"
+                  )}>
+                    {day.getDate()}
+                  </span>
+                  {dayRecords.length > 0 && (
+                    <div className="flex items-center gap-0.5 flex-wrap justify-center">
+                      {dayRecords.slice(0, 3).map(r => (
+                        <span key={r.id} className={cn("w-1.5 h-1.5 rounded-full", statusDotClass(r.status))} />
+                      ))}
+                      {dayRecords.length > 3 && (
+                        <span className="text-[10px] text-on-surface-variant leading-none">+{dayRecords.length - 3}</span>
+                      )}
                     </div>
                   )}
-                </>
-              )}
-            </div>
-          )}
+                </button>
+              );
+            })
+          ))}
         </div>
+
+        {selectedDateKey && (
+          <div className="border-t border-outline-variant pt-4 flex flex-col gap-2">
+            <h4 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wide">
+              {new Date(weeks.flat().find(d => toDateKey(d) === selectedDateKey)!).toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </h4>
+            {selectedRecords.length === 0 ? (
+              <p className="text-sm text-on-surface-variant">Tidak ada jadwal maintenance pada tanggal ini.</p>
+            ) : (
+              <>
+                {paginatedDayRecords.map(record => (
+                  <button
+                    key={record.id}
+                    onClick={() => {
+                      onSelectRecord(record.id);
+                      handleClose();
+                    }}
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface-container-low transition-colors text-left"
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold text-on-surface truncate" title={record.assetDescription}>
+                        {record.assetDescription}
+                      </span>
+                      <span className="text-sm text-on-surface-variant truncate">{record.serviceType}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
+                        {record.assetNumber}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant">
+                        <span className={cn("w-1.5 h-1.5 rounded-full", statusDotClass(record.status))} />
+                        {record.status}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+                {dayTotalPages > 1 && (
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-on-surface-variant">
+                      Showing {paginatedDayRecords.length} of {selectedRecords.length} entries
+                    </span>
+                    <div className="flex items-center gap-1 text-sm font-medium">
+                      <button
+                        onClick={() => setDayPage(prev => Math.max(1, prev - 1))}
+                        disabled={dayPage === 1}
+                        className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <span className="px-3 py-1 rounded bg-surface-container-high text-on-surface font-semibold text-xs">
+                        Page {dayPage} of {dayTotalPages}
+                      </span>
+                      <button
+                        onClick={() => setDayPage(prev => Math.min(dayTotalPages, prev + 1))}
+                        disabled={dayPage === dayTotalPages}
+                        className="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest disabled:opacity-50 disabled:hover:text-on-surface-variant"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

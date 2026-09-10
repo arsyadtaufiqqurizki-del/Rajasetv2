@@ -16,6 +16,8 @@ interface FormModalProps {
   cancelLabel?: string;
   /** disables the chrome, blocks Esc, and swaps submitLabel for a spinner + savingLabel */
   isSaving?: boolean;
+  /** disables the submit button on top of isSaving, e.g. while a required picker is empty */
+  submitDisabled?: boolean;
   savingLabel?: string;
   /** banner shown between the fields and the footer; nothing is rendered when null */
   error?: string | null;
@@ -33,6 +35,7 @@ export default function FormModal({
   submitLabel,
   cancelLabel = 'Cancel',
   isSaving = false,
+  submitDisabled = false,
   savingLabel = 'Saving...',
   error = null,
   className = 'max-w-2xl max-h-[90vh] flex flex-col',
@@ -77,7 +80,7 @@ export default function FormModal({
           </button>
           <button
             type="submit"
-            disabled={isSaving}
+            disabled={isSaving || submitDisabled}
             className="px-5 py-2.5 text-sm font-medium text-on-primary bg-primary hover:bg-primary/90 transition-colors rounded-lg shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
           >
             {isSaving ? (

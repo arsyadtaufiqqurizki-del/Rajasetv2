@@ -75,14 +75,14 @@ beforeEach(() => {
 describe('EditReclassificationModal — mount condition', () => {
   it('renders nothing while the modal flag is off', () => {
     mockIsEditModalOpen = false;
-    const { container } = render(<EditReclassificationModal />);
-    expect(container).toBeEmptyDOMElement();
+    render(<EditReclassificationModal />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('renders nothing when no row is being edited', () => {
     mockEditing = null;
-    const { container } = render(<EditReclassificationModal />);
-    expect(container).toBeEmptyDOMElement();
+    render(<EditReclassificationModal />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 
@@ -234,5 +234,55 @@ describe('EditReclassificationModal — save flow', () => {
 
     release();
     await waitFor(() => expect(mockSetIsEditModalOpen).toHaveBeenCalledWith(false), { timeout: 3000 });
+  });
+});
+
+// Step 7a (B1) — hand-rolled chrome replaced by ui/FormModal: portal, Esc, focus trap,
+// body scroll lock. Both new close paths must clear the flag AND the edited row, the
+// same pair Cancel already clears.
+describe('EditReclassificationModal — ui/FormModal chrome', () => {
+  const closeButton = () => screen.getAllByRole('button').find(b => b.textContent === '') as HTMLElement;
+
+  it('labels the dialog with the heading it renders', () => {
+    render(<EditReclassificationModal />);
+    const heading = screen.getByRole('heading', { name: 'Edit Item Reclassification' });
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby', heading.id);
+  });
+
+  it('clears both the flag and the edited row when the header X button is pressed', () => {
+    render(<EditReclassificationModal />);
+    fireEvent.click(closeButton());
+    expect(mockSetIsEditModalOpen).toHaveBeenCalledWith(false);
+    expect(mockSetEditingReclassification).toHaveBeenCalledWith(null);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('clears both the flag and the edited row when Esc is pressed', () => {
+    render(<EditReclassificationModal />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockSetIsEditModalOpen).toHaveBeenCalledWith(false);
+    expect(mockSetEditingReclassification).toHaveBeenCalledWith(null);
+  });
+
+  it('ignores Esc while a save is in flight', async () => {
+    let release!: () => void;
+    mockUpdate.mockReturnValue(new Promise<void>(r => { release = r; }));
+    render(<EditReclassificationModal />);
+    submit();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Updating/ })).toBeDisabled());
+    mockSetIsEditModalOpen.mockClear();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockSetIsEditModalOpen).not.toHaveBeenCalled();
+
+    release();
+    await waitFor(() => expect(mockSetIsEditModalOpen).toHaveBeenCalledWith(false), { timeout: 3000 });
+  });
+
+  it('locks body scroll while open and restores it on close', () => {
+    const { unmount } = render(<EditReclassificationModal />);
+    expect(document.body.style.overflow).toBe('hidden');
+    unmount();
+    expect(document.body.style.overflow).not.toBe('hidden');
   });
 });

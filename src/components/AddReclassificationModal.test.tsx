@@ -106,8 +106,8 @@ beforeEach(() => {
 describe('AddReclassificationModal — chrome', () => {
   it('renders nothing while the modal flag is off', () => {
     mockIsAddModalOpen = false;
-    const { container } = render(<AddReclassificationModal />);
-    expect(container).toBeEmptyDOMElement();
+    render(<AddReclassificationModal />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('shows the add title and the Simpan button', () => {
@@ -288,5 +288,61 @@ describe('AddReclassificationModal — save flow', () => {
 
     release();
     await waitFor(() => expect(mockSetIsAddModalOpen).toHaveBeenCalledWith(false), { timeout: 3000 });
+  });
+});
+
+// Step 7a (B1) — the hand-rolled `fixed inset-0 z-[100]` chrome was replaced by
+// ui/FormModal, so the dialog now renders through a portal and gains Esc, a focus trap
+// and a body scroll lock. The autofocus lands on the header X button, NOT the asset
+// picker — otherwise its dropdown would pop open on mount.
+describe('AddReclassificationModal — ui/FormModal chrome', () => {
+  const closeButton = () => screen.getAllByRole('button').find(b => b.textContent === '') as HTMLElement;
+
+  it('labels the dialog with the heading it renders', () => {
+    render(<AddReclassificationModal />);
+    const heading = screen.getByRole('heading', { name: 'Tambah Item Reclassification' });
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby', heading.id);
+  });
+
+  it('closes through the context flag when the header X button is pressed', () => {
+    render(<AddReclassificationModal />);
+    fireEvent.click(closeButton());
+    expect(mockSetIsAddModalOpen).toHaveBeenCalledWith(false);
+    expect(mockAddLinked).not.toHaveBeenCalled();
+  });
+
+  it('closes through the context flag when Esc is pressed', () => {
+    render(<AddReclassificationModal />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockSetIsAddModalOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('ignores Esc while a save is in flight', async () => {
+    let release!: () => void;
+    mockAddLinked.mockReturnValue(new Promise<void>(r => { release = r; }));
+    render(<AddReclassificationModal />);
+    pickAsset('AST-001');
+    submit();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled());
+    mockSetIsAddModalOpen.mockClear();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockSetIsAddModalOpen).not.toHaveBeenCalled();
+
+    release();
+    await waitFor(() => expect(mockSetIsAddModalOpen).toHaveBeenCalledWith(false), { timeout: 3000 });
+  });
+
+  it('locks body scroll while open and restores it on close', () => {
+    const { unmount } = render(<AddReclassificationModal />);
+    expect(document.body.style.overflow).toBe('hidden');
+    unmount();
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
+
+  it('puts the initial focus on the close button, leaving the asset dropdown shut', () => {
+    render(<AddReclassificationModal />);
+    expect(document.activeElement).toBe(closeButton());
+    expect(screen.queryByPlaceholderText(SEARCH_PLACEHOLDER)).not.toBeInTheDocument();
   });
 });
