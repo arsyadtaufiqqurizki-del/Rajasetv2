@@ -3,6 +3,8 @@ import { Loader2, X } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import AutocompleteInput from './ui/AutocompleteInput';
 import Modal from './ui/Modal';
+import { applyListedChange, applyVerificationChange } from '../lib/assetRules';
+import { formatCostInput } from '../lib/money';
 
 const TITLE_ID = 'edit-asset-modal-title';
 
@@ -34,23 +36,8 @@ export default function EditAssetModal() {
 
   useEffect(() => {
     if (editingAsset) {
-      // Format the initial loaded value for display
-      let initialCost = editingAsset.assetCost || '';
-      initialCost = initialCost.replace(/[^\d.]/g, '');
-      const parts = initialCost.split('.');
-      if (parts.length > 2) initialCost = parts[0] + '.' + parts.slice(1).join('');
-      
-      let formattedInitialCost = initialCost;
-      if (initialCost) {
-        const splitVal = initialCost.split('.');
-        const integerPart = splitVal[0];
-        const decimalPart = splitVal.length > 1 ? '.' + splitVal[1] : '';
-        if (integerPart) {
-          formattedInitialCost = new Intl.NumberFormat('en-US').format(parseInt(integerPart, 10)) + decimalPart;
-        } else {
-          formattedInitialCost = decimalPart;
-        }
-      }
+      // Stored cost is unformatted; run it through the same formatter the field uses.
+      const formattedInitialCost = formatCostInput(editingAsset.assetCost || '');
 
       setFormData({
         assetBook: editingAsset.assetBook,
@@ -110,47 +97,17 @@ export default function EditAssetModal() {
 
   const handleVerificationChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const value = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      verification: value,
-      verificationDate: value === 'Yes' ? (prev.verificationDate || new Date().toISOString().split('T')[0]) : '',
-    }));
+    setFormData(prev => applyVerificationChange(prev, value));
   };
 
   const handleListedChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const value = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      listed: value,
-      verification: value === 'Audited' ? 'Yes' : prev.verification,
-      verificationDate: value === 'Audited' ? (prev.verificationDate || new Date().toISOString().split('T')[0]) : prev.verificationDate,
-    }));
+    setFormData(prev => applyListedChange(prev, value));
   };
 
   const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value;
-    val = val.replace(/[^\d.]/g, '');
-    
-    const parts = val.split('.');
-    if (parts.length > 2) {
-      val = parts[0] + '.' + parts.slice(1).join('');
-    }
-    
-    if (!val) {
-      setFormData(prev => ({ ...prev, assetCost: '' }));
-      return;
-    }
-
-    const splitVal = val.split('.');
-    const integerPart = splitVal[0];
-    const decimalPart = splitVal.length > 1 ? '.' + splitVal[1] : '';
-
-    let formattedInteger = integerPart;
-    if (integerPart) {
-      formattedInteger = new Intl.NumberFormat('en-US').format(parseInt(integerPart, 10));
-    }
-
-    setFormData(prev => ({ ...prev, assetCost: formattedInteger + decimalPart }));
+    const formatted = formatCostInput(e.target.value);
+    setFormData(prev => ({ ...prev, assetCost: formatted }));
   };
 
   const handleUnlimitedChange = (e: React.ChangeEvent<HTMLInputElement>) => {

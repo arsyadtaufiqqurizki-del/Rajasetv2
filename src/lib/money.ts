@@ -45,3 +45,29 @@ export function formatCompactNumber(value: number): string {
     maximumFractionDigits: 1,
   }).format(value);
 }
+
+/**
+ * Formats a raw Asset Cost keystroke into a thousands-separated string, keeping a
+ * partial decimal tail ("1,234." / ".5") so the field stays typeable mid-entry.
+ * Non-digits are dropped and a second "." collapses into the first decimal group.
+ * Moved verbatim from the three copies in AddAssetModal/EditAssetModal — see Step 2
+ * of "refactoring v2.md"; the pinned cases live in AddAssetModal.test.tsx.
+ */
+export function formatCostInput(value: string): string {
+  let val = value.replace(/[^\d.]/g, '');
+
+  const parts = val.split('.');
+  if (parts.length > 2) {
+    val = parts[0] + '.' + parts.slice(1).join('');
+  }
+
+  if (!val) return '';
+
+  const splitVal = val.split('.');
+  const integerPart = splitVal[0];
+  const decimalPart = splitVal.length > 1 ? '.' + splitVal[1] : '';
+
+  if (!integerPart) return decimalPart;
+
+  return new Intl.NumberFormat('en-US').format(parseInt(integerPart, 10)) + decimalPart;
+}
