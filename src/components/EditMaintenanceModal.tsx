@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useMaintenance } from '../contexts/MaintenanceContext';
+import { useEntityForm } from '../hooks/useEntityForm';
+import { emptyMaintenanceForm, recordToFormValues, toMaintenanceUpdate } from '../lib/maintenanceForm';
 
 interface EditMaintenanceModalProps {
   isOpen: boolean;
@@ -8,59 +9,31 @@ interface EditMaintenanceModalProps {
   recordId: string | null;
 }
 
+const INPUT_CLASS =
+  'w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+
 export default function EditMaintenanceModal({ isOpen, onClose, recordId }: EditMaintenanceModalProps) {
   const { records, updateRecord } = useMaintenance();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [formData, setFormData] = useState({
-    serviceType: '',
-    estimateCost: '',
-    actualCost: '',
-    status: 'Pending',
-    scheduledDate: new Date().toISOString().split('T')[0]
-  });
-
   const recordToEdit = records.find(r => r.id === recordId);
 
-  useEffect(() => {
-    if (isOpen && recordToEdit) {
-      setFormData({
-        serviceType: recordToEdit.serviceType || '',
-        estimateCost: recordToEdit.estimateCost || '',
-        actualCost: recordToEdit.actualCost || '',
-        status: recordToEdit.status || 'Pending',
-        scheduledDate: recordToEdit.scheduledDate || new Date().toISOString().split('T')[0]
-      });
-      setIsSubmitting(false);
-    }
-  }, [isOpen, recordToEdit]);
+  const form = useEntityForm({
+    // Only reached when the modal is opened without a row; the early return below
+    // means the blank form is never rendered.
+    initialValues: emptyMaintenanceForm(),
+    resetKey: recordToEdit,
+    // Re-hydrating on every row change, and on mount when a row is already picked.
+    // Losing the row seeds nothing, so the fields are left as they were.
+    seed: () => (recordToEdit ? recordToFormValues(recordToEdit) : null),
+    errorPrefix: 'Failed to update maintenance record',
+  });
 
   if (!isOpen || !recordToEdit) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!recordId || isSubmitting) return;
-
-    setIsSubmitting(true);
-    try {
-      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
-      await Promise.all([
-        updateRecord(recordId, {
-          ...recordToEdit,
-          serviceType: formData.serviceType,
-          estimateCost: formData.estimateCost,
-          actualCost: formData.actualCost,
-          status: formData.status,
-          scheduledDate: formData.scheduledDate
-        }),
-        minDelay
-      ]);
-      onClose();
-    } catch (err) {
-      setIsSubmitting(false);
-      throw err;
-    }
-  };
+  const handleSubmit = form.handleSubmit(async values => {
+    const minDelay = new Promise(resolve => setTimeout(resolve, 600));
+    await Promise.all([updateRecord(recordToEdit.id, toMaintenanceUpdate(recordToEdit, values)), minDelay]);
+    onClose();
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -72,7 +45,7 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-6">
-          
+
           <div className="grid grid-cols-2 gap-4 p-4 bg-surface-container-low rounded-lg border border-outline-variant text-sm">
             <div><span className="text-on-surface-variant">Asset:</span> {recordToEdit.assetNumber} - {recordToEdit.assetDescription}</div>
             <div><span className="text-on-surface-variant">Book:</span> {recordToEdit.assetBook}</div>
@@ -86,9 +59,10 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
               <input
                 required
                 type="date"
-                value={formData.scheduledDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, scheduledDate: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="scheduledDate"
+                value={form.values.scheduledDate}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
               />
             </div>
             <div>
@@ -96,9 +70,10 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
               <input
                 required
                 type="text"
-                value={formData.serviceType}
-                onChange={(e) => setFormData(prev => ({ ...prev, serviceType: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="serviceType"
+                value={form.values.serviceType}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
                 placeholder="e.g. Oil Change, Repair"
               />
             </div>
@@ -106,9 +81,10 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
               <label className="block text-sm font-medium text-on-surface mb-2">Status *</label>
               <select
                 required
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="status"
+                value={form.values.status}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
               >
                 <option value="Pending">Pending</option>
                 <option value="In Progress">In Progress</option>
@@ -120,9 +96,10 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
               <label className="block text-sm font-medium text-on-surface mb-2">Estimate Cost</label>
               <input
                 type="text"
-                value={formData.estimateCost}
-                onChange={(e) => setFormData(prev => ({ ...prev, estimateCost: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="estimateCost"
+                value={form.values.estimateCost}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
                 placeholder="e.g. $500.00"
               />
             </div>
@@ -130,29 +107,36 @@ export default function EditMaintenanceModal({ isOpen, onClose, recordId }: Edit
               <label className="block text-sm font-medium text-on-surface mb-2">Actual Cost</label>
               <input
                 type="text"
-                value={formData.actualCost}
-                onChange={(e) => setFormData(prev => ({ ...prev, actualCost: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="actualCost"
+                value={form.values.actualCost}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
                 placeholder="e.g. $450.00"
               />
             </div>
           </div>
 
+          {form.saveError && (
+            <p className="text-sm text-error bg-error-container/20 border border-error/20 rounded-lg px-3 py-2">
+              {form.saveError}
+            </p>
+          )}
+
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-outline-variant">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={form.isSaving}
               className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={form.isSaving}
               className="bg-primary text-on-primary px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]"
             >
-              {isSubmitting ? (
+              {form.isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Saving...

@@ -12,11 +12,14 @@ import React, { useCallback, useState } from 'react';
  * inputs, and the conversions to the shape the database wants (a boolean here, a
  * comma-stripped number there) happen once, on save, at the call site.
  */
+/** Every control an entity form drives its values through. */
+export type FormFieldElement = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+
 export interface EntityForm<T extends Record<string, string>> {
   values: T;
   setValues: React.Dispatch<React.SetStateAction<T>>;
   /** Writes one field, keyed by the input's `name`. */
-  handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  handleChange: (e: React.ChangeEvent<FormFieldElement>) => void;
   isSaving: boolean;
   saveError: string | null;
   /**
@@ -68,7 +71,7 @@ export function useEntityForm<T extends Record<string, string>>({
     if (seeded != null) setValues(seeded);
   }
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<FormFieldElement>) => {
     const { name, value } = e.target;
     setValues(prev => ({ ...prev, [name]: value }));
   }, []);

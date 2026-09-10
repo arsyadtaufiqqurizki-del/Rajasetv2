@@ -1,102 +1,54 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, ChevronDown, Search, Loader2 } from 'lucide-react';
+import React from 'react';
+import { X, Loader2 } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import { useMaintenance } from '../contexts/MaintenanceContext';
-import { id as copy } from '../i18n/id';
+import AssetPicker from './ui/AssetPicker';
+import { useEntityForm } from '../hooks/useEntityForm';
+import { emptyAddMaintenanceForm, toMaintenancePayload } from '../lib/maintenanceForm';
 
 interface AddMaintenanceModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const PICKER_TRIGGER_CLASS =
+  'w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary';
+const PICKER_PANEL_CLASS =
+  'absolute z-50 mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg';
+const INPUT_CLASS =
+  'w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+
 export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceModalProps) {
   const { assets } = useAsset();
   const { addRecord } = useMaintenance();
-  const [selectedAssetId, setSelectedAssetId] = useState('');
-  const [assetSearch, setAssetSearch] = useState('');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const [formData, setFormData] = useState({
-    serviceType: '',
-    estimateCost: '',
-    actualCost: '',
-    status: 'Pending',
-    scheduledDate: new Date().toISOString().split('T')[0]
+  const form = useEntityForm({
+    initialValues: emptyAddMaintenanceForm(),
+    // Opening or closing blanks the whole form, picked asset included — that is what
+    // the old reset-on-close effect did, except the scheduled date is now taken at
+    // open time rather than at close time.
+    resetKey: isOpen,
+    seed: emptyAddMaintenanceForm,
+    errorPrefix: 'Failed to save maintenance record',
   });
-
-  const filteredAssets = useMemo(() => {
-    const q = assetSearch.trim().toLowerCase();
-    if (!q) return assets.slice(0, 50);
-    return assets.filter(a =>
-      a.assetNumber?.toLowerCase().includes(q) ||
-      a.assetDescription?.toLowerCase().includes(q)
-    ).slice(0, 50);
-  }, [assets, assetSearch]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setSelectedAssetId('');
-      setAssetSearch('');
-      setDropdownOpen(false);
-      setIsSubmitting(false);
-      setFormData({
-        serviceType: '',
-        estimateCost: '',
-        actualCost: '',
-        status: 'Pending',
-        scheduledDate: new Date().toISOString().split('T')[0]
-      });
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    if (dropdownOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [dropdownOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-    const asset = assets.find(a => a.id === selectedAssetId);
-    if (!asset) return;
+  const selectedAsset = assets.find(a => a.id === form.values.assetId);
 
-    setIsSubmitting(true);
-    try {
-      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
-      await Promise.all([
-        addRecord({
-          assetBook: asset.assetBook || asset.id,
-          subsidiary: asset.subsidiary,
-          assetNumber: asset.assetNumber,
-          assetDescription: asset.assetDescription,
-          assetUnits: asset.assetUnits,
-          serviceType: formData.serviceType,
-          assetCategorySegment1: asset.categorySegment1,
-          assetCategorySegment2: asset.categorySegment2,
-          estimateCost: formData.estimateCost,
-          actualCost: formData.actualCost,
-          status: formData.status,
-          scheduledDate: formData.scheduledDate
-        }),
-        minDelay
-      ]);
-      onClose();
-    } catch (err) {
-      setIsSubmitting(false);
-      throw err;
+  // The guard sits outside form.handleSubmit so a submit with no asset picked never
+  // raises isSaving — pressing Save with an empty picker has always been a no-op.
+  const handleSubmit = (e: React.FormEvent) => {
+    if (!selectedAsset) {
+      e.preventDefault();
+      return;
     }
+    void form.handleSubmit(async values => {
+      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
+      await Promise.all([addRecord(toMaintenancePayload(selectedAsset, values)), minDelay]);
+      onClose();
+    })(e);
   };
-
-  const selectedAsset = assets.find(a => a.id === selectedAssetId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -108,71 +60,18 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-6">
-          
+
           <div>
             <label className="block text-sm font-medium text-on-surface mb-2">Select Asset *</label>
-            <div ref={dropdownRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setDropdownOpen(prev => !prev)}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <span className={selectedAssetId ? 'text-on-surface' : 'text-on-surface-variant'}>
-                  {selectedAsset
-                    ? `${selectedAsset.assetNumber} - ${selectedAsset.assetDescription}`
-                    : 'Select an asset'}
-                </span>
-                <ChevronDown className="h-4 w-4 text-on-surface-variant shrink-0 ml-2" />
-              </button>
-              {/* hidden input to satisfy form required validation */}
-              <input type="text" required className="sr-only" value={selectedAssetId} readOnly tabIndex={-1} />
-
-              {dropdownOpen && (
-                <div className="absolute z-50 mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg">
-                  <div className="p-2 border-b border-outline-variant flex items-center gap-2">
-                    <Search className="h-4 w-4 text-on-surface-variant shrink-0" />
-                    <input
-                      autoFocus
-                      type="text"
-                      value={assetSearch}
-                      onChange={e => setAssetSearch(e.target.value)}
-                      placeholder="Cari asset number atau deskripsi..."
-                      className="flex-1 bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none"
-                    />
-                    {assetSearch && (
-                      <button type="button" onClick={() => setAssetSearch('')} className="text-on-surface-variant hover:text-on-surface">
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                  <ul className="max-h-56 overflow-y-auto py-1">
-                    {filteredAssets.length === 0 ? (
-                      <li className="px-3 py-2 text-sm text-on-surface-variant">{copy.emptyState.noResults}</li>
-                    ) : (
-                      filteredAssets.map(asset => (
-                        <li
-                          key={asset.id}
-                          onClick={() => {
-                            setSelectedAssetId(asset.id);
-                            setDropdownOpen(false);
-                            setAssetSearch('');
-                          }}
-                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-surface-container-low ${selectedAssetId === asset.id ? 'bg-primary/10 text-primary font-medium' : 'text-on-surface'}`}
-                        >
-                          <span className="font-medium">{asset.assetNumber}</span>
-                          <span className="text-on-surface-variant"> — {asset.assetDescription}</span>
-                        </li>
-                      ))
-                    )}
-                  </ul>
-                  {!assetSearch && assets.length > 50 && (
-                    <p className="px-3 py-2 text-xs text-on-surface-variant border-t border-outline-variant">
-                      Menampilkan 50 dari {assets.length} aset. Ketik untuk mencari.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+            <AssetPicker
+              assets={assets}
+              value={form.values.assetId}
+              onChange={assetId => form.setValues(prev => ({ ...prev, assetId }))}
+              placeholder="Select an asset"
+              triggerClassName={PICKER_TRIGGER_CLASS}
+              panelClassName={PICKER_PANEL_CLASS}
+              renderMoreHint={total => `Menampilkan 50 dari ${total} aset. Ketik untuk mencari.`}
+            />
           </div>
 
           {selectedAsset && (
@@ -191,9 +90,10 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
               <input
                 required
                 type="date"
-                value={formData.scheduledDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, scheduledDate: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="scheduledDate"
+                value={form.values.scheduledDate}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
               />
             </div>
             <div>
@@ -201,9 +101,10 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
               <input
                 required
                 type="text"
-                value={formData.serviceType}
-                onChange={(e) => setFormData(prev => ({ ...prev, serviceType: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="serviceType"
+                value={form.values.serviceType}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
                 placeholder="e.g. Oil Change, Repair"
               />
             </div>
@@ -211,9 +112,10 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
               <label className="block text-sm font-medium text-on-surface mb-2">Status *</label>
               <select
                 required
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="status"
+                value={form.values.status}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
               >
                 <option value="Pending">Pending</option>
                 <option value="In Progress">In Progress</option>
@@ -225,9 +127,10 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
               <label className="block text-sm font-medium text-on-surface mb-2">Estimate Cost</label>
               <input
                 type="text"
-                value={formData.estimateCost}
-                onChange={(e) => setFormData(prev => ({ ...prev, estimateCost: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="estimateCost"
+                value={form.values.estimateCost}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
                 placeholder="e.g. $500.00"
               />
             </div>
@@ -235,29 +138,36 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
               <label className="block text-sm font-medium text-on-surface mb-2">Actual Cost</label>
               <input
                 type="text"
-                value={formData.actualCost}
-                onChange={(e) => setFormData(prev => ({ ...prev, actualCost: e.target.value }))}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                name="actualCost"
+                value={form.values.actualCost}
+                onChange={form.handleChange}
+                className={INPUT_CLASS}
                 placeholder="e.g. $450.00"
               />
             </div>
           </div>
 
+          {form.saveError && (
+            <p className="text-sm text-error bg-error-container/20 border border-error/20 rounded-lg px-3 py-2">
+              {form.saveError}
+            </p>
+          )}
+
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-outline-variant">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={form.isSaving}
               className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={form.isSaving}
               className="bg-primary text-on-primary px-6 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[130px]"
             >
-              {isSubmitting ? (
+              {form.isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Saving...

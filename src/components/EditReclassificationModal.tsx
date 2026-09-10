@@ -1,17 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { X, Link2, Loader2 } from 'lucide-react';
 import { useReclassification, RECLASSIFICATION_PRESET_CATEGORIES } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
 import AutocompleteInput from './ui/AutocompleteInput';
+import { useEntityForm } from '../hooks/useEntityForm';
+import {
+  CUSTOM_CATEGORY,
+  EMPTY_EDIT_RECLASSIFICATION_FORM,
+  reclassificationToFormValues,
+  resolveCategory,
+  toReclassificationPayload,
+} from '../lib/reclassificationForm';
 
-const EMPTY_FORM = {
-  assetCategory: '',
-  assetDescription: '',
-  location: '',
-  unit: '1',
-  ownership: '',
-  remarks: '',
-};
+const FIELD_CLASS =
+  'w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
+const LOCKED_FIELD_CLASS =
+  'w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm opacity-60 cursor-not-allowed';
+const DISABLABLE_FIELD_CLASS = `${FIELD_CLASS} disabled:opacity-60 disabled:cursor-not-allowed`;
 
 export default function EditReclassificationModal() {
   const {
@@ -22,59 +27,41 @@ export default function EditReclassificationModal() {
 
   const { categories1, categories2, subsidiaries } = useAsset();
 
-  const [formData, setFormData] = useState(EMPTY_FORM);
-  const [categorySelect, setCategorySelect] = useState<string>(RECLASSIFICATION_PRESET_CATEGORIES[1]);
-  const [customCategory, setCustomCategory] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (editingReclassification) {
-      setFormData({
-        assetCategory: editingReclassification.assetCategory,
-        assetDescription: editingReclassification.assetDescription,
-        location: editingReclassification.location,
-        unit: editingReclassification.unit,
-        ownership: editingReclassification.ownership,
-        remarks: editingReclassification.remarks,
-      });
-      const isPreset = (RECLASSIFICATION_PRESET_CATEGORIES as readonly string[]).includes(editingReclassification.category);
-      setCategorySelect(isPreset ? editingReclassification.category : 'Custom');
-      setCustomCategory(isPreset ? '' : editingReclassification.category);
-      setIsSubmitting(false);
-    }
-  }, [editingReclassification]);
+  const form = useEntityForm({
+    // Only reached when the modal is opened without a row; the early return below
+    // means the blank form is never rendered.
+    initialValues: EMPTY_EDIT_RECLASSIFICATION_FORM,
+    resetKey: editingReclassification,
+    seed: () => (editingReclassification ? reclassificationToFormValues(editingReclassification) : null),
+    errorPrefix: 'Gagal memperbarui item',
+  });
 
   if (!isEditModalOpen || !editingReclassification) return null;
 
   const isLinked = !!editingReclassification.assetId;
+  const { categorySelect, customCategory } = form.values;
+  const category = resolveCategory(categorySelect, customCategory);
 
   const handleClose = () => {
     setIsEditModalOpen(false);
     setEditingReclassification(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-    const category = categorySelect === 'Custom' ? customCategory.trim() : categorySelect;
-    if (!category) return;
-
-    setIsSubmitting(true);
-    try {
+  // The blank-custom-category guard sits outside form.handleSubmit so it never
+  // raises isSaving — it has always been a plain no-op.
+  const handleSubmit = (e: React.FormEvent) => {
+    if (!category) {
+      e.preventDefault();
+      return;
+    }
+    void form.handleSubmit(async values => {
       const minDelay = new Promise(resolve => setTimeout(resolve, 600));
       await Promise.all([
-        updateReclassification(editingReclassification.id, { ...formData, category }),
+        updateReclassification(editingReclassification.id, toReclassificationPayload(values, category)),
         minDelay,
       ]);
       handleClose();
-    } catch (err) {
-      setIsSubmitting(false);
-      throw err;
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    })(e);
   };
 
   return (
@@ -105,26 +92,22 @@ export default function EditReclassificationModal() {
                 required
                 disabled={isLinked}
                 name="assetDescription"
-                value={formData.assetDescription}
-                onChange={handleChange}
+                value={form.values.assetDescription}
+                onChange={form.handleChange}
                 placeholder="e.g. Kompresor GA-30 ditemukan di Gudang A"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                className={DISABLABLE_FIELD_CLASS}
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Asset Category</label>
               {isLinked ? (
-                <input
-                  disabled
-                  value={formData.assetCategory}
-                  className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm opacity-60 cursor-not-allowed"
-                />
+                <input disabled value={form.values.assetCategory} className={LOCKED_FIELD_CLASS} />
               ) : (
                 <AutocompleteInput
                   name="assetCategory"
-                  value={formData.assetCategory}
-                  onChange={handleChange as any}
+                  value={form.values.assetCategory}
+                  onChange={form.handleChange}
                   placeholder="e.g. Elektronik"
                   options={categories1}
                 />
@@ -133,16 +116,12 @@ export default function EditReclassificationModal() {
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Location</label>
               {isLinked ? (
-                <input
-                  disabled
-                  value={formData.location}
-                  className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm opacity-60 cursor-not-allowed"
-                />
+                <input disabled value={form.values.location} className={LOCKED_FIELD_CLASS} />
               ) : (
                 <AutocompleteInput
                   name="location"
-                  value={formData.location}
-                  onChange={handleChange as any}
+                  value={form.values.location}
+                  onChange={form.handleChange}
                   placeholder="e.g. Gudang A"
                   options={categories2}
                 />
@@ -155,25 +134,21 @@ export default function EditReclassificationModal() {
                 type="number"
                 disabled={isLinked}
                 name="unit"
-                value={formData.unit}
-                onChange={handleChange}
+                value={form.values.unit}
+                onChange={form.handleChange}
                 min="0"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                className={DISABLABLE_FIELD_CLASS}
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Ownership</label>
               {isLinked ? (
-                <input
-                  disabled
-                  value={formData.ownership}
-                  className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm opacity-60 cursor-not-allowed"
-                />
+                <input disabled value={form.values.ownership} className={LOCKED_FIELD_CLASS} />
               ) : (
                 <AutocompleteInput
                   name="ownership"
-                  value={formData.ownership}
-                  onChange={handleChange as any}
+                  value={form.values.ownership}
+                  onChange={form.handleChange}
                   placeholder="e.g. Divisi Operasional"
                   options={subsidiaries}
                 />
@@ -183,23 +158,25 @@ export default function EditReclassificationModal() {
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-on-surface">Item Status (Klasifikasi) *</label>
               <select
+                name="categorySelect"
                 value={categorySelect}
-                onChange={(e) => setCategorySelect(e.target.value)}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                onChange={form.handleChange}
+                className={`${FIELD_CLASS} cursor-pointer`}
               >
                 {RECLASSIFICATION_PRESET_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                <option value="Custom">Custom...</option>
+                <option value={CUSTOM_CATEGORY}>Custom...</option>
               </select>
             </div>
-            {categorySelect === 'Custom' && (
+            {categorySelect === CUSTOM_CATEGORY && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-semibold text-on-surface">Nama Custom *</label>
                 <input
                   required
+                  name="customCategory"
                   value={customCategory}
-                  onChange={(e) => setCustomCategory(e.target.value)}
+                  onChange={form.handleChange}
                   placeholder="e.g. Barang Hilang"
-                  className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={FIELD_CLASS}
                 />
               </div>
             )}
@@ -208,30 +185,36 @@ export default function EditReclassificationModal() {
               <label className="text-sm font-semibold text-on-surface">Remarks</label>
               <textarea
                 name="remarks"
-                value={formData.remarks}
-                onChange={handleChange as any}
+                value={form.values.remarks}
+                onChange={form.handleChange}
                 placeholder="Catatan tambahan (opsional)"
                 rows={3}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                className={`${FIELD_CLASS} resize-none`}
               />
             </div>
           </div>
+
+          {form.saveError && (
+            <p className="text-sm text-error bg-error-container/20 border border-error/20 rounded-lg px-3 py-2">
+              {form.saveError}
+            </p>
+          )}
 
           <div className="mt-4 pt-4 border-t border-outline-variant/30 flex justify-end gap-3">
             <button
               type="button"
               onClick={handleClose}
-              disabled={isSubmitting}
+              disabled={form.isSaving}
               className="px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={form.isSaving}
               className="px-5 py-2.5 text-sm font-medium text-on-primary bg-primary hover:bg-primary/90 transition-colors rounded-lg shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[100px]"
             >
-              {isSubmitting ? (
+              {form.isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Updating...
