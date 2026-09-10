@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a SELESAI (2026-09-10). Berikutnya: Step 6.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6 SELESAI (2026-09-10). Berikutnya: Step 7.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **300** (23 file) · lint: 46 → **42 problems** · gate terakhir dijalankan 2026-09-10
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **328** (25 file) · lint: 46 → **32 problems** · gate terakhir dijalankan 2026-09-10
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -560,7 +560,7 @@ Yang **tidak** tercakup test dan masih perlu dilihat mata: mengetik di modal sun
 
 ---
 
-### Step 6 — 🎯 Satukan Add/EditAssetModal *(±6 jam — nilai terbesar)*
+### Step 6 — 🎯 Satukan Add/EditAssetModal ✅ **SELESAI 2026-09-10** *(±3 jam — nilai terbesar)*
 - `hooks/useEntityForm.ts`: `formData`, `setField`, `isSaving`, `saveError`, `resetOn(open)`.
   Menghapus 2 dari 16 error `set-state-in-effect`.
 - `components/AssetFormFields.tsx`: seluruh body field (16 field), menerima `values` + `onChange` +
@@ -584,6 +584,72 @@ jalankan test Step 0 di antaranya.
 sudah diganti test perilaku baru. Step 6 karena itu tidak lagi memikul perubahan behavior terselubung;
 `useEntityForm` boleh saja membungkus `handleClose` dengan `useCallback` (tetap praktik yang benar),
 tapi gate-nya sekarang murni structure-only.
+
+**Hasil (2026-09-10):** dikerjakan sebagai **dua commit** sesuai mitigasi — `88e01d4` (ekstrak + adopsi
+di Add) lalu `020e585` (migrasi Edit). 1 hook + 1 modul lib + 1 komponen baru, **300 → 328 test**
+(25 file), semuanya hijau. Golden file CSV tetap identik.
+
+| Yang dipindah | Dari | Ke |
+|---|---|---|
+| State `formData` + `isSaving` + `saveError` + effect reset (6 salinan) | `AddAssetModal:32-47`, `EditAssetModal:14-72` | `hooks/useEntityForm.ts` → `useEntityForm({ initialValues, resetKey, seed, errorPrefix })` |
+| try/catch simpan + perakitan pesan error (2 salinan) | `AddAssetModal:49-69`, `EditAssetModal:74-92` | `useEntityForm` → `handleSubmit(save)` |
+| Bentuk form + payload simpan (2 salinan) | `AddAssetModal:10-27` & `:54-58`, `EditAssetModal:14-31` & `:79-83` | `lib/assetForm.ts` → `AssetFormValues`, `EMPTY_ASSET_FORM`, `toAssetPayload` |
+| Hidrasi dari baris tersimpan | `EditAssetModal:37-64` | `lib/assetForm.ts` → `assetToFormValues` |
+| 16 field + 4 handler aturan lintas-field (2 salinan, 89% identik) | `AddAssetModal:111-350`, `EditAssetModal:144-383` | `components/AssetFormFields.tsx` |
+
+**Empat keputusan bentuk API:**
+- **Reset dilakukan saat render, bukan di `useEffect`.** `useEntityForm` menyimpan `resetKey`
+  sebelumnya sebagai state; begitu berubah, ia memanggil setter di badan render. React menjalankan
+  ulang komponen sebelum commit, jadi tidak ada satu frame pun yang menampilkan nilai basi —
+  `EditAssetModal` yang tadinya menghidrasi lewat effect sekarang sudah terisi di render pertama.
+  Ini juga yang menghapus 2 error `set-state-in-effect` yang dijanjikan.
+- **`seed` boleh mengembalikan `null`, artinya "biarkan field apa adanya".** Add tidak memberi `seed`
+  sama sekali, jadi nilai yang sudah diketik **bertahan** saat modal ditutup lalu dibuka lagi —
+  persis perilaku lama. Hanya simpan yang sukses yang mengosongkannya (`form.setValues(EMPTY_ASSET_FORM)`).
+- **`AssetFormFields` menerima satu prop `form`,** bukan `values` + `setValues` terpisah. Aturan
+  lintas-field butuh nilai sebelumnya (`applyListedChange(prev, ...)`), jadi ia perlu updater-nya —
+  dan mengoper objek hook utuh menghindari `handleChange` ditulis dua kali.
+- **Bentuk form & mapping-nya tinggal di `lib/assetForm.ts`, bukan di file komponen.** Mengekspor
+  konstanta dari file `.tsx` memicu 2 warning `react-refresh/only-export-components`; memindahkannya
+  ke `lib/` menghapus warning itu sekaligus membuat kedua mapping bisa diuji tanpa render.
+
+⚠️ **Keempat perbedaan Add vs Edit dipertahankan** dan masih dipin test yang sama seperti Step 0:
+hidrasi cost di-format ulang (`assetToFormValues`) · judul & label tombol berbeda (prop `title`/
+`submitLabel`) · `return null` saat `editingAsset` kosong (tetap di `EditAssetModal`) · pesan error
+berbeda (prop `errorPrefix`).
+
+**Satu penyederhanaan yang setara, bukan perubahan perilaku:** `isUnlimitedLife` tidak lagi state
+tersendiri. Nilainya selalu sama dengan `values.lifeInMonths === 'Unlimited'` — satu-satunya cara
+literal itu masuk ke field adalah lewat checkbox itu sendiri (saat tidak dicentang, input bertipe
+`number` dan tidak bisa menampung teks). Dua salinan state hilang; test checkbox Unlimited di kedua
+modal lulus tanpa diubah.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **328 test / 25 file — semua lulus** (300 lama + 28 baru) |
+| Test `AddAssetModal` & `EditAssetModal` Step 0 | **26 + 19 test lulus tanpa satu baris pun diubah** |
+| Golden file CSV | **identik** — lulus tanpa `UPDATE_GOLDEN` |
+| `npx eslint .` | **32 problems (23 error, 9 warning)** — turun 10 error dari 42/33: 8 `no-explicit-any` (`onChange={handleChange as any}` pada `AutocompleteInput` hilang — ternyata memang type-safe tanpa cast) + 2 `set-state-in-effect` |
+| `npm run build` | sukses (10,63 s) |
+| Gate manual (buat & edit asset, bandingkan baris DB) | ⬜ **belum dijalankan** — sesi ini tanpa browser; digantikan test di bawah |
+
+**Pengganti gate manual.** Gate Step 6 aslinya manual (buat asset baru & edit asset, bandingkan baris
+database sebelum/sesudah). Jaminannya ada di tiga lapis test:
+
+| Lapis | File | Test | Yang dipin |
+|---|---|---|---|
+| Mapping murni | `lib/assetForm.test.ts` | 13 | `EMPTY_ASSET_FORM` apa adanya · koma dilepas & verification→boolean · nilai selain `Yes` = belum terverifikasi · hidrasi format ulang cost per cabang · kolom nullable jadi string kosong · round-trip `assetToFormValues` → `toAssetPayload` tidak mengubah nilai tersimpan |
+| Semantik hook | `hooks/useEntityForm.test.ts` | 15 | seed dipakai saat mount · reset tanpa seed **tidak** menyentuh field · reset dengan seed menghidrasi ulang · banner basi dibersihkan · `isSaving` naik selama simpan · prefix error & pesan generik · nilai bertahan setelah simpan gagal |
+| Perilaku modal | `AddAssetModal.test.tsx` + `EditAssetModal.test.tsx` | 45 | tidak diubah sama sekali — payload `addAsset`/`updateAsset`, aturan Listed↔Verification, format ribuan, checkbox Unlimited, judul/tombol, mount condition, pesan error, regresi fokus B6 |
+
+Yang **tidak** tercakup test dan masih perlu dilihat mata: baris database sungguhan setelah create &
+edit, dan dropdown Autocomplete di modal sungguhan (menumpuk dengan gate manual Step 4 yang tertunda).
+
+**Delta LOC:** pasangan modal **771 → 110 baris** (`AddAssetModal` 353 → 52, `EditAssetModal` 418 → 58),
++499 baris di 3 modul bersama (`AssetFormFields` 322 · `useEntityForm` 92 · `assetForm` 85) →
+**−162 bersih**, dan penghematan berikutnya datang di Step 7 saat empat modal Maintenance/
+Reclassification ikut memakai `useEntityForm` + `FormModal`.
 
 ---
 
@@ -747,7 +813,7 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
 3 Supabase helpers ✅ ─► 4 useLookupTable + useEntityModals ✅
                                         │
 5 ui/FormModal ✅ ─► 5a ⚠️ B6 fokus ui/Modal ✅
-  └─► 6 🎯 Add/EditAssetModal ◄── di sini ─► 7 Modal Maintenance & Reclassification
+  └─► 6 🎯 Add/EditAssetModal ✅ ─► 7 Modal Maintenance & Reclassification ◄── di sini
                                         │
                               7a ⚠️ B1 ui/Modal ─► 7b ⚠️ B2 error handling
                                         │
