@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4 SELESAI (2026-09-10). Berikutnya: Step 5.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5 SELESAI (2026-09-10). Berikutnya: Step 6.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **281** (22 file) · lint: 46 → **42 problems** · gate terakhir dijalankan 2026-09-10
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 6–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **293** (23 file) · lint: 46 → **42 problems** · gate terakhir dijalankan 2026-09-10
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -449,7 +449,7 @@ Sama seperti Step 2–3, nilainya bukan di jumlah baris melainkan di 4 salinan y
 
 ---
 
-### Step 5 — `ui/FormModal` + primitive field *(±4 jam)*
+### Step 5 — `ui/FormModal` ✅ **SELESAI 2026-09-10** *(±2 jam)*
 - `ui/FormModal.tsx` di atas `ui/Modal`: header + judul + tombol X + `<form>` + error banner + footer
   (Cancel / Save dengan spinner).
 - Adopsi **hanya di `AddAssetModal`** dulu (yang sudah memakai `ui/Modal`, jadi tidak ada perubahan a11y).
@@ -457,6 +457,54 @@ Sama seperti Step 2–3, nilainya bukan di jumlah baris melainkan di 4 salinan y
 **Risiko: RENDAH.** Murni pemindahan markup. Mitigasi: bandingkan screenshot sebelum/sesudah.
 
 **Gate:** test `AddAssetModal` dari Step 0 hijau · Esc & Tab masih berperilaku sama.
+
+**Hasil (2026-09-10):** 1 komponen ui baru (96 LOC) + 1 file test baru, **281 → 293 test** (23 file),
+semuanya hijau. Chrome dipindah **verbatim** — string `className` tidak diubah satu karakter pun,
+jadi tidak ada perubahan visual yang perlu dibandingkan lewat screenshot.
+
+| Yang dipindah | Dari | Ke |
+|---|---|---|
+| Header (judul + tombol X) | `AddAssetModal:109–119` | `ui/FormModal.tsx` — prop `titleId`, `title` |
+| Elemen `<form>` + kelasnya | `AddAssetModal:121` | `ui/FormModal.tsx` — prop `onSubmit`, `children` |
+| Banner error | `AddAssetModal:363–367` | `ui/FormModal.tsx` — prop `error` (null = tidak dirender) |
+| Footer Cancel / Save + spinner | `AddAssetModal:369–392` | `ui/FormModal.tsx` — prop `submitLabel`, `cancelLabel`, `isSaving`, `savingLabel` |
+| Bentuk panel `max-w-2xl max-h-[90vh] flex flex-col` | `AddAssetModal:107` | default prop `className` di `FormModal` (bisa ditimpa pemanggil) |
+
+**Tiga keputusan bentuk API** (mengantisipasi Step 6 & 7 tanpa menebak-nebak):
+- **`submitLabel` wajib, `savingLabel` punya default `'Saving...'`.** Add dan Edit berbeda label tombol
+  (`Save Asset` vs `Update Asset`) tapi keduanya memakai `Saving...` saat menyimpan — itu perbedaan
+  yang didaftar di Step 6 no. 2, jadi labelnya dijadikan prop, bukan diseragamkan.
+- **`onClose` diteruskan apa adanya ke ketiga jalur tutup** (tombol X, tombol Cancel, Esc). `FormModal`
+  **tidak** memutuskan apakah boleh ditutup saat menyimpan — `AddAssetModal.handleClose` tetap yang
+  melakukan `if (isSaving) return`, persis seperti sebelumnya. `closeOnEscape={!isSaving}` tetap
+  dihitung di dalam `FormModal` dari prop `isSaving`.
+- **`className` default, bukan wajib.** Bentuk panel modal form (lebar 2xl, tinggi maks 90vh, kolom
+  flex) sama untuk semua modal form; `twMerge` di `ui/Modal` membuat `max-w-2xl` menimpa `max-w-md`
+  bawaan. Modal Maintenance/Reclassification di Step 7 bisa menimpanya bila perlu.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **293 test / 23 file — semua lulus** (281 lama + 12 baru) |
+| Test `AddAssetModal` Step 0 | **25 test lulus tanpa diubah** — termasuk blok `chrome` (judul, tombol Save Asset, Cancel menutup tanpa menyimpan) |
+| Golden file CSV | **identik** — lulus tanpa `UPDATE_GOLDEN` |
+| `npx eslint .` | **42 problems (33 error, 9 warning)** — tidak berubah dari Step 3/4; tidak ada lint baru |
+| `npm run build` | sukses (8,09 s) |
+| Esc & Tab berperilaku sama | ✅ dijamin test: `FormModal.test.tsx` memin Esc (menutup, dan **tidak** menutup saat `isSaving`); jebakan Tab hidup di `ui/Modal` yang **tidak disentuh** — `Modal.test.tsx` tetap hijau |
+
+**Test baru** `ui/FormModal.test.tsx` (12): wiring `aria-labelledby` ↔ id heading, children + footer
+berada di dalam `<form>` yang sama, submit lewat tombol footer, tiga jalur `onClose`, banner error
+muncul/menghilang, `isSaving` menonaktifkan seluruh kontrol + menukar label + memblokir Esc,
+`className` default vs timpaan.
+
+⚠️ **Cacat fokus dari Step 0 sengaja BELUM diperbaiki.** Blok `known defect` di `AddAssetModal.test.tsx`
+masih hijau — artinya perilakunya benar-benar tidak berubah, sesuai batasan *structure-only* Step 5.
+`AddAssetModal` masih membuat ulang `handleClose` tiap render, jadi effect fokus `ui/Modal` masih
+berjalan ulang tiap ketikan. Perbaikannya menunggu Step 6 (`useEntityForm` menstabilkan handler) —
+lihat B6 di §5.
+
+**Delta LOC:** `AddAssetModal.tsx` **396 → 353 (−43)**, +96 baris di `ui/FormModal.tsx`.
+Baru jadi penghematan bersih di Step 6–7 saat pemanggil kedua sampai keenam ikut memakainya.
 
 ---
 
@@ -479,6 +527,11 @@ Mitigasi: kerjakan sebagai dua commit (ekstrak `AssetFormFields` → Add saja; b
 jalankan test Step 0 di antaranya.
 
 **Gate:** buat asset baru & edit asset lalu bandingkan baris database sebelum/sesudah · semua test hijau.
+
+**Catatan B6:** `useEntityForm` akan menstabilkan `handleClose` (`useCallback`), yang **memperbaiki**
+cacat fokus dari Step 0 sebagai efek samping. Itu perubahan yang terlihat user (mengetik spasi tidak
+lagi menutup modal) — putuskan dulu sebelum mulai. Kalau disetujui, hapus blok `known defect` di
+`AddAssetModal.test.tsx` dan ganti dengan test yang memin perilaku baru, di commit yang sama.
 
 ---
 
@@ -641,8 +694,8 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
                                         │
 3 Supabase helpers ✅ ─► 4 useLookupTable + useEntityModals ✅
                                         │
-5 ui/FormModal   ◄── di sini
-  └─► 6 🎯 Add/EditAssetModal ─► 7 Modal Maintenance & Reclassification
+5 ui/FormModal ✅
+  └─► 6 🎯 Add/EditAssetModal ◄── di sini ─► 7 Modal Maintenance & Reclassification
                                         │
                               7a ⚠️ B1 ui/Modal ─► 7b ⚠️ B2 error handling
                                         │
@@ -666,6 +719,7 @@ Semua ditemukan saat analisis. Status per 2026-09-09 setelah konfirmasi:
 | B3 | 4 provider data mount di root `App.tsx`, semuanya fetch saat mount — termasuk saat user di halaman Login | Fetch penuh sebelum login; waktu muat awal | ⏸️ ditunda — sesi terpisah |
 | B4 | `Reclassification.tsx:220` — `h-[calc(100vh-[180px])]` (kurung siku bersarang, kelas Tailwind invalid) | Tinggi container tidak sesuai maksud | ⏸️ ditunda — tata letak akan bergeser |
 | B5 | Bahasa campur Indonesia/Inggris di UI (8 file pakai `i18n/id`, 11 pakai `i18n/en`, plus ±25 string hardcoded) | Seluruh UI jadi bahasa Inggris | ✅ **DISETUJUI** → Step 8a. Bahasa target: **Inggris** |
+| B6 | Fokus dicuri tiap ketikan di Add/EditAssetModal — `onClose` di dep array effect fokus `ui/Modal` + `handleClose` dibuat ulang tiap render (ditemukan di Step 0) | Mengetik spasi di field mana pun **menutup modal** dan membuang isian; setelah diperbaiki, fokus bertahan di field | ⬜ **BELUM DIPUTUSKAN** — Step 5 sengaja mempertahankannya (structure-only). Perbaikan alami jatuh di Step 6 saat `useEntityForm` menstabilkan `handleClose`; blok `known defect` di `AddAssetModal.test.tsx` dihapus di commit yang sama |
 
 **Diputuskan 2026-09-09:** `server/index.js:149–183` (`"Jawab dalam Bahasa Indonesia"`) **tidak diubah**.
 Asisten AI tetap menjawab dalam bahasa Indonesia; tidak ada deploy Cloud Run dalam rencana ini.

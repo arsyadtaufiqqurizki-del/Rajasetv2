@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, X } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
 import AutocompleteInput from './ui/AutocompleteInput';
-import Modal from './ui/Modal';
+import FormModal from './ui/FormModal';
 import { applyListedChange, applyVerificationChange } from '../lib/assetRules';
 import { formatCostInput } from '../lib/money';
 
@@ -99,298 +98,256 @@ export default function AddAssetModal() {
   };
 
   return (
-    <Modal
+    <FormModal
       isOpen={isAddModalOpen}
+      titleId={TITLE_ID}
+      title="Add New Asset"
       onClose={handleClose}
-      labelledBy={TITLE_ID}
-      closeOnEscape={!isSaving}
-      className="max-w-2xl max-h-[90vh] flex flex-col"
+      onSubmit={handleSubmit}
+      submitLabel="Save Asset"
+      isSaving={isSaving}
+      error={saveError}
     >
-      <div className="flex items-center justify-between p-6 border-b border-outline-variant/30 shrink-0">
-        <h2 id={TITLE_ID} className="text-xl font-bold text-on-surface">Add New Asset</h2>
-        <button
-          type="button"
-          onClick={handleClose}
-          disabled={isSaving}
-          className="p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="flex flex-col gap-1.5 sm:col-span-1">
+          <label className="text-sm font-semibold text-on-surface">Asset Book *</label>
+          <input 
+            required
+            name="assetBook"
+            value={formData.assetBook}
+            onChange={handleChange}
+            placeholder="e.g. Corporate, Tax, AMT"
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5 sm:col-span-1">
+          <label className="text-sm font-semibold text-on-surface">Subsidiary *</label>
+          <AutocompleteInput 
+            required
+            name="subsidiary"
+            value={formData.subsidiary}
+            onChange={handleChange as any}
+            placeholder="e.g. PT Raja Prima"
+            options={subsidiaries}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Asset Number *</label>
+          <input 
+            required
+            name="assetNumber"
+            value={formData.assetNumber}
+            onChange={handleChange}
+            placeholder="e.g. AST-2026-001"
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Asset Description *</label>
+          <input 
+            required
+            name="assetDescription"
+            value={formData.assetDescription}
+            onChange={handleChange}
+            placeholder="e.g. MacBook Pro M3"
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Asset Cost *</label>
+          <input 
+            required
+            name="assetCost"
+            type="text"
+            value={formData.assetCost}
+            onChange={handleCostChange}
+            placeholder="e.g. 2,499.00"
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Date Place in Service *</label>
+          <input 
+            required
+            name="datePlaceInService"
+            type="date"
+            value={formData.datePlaceInService}
+            onChange={handleChange}
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
 
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div className="flex flex-col gap-1.5 sm:col-span-1">
-              <label className="text-sm font-semibold text-on-surface">Asset Book *</label>
-              <input 
-                required
-                name="assetBook"
-                value={formData.assetBook}
-                onChange={handleChange}
-                placeholder="e.g. Corporate, Tax, AMT"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5 sm:col-span-1">
-              <label className="text-sm font-semibold text-on-surface">Subsidiary *</label>
-              <AutocompleteInput 
-                required
-                name="subsidiary"
-                value={formData.subsidiary}
-                onChange={handleChange as any}
-                placeholder="e.g. PT Raja Prima"
-                options={subsidiaries}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Number *</label>
-              <input 
-                required
-                name="assetNumber"
-                value={formData.assetNumber}
-                onChange={handleChange}
-                placeholder="e.g. AST-2026-001"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Description *</label>
-              <input 
-                required
-                name="assetDescription"
-                value={formData.assetDescription}
-                onChange={handleChange}
-                placeholder="e.g. MacBook Pro M3"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Cost *</label>
-              <input 
-                required
-                name="assetCost"
-                type="text"
-                value={formData.assetCost}
-                onChange={handleCostChange}
-                placeholder="e.g. 2,499.00"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Date Place in Service *</label>
-              <input 
-                required
-                name="datePlaceInService"
-                type="date"
-                value={formData.datePlaceInService}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Asset Class</label>
+          <AutocompleteInput 
+            name="categorySegment1"
+            value={formData.categorySegment1}
+            onChange={handleChange as any}
+            placeholder="e.g. Electronics"
+            options={categories1}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Location</label>
+          <AutocompleteInput 
+            name="categorySegment2"
+            value={formData.categorySegment2}
+            onChange={handleChange as any}
+            placeholder="e.g. Location"
+            options={categories2}
+          />
+        </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Class</label>
-              <AutocompleteInput 
-                name="categorySegment1"
-                value={formData.categorySegment1}
-                onChange={handleChange as any}
-                placeholder="e.g. Electronics"
-                options={categories1}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Location</label>
-              <AutocompleteInput 
-                name="categorySegment2"
-                value={formData.categorySegment2}
-                onChange={handleChange as any}
-                placeholder="e.g. Location"
-                options={categories2}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Units</label>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Asset Units</label>
+          <input 
+            type="number"
+            name="assetUnits"
+            value={formData.assetUnits}
+            onChange={handleChange}
+            min="1"
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-on-surface">Life in Months</label>
+            <label className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
               <input 
-                type="number"
-                name="assetUnits"
-                value={formData.assetUnits}
-                onChange={handleChange}
-                min="1"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                type="checkbox" 
+                checked={isUnlimitedLife} 
+                onChange={handleUnlimitedChange}
+                className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-on-surface">Life in Months</label>
-                <label className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={isUnlimitedLife} 
-                    onChange={handleUnlimitedChange}
-                    className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
+              Unlimited
+            </label>
+          </div>
+          <input 
+            type={isUnlimitedLife ? "text" : "number"}
+            name="lifeInMonths"
+            value={isUnlimitedLife ? "Unlimited" : formData.lifeInMonths}
+            onChange={handleChange}
+            disabled={isUnlimitedLife}
+            min={isUnlimitedLife ? undefined : "1"}
+            className={`w-full rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${isUnlimitedLife ? 'bg-surface-container text-on-surface-variant cursor-not-allowed' : 'bg-surface-container-lowest'}`}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Depreciation Method</label>
+          <div role="radiogroup" aria-label="Depreciation Method" className="flex flex-col gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
+            {['Straight Line', 'Declining Balance', 'Units of Production'].map((method) => {
+              const isUnderMaintenance = method === 'Units of Production';
+              return (
+                <label
+                  key={method}
+                  className={`flex items-center gap-2 text-sm ${isUnderMaintenance ? 'text-on-surface-variant cursor-not-allowed' : 'text-on-surface cursor-pointer'}`}
+                >
+                  <input
+                    type="radio"
+                    name="depreciationMethod"
+                    value={method}
+                    checked={formData.depreciationMethod === method}
+                    onChange={handleChange}
+                    disabled={isUnderMaintenance}
+                    className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
                   />
-                  Unlimited
+                  {method}
+                  {isUnderMaintenance && (
+                    <span className="text-xs text-on-surface-variant">(Maintenance)</span>
+                  )}
                 </label>
-              </div>
-              <input 
-                type={isUnlimitedLife ? "text" : "number"}
-                name="lifeInMonths"
-                value={isUnlimitedLife ? "Unlimited" : formData.lifeInMonths}
-                onChange={handleChange}
-                disabled={isUnlimitedLife}
-                min={isUnlimitedLife ? undefined : "1"}
-                className={`w-full rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${isUnlimitedLife ? 'bg-surface-container text-on-surface-variant cursor-not-allowed' : 'bg-surface-container-lowest'}`}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Depreciation Method</label>
-              <div role="radiogroup" aria-label="Depreciation Method" className="flex flex-col gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
-                {['Straight Line', 'Declining Balance', 'Units of Production'].map((method) => {
-                  const isUnderMaintenance = method === 'Units of Production';
-                  return (
-                    <label
-                      key={method}
-                      className={`flex items-center gap-2 text-sm ${isUnderMaintenance ? 'text-on-surface-variant cursor-not-allowed' : 'text-on-surface cursor-pointer'}`}
-                    >
-                      <input
-                        type="radio"
-                        name="depreciationMethod"
-                        value={method}
-                        checked={formData.depreciationMethod === method}
-                        onChange={handleChange}
-                        disabled={isUnderMaintenance}
-                        className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
-                      />
-                      {method}
-                      {isUnderMaintenance && (
-                        <span className="text-xs text-on-surface-variant">(Maintenance)</span>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Listed</label>
-              <div role="radiogroup" aria-label="Listed" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
-                {['Audited', 'Non-Listed'].map((option) => (
-                  <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
-                    <input
-                      type="radio"
-                      name="listed"
-                      value={option}
-                      checked={formData.listed === option}
-                      onChange={handleListedChange}
-                      className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-sm font-semibold text-on-surface">Status</label>
-              <select 
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                <option value="Active">Active</option>
-                <option value="In Maintenance">In Maintenance</option>
-                <option value="Needs Service">Needs Service</option>
-                <option value="Broken">Broken</option>
-                <option value="Retired">Retired</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Verification</label>
-              <div role="radiogroup" aria-label="Verification" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
-                {['No', 'Yes'].map((option) => {
-                  const isLockedByAudited = option === 'No' && formData.listed === 'Audited';
-                  return (
-                    <label
-                      key={option}
-                      className={`flex items-center gap-2 text-sm ${isLockedByAudited ? 'text-on-surface-variant cursor-not-allowed' : 'text-on-surface cursor-pointer'}`}
-                    >
-                      <input
-                        type="radio"
-                        name="verification"
-                        value={option}
-                        checked={formData.verification === option}
-                        onChange={handleVerificationChange}
-                        disabled={isLockedByAudited}
-                        className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
-                      />
-                      {option}
-                      {isLockedByAudited && (
-                        <span className="text-xs text-on-surface-variant">(Audited requires Yes)</span>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Verification Date</label>
-              <input
-                name="verificationDate"
-                type="date"
-                value={formData.verificationDate}
-                onChange={handleChange}
-                disabled={formData.verification !== 'Yes'}
-                className={`w-full rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formData.verification !== 'Yes' ? 'bg-surface-container text-on-surface-variant cursor-not-allowed' : 'bg-surface-container-lowest'}`}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-sm font-semibold text-on-surface">Item Status</label>
-              <AutocompleteInput
-                name="itemStatus"
-                value={formData.itemStatus}
-                onChange={handleChange as any}
-                placeholder="e.g. Asset, Inventory, Needs Review"
-                options={itemStatuses}
-              />
-            </div>
+              );
+            })}
           </div>
-
-          {saveError && (
-            <p className="text-sm text-error bg-error-container/20 border border-error/20 rounded-lg px-3 py-2">
-              {saveError}
-            </p>
-          )}
-
-          <div className="mt-4 pt-4 border-t border-outline-variant/30 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={isSaving}
-              className="px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-5 py-2.5 text-sm font-medium text-on-primary bg-primary hover:bg-primary/90 transition-colors rounded-lg shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Asset'
-              )}
-            </button>
+        </div>
+        
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Listed</label>
+          <div role="radiogroup" aria-label="Listed" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
+            {['Audited', 'Non-Listed'].map((option) => (
+              <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
+                <input
+                  type="radio"
+                  name="listed"
+                  value={option}
+                  checked={formData.listed === option}
+                  onChange={handleListedChange}
+                  className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
+                />
+                {option}
+              </label>
+            ))}
           </div>
-      </form>
-    </Modal>
+        </div>
+
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <label className="text-sm font-semibold text-on-surface">Status</label>
+          <select 
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+          >
+            <option value="Active">Active</option>
+            <option value="In Maintenance">In Maintenance</option>
+            <option value="Needs Service">Needs Service</option>
+            <option value="Broken">Broken</option>
+            <option value="Retired">Retired</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Verification</label>
+          <div role="radiogroup" aria-label="Verification" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
+            {['No', 'Yes'].map((option) => {
+              const isLockedByAudited = option === 'No' && formData.listed === 'Audited';
+              return (
+                <label
+                  key={option}
+                  className={`flex items-center gap-2 text-sm ${isLockedByAudited ? 'text-on-surface-variant cursor-not-allowed' : 'text-on-surface cursor-pointer'}`}
+                >
+                  <input
+                    type="radio"
+                    name="verification"
+                    value={option}
+                    checked={formData.verification === option}
+                    onChange={handleVerificationChange}
+                    disabled={isLockedByAudited}
+                    className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
+                  />
+                  {option}
+                  {isLockedByAudited && (
+                    <span className="text-xs text-on-surface-variant">(Audited requires Yes)</span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-on-surface">Verification Date</label>
+          <input
+            name="verificationDate"
+            type="date"
+            value={formData.verificationDate}
+            onChange={handleChange}
+            disabled={formData.verification !== 'Yes'}
+            className={`w-full rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formData.verification !== 'Yes' ? 'bg-surface-container text-on-surface-variant cursor-not-allowed' : 'bg-surface-container-lowest'}`}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <label className="text-sm font-semibold text-on-surface">Item Status</label>
+          <AutocompleteInput
+            name="itemStatus"
+            value={formData.itemStatus}
+            onChange={handleChange as any}
+            placeholder="e.g. Asset, Inventory, Needs Review"
+            options={itemStatuses}
+          />
+        </div>
+      </div>
+    </FormModal>
   );
 }
