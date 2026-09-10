@@ -1,418 +1,58 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, X } from 'lucide-react';
 import { useAsset } from '../contexts/AssetContext';
-import AutocompleteInput from './ui/AutocompleteInput';
-import Modal from './ui/Modal';
-import { applyListedChange, applyVerificationChange } from '../lib/assetRules';
-import { formatCostInput } from '../lib/money';
+import FormModal from './ui/FormModal';
+import AssetFormFields from './AssetFormFields';
+import { EMPTY_ASSET_FORM, assetToFormValues, toAssetPayload } from '../lib/assetForm';
+import { useEntityForm } from '../hooks/useEntityForm';
 
 const TITLE_ID = 'edit-asset-modal-title';
 
 export default function EditAssetModal() {
   const { isEditModalOpen, setIsEditModalOpen, updateAsset, editingAsset, setEditingAsset, subsidiaries, categories1, categories2, itemStatuses } = useAsset();
 
-  const [formData, setFormData] = useState({
-    assetBook: '',
-    subsidiary: '',
-    assetNumber: '',
-    assetDescription: '',
-    assetCost: '',
-    datePlaceInService: '',
-    assetUnits: '1',
-    categorySegment1: '',
-    categorySegment2: '',
-    depreciationMethod: 'Straight Line',
-    lifeInMonths: '60',
-    listed: 'Audited',
-    status: 'Active',
-    verification: 'No',
-    verificationDate: '',
-    itemStatus: '',
+  const form = useEntityForm({
+    // Only reached when the modal is opened without a row; the early return below
+    // means the blank form is never rendered.
+    initialValues: EMPTY_ASSET_FORM,
+    resetKey: editingAsset,
+    // Re-hydrating on every row change, and on mount when a row is already picked.
+    // Clearing the row (after a save, or on Cancel) seeds nothing, so the fields
+    // are left as they were while the modal unmounts.
+    seed: () => (editingAsset ? assetToFormValues(editingAsset) : null),
+    errorPrefix: 'Failed to update asset',
   });
-
-  const [isUnlimitedLife, setIsUnlimitedLife] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (editingAsset) {
-      // Stored cost is unformatted; run it through the same formatter the field uses.
-      const formattedInitialCost = formatCostInput(editingAsset.assetCost || '');
-
-      setFormData({
-        assetBook: editingAsset.assetBook,
-        subsidiary: editingAsset.subsidiary || '',
-        assetNumber: editingAsset.assetNumber,
-        assetDescription: editingAsset.assetDescription,
-        assetCost: formattedInitialCost,
-        datePlaceInService: editingAsset.datePlaceInService,
-        assetUnits: editingAsset.assetUnits,
-        categorySegment1: editingAsset.categorySegment1,
-        categorySegment2: editingAsset.categorySegment2,
-        depreciationMethod: editingAsset.depreciationMethod,
-        lifeInMonths: editingAsset.lifeInMonths,
-        listed: editingAsset.listed,
-        status: editingAsset.status,
-        verification: editingAsset.verification ? 'Yes' : 'No',
-        verificationDate: editingAsset.verificationDate || '',
-        itemStatus: editingAsset.itemStatus || '',
-      });
-      setIsUnlimitedLife(editingAsset.lifeInMonths === 'Unlimited');
-      setIsSaving(false);
-      setSaveError(null);
-    }
-  }, [editingAsset]);
 
   if (!editingAsset) return null;
 
   const handleClose = () => {
-    if (isSaving) return;
+    if (form.isSaving) return;
     setIsEditModalOpen(false);
     setEditingAsset(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaveError(null);
-    setIsSaving(true);
-    try {
-      const dataToSave = {
-        ...formData,
-        assetCost: formData.assetCost.replace(/,/g, ''),
-        verification: formData.verification === 'Yes',
-      };
-      await updateAsset(editingAsset.id, dataToSave);
-      setIsEditModalOpen(false);
-      setEditingAsset(null);
-    } catch (err) {
-      setSaveError('Failed to update asset: ' + (err instanceof Error ? err.message : 'An unexpected error occurred.'));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleVerificationChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const value = e.target.value;
-    setFormData(prev => applyVerificationChange(prev, value));
-  };
-
-  const handleListedChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const value = e.target.value;
-    setFormData(prev => applyListedChange(prev, value));
-  };
-
-  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatCostInput(e.target.value);
-    setFormData(prev => ({ ...prev, assetCost: formatted }));
-  };
-
-  const handleUnlimitedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = e.target.checked;
-    setIsUnlimitedLife(checked);
-    if (checked) {
-      setFormData(prev => ({ ...prev, lifeInMonths: 'Unlimited' }));
-    } else {
-      setFormData(prev => ({ ...prev, lifeInMonths: '60' }));
-    }
-  };
+  const handleSubmit = form.handleSubmit(async values => {
+    await updateAsset(editingAsset.id, toAssetPayload(values));
+    setIsEditModalOpen(false);
+    setEditingAsset(null);
+  });
 
   return (
-    <Modal
+    <FormModal
       isOpen={isEditModalOpen}
+      titleId={TITLE_ID}
+      title="Edit Asset"
       onClose={handleClose}
-      labelledBy={TITLE_ID}
-      closeOnEscape={!isSaving}
-      className="max-w-2xl max-h-[90vh] flex flex-col"
+      onSubmit={handleSubmit}
+      submitLabel="Update Asset"
+      isSaving={form.isSaving}
+      error={form.saveError}
     >
-      <div className="flex items-center justify-between p-6 border-b border-outline-variant/30 shrink-0">
-        <h2 id={TITLE_ID} className="text-xl font-bold text-on-surface">Edit Asset</h2>
-        <button
-          type="button"
-          onClick={handleClose}
-          disabled={isSaving}
-          className="p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div className="flex flex-col gap-1.5 sm:col-span-1">
-              <label className="text-sm font-semibold text-on-surface">Asset Book *</label>
-              <input 
-                required
-                name="assetBook"
-                value={formData.assetBook}
-                onChange={handleChange}
-                placeholder="e.g. Corporate, Tax, AMT"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5 sm:col-span-1">
-              <label className="text-sm font-semibold text-on-surface">Subsidiary *</label>
-              <AutocompleteInput 
-                required
-                name="subsidiary"
-                value={formData.subsidiary}
-                onChange={handleChange as any}
-                placeholder="e.g. PT Raja Prima"
-                options={subsidiaries}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Number *</label>
-              <input 
-                required
-                name="assetNumber"
-                value={formData.assetNumber}
-                onChange={handleChange}
-                placeholder="e.g. AST-2026-001"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Description *</label>
-              <input 
-                required
-                name="assetDescription"
-                value={formData.assetDescription}
-                onChange={handleChange}
-                placeholder="e.g. MacBook Pro M3"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Cost *</label>
-              <input 
-                required
-                name="assetCost"
-                type="text"
-                value={formData.assetCost}
-                onChange={handleCostChange}
-                placeholder="e.g. 2,499.00"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Date Place in Service *</label>
-              <input 
-                required
-                name="datePlaceInService"
-                type="date"
-                value={formData.datePlaceInService}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Class</label>
-              <AutocompleteInput 
-                name="categorySegment1"
-                value={formData.categorySegment1}
-                onChange={handleChange as any}
-                placeholder="e.g. Electronics"
-                options={categories1}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Location</label>
-              <AutocompleteInput 
-                name="categorySegment2"
-                value={formData.categorySegment2}
-                onChange={handleChange as any}
-                placeholder="e.g. Location"
-                options={categories2}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Asset Units</label>
-              <input 
-                type="number"
-                name="assetUnits"
-                value={formData.assetUnits}
-                onChange={handleChange}
-                min="1"
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-on-surface">Life in Months</label>
-                <label className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={isUnlimitedLife} 
-                    onChange={handleUnlimitedChange}
-                    className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
-                  />
-                  Unlimited
-                </label>
-              </div>
-              <input 
-                type={isUnlimitedLife ? "text" : "number"}
-                name="lifeInMonths"
-                value={isUnlimitedLife ? "Unlimited" : formData.lifeInMonths}
-                onChange={handleChange}
-                disabled={isUnlimitedLife}
-                min={isUnlimitedLife ? undefined : "1"}
-                className={`w-full rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${isUnlimitedLife ? 'bg-surface-container text-on-surface-variant cursor-not-allowed' : 'bg-surface-container-lowest'}`}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Depreciation Method</label>
-              <div role="radiogroup" aria-label="Depreciation Method" className="flex flex-col gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
-                {['Straight Line', 'Declining Balance', 'Units of Production'].map((method) => {
-                  const isUnderMaintenance = method === 'Units of Production';
-                  return (
-                    <label
-                      key={method}
-                      className={`flex items-center gap-2 text-sm ${isUnderMaintenance ? 'text-on-surface-variant cursor-not-allowed' : 'text-on-surface cursor-pointer'}`}
-                    >
-                      <input
-                        type="radio"
-                        name="depreciationMethod"
-                        value={method}
-                        checked={formData.depreciationMethod === method}
-                        onChange={handleChange}
-                        disabled={isUnderMaintenance}
-                        className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
-                      />
-                      {method}
-                      {isUnderMaintenance && (
-                        <span className="text-xs text-on-surface-variant">(Maintenance)</span>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Listed</label>
-              <div role="radiogroup" aria-label="Listed" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
-                {['Audited', 'Non-Listed'].map((option) => (
-                  <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
-                    <input
-                      type="radio"
-                      name="listed"
-                      value={option}
-                      checked={formData.listed === option}
-                      onChange={handleListedChange}
-                      className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-sm font-semibold text-on-surface">Status</label>
-              <select 
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                <option value="Active">Active</option>
-                <option value="In Maintenance">In Maintenance</option>
-                <option value="Needs Service">Needs Service</option>
-                <option value="Broken">Broken</option>
-                <option value="Retired">Retired</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Verification</label>
-              <div role="radiogroup" aria-label="Verification" className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5">
-                {['No', 'Yes'].map((option) => {
-                  const isLockedByAudited = option === 'No' && formData.listed === 'Audited';
-                  return (
-                    <label
-                      key={option}
-                      className={`flex items-center gap-2 text-sm ${isLockedByAudited ? 'text-on-surface-variant cursor-not-allowed' : 'text-on-surface cursor-pointer'}`}
-                    >
-                      <input
-                        type="radio"
-                        name="verification"
-                        value={option}
-                        checked={formData.verification === option}
-                        onChange={handleVerificationChange}
-                        disabled={isLockedByAudited}
-                        className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
-                      />
-                      {option}
-                      {isLockedByAudited && (
-                        <span className="text-xs text-on-surface-variant">(Audited requires Yes)</span>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-semibold text-on-surface">Verification Date</label>
-              <input
-                name="verificationDate"
-                type="date"
-                value={formData.verificationDate}
-                onChange={handleChange}
-                disabled={formData.verification !== 'Yes'}
-                className={`w-full rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${formData.verification !== 'Yes' ? 'bg-surface-container text-on-surface-variant cursor-not-allowed' : 'bg-surface-container-lowest'}`}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-sm font-semibold text-on-surface">Item Status</label>
-              <AutocompleteInput
-                name="itemStatus"
-                value={formData.itemStatus}
-                onChange={handleChange as any}
-                placeholder="e.g. Asset, Inventory, Needs Review"
-                options={itemStatuses}
-              />
-            </div>
-          </div>
-
-          {saveError && (
-            <p className="text-sm text-error bg-error-container/20 border border-error/20 rounded-lg px-3 py-2">
-              {saveError}
-            </p>
-          )}
-
-          <div className="mt-4 pt-4 border-t border-outline-variant/30 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={isSaving}
-              className="px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-5 py-2.5 text-sm font-medium text-on-primary bg-primary hover:bg-primary/90 transition-colors rounded-lg shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Update Asset'
-              )}
-            </button>
-          </div>
-      </form>
-    </Modal>
+      <AssetFormFields
+        form={form}
+        subsidiaries={subsidiaries}
+        categories1={categories1}
+        categories2={categories2}
+        itemStatuses={itemStatuses}
+      />
+    </FormModal>
   );
 }

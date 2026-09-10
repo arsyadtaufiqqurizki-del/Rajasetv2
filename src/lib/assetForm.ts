@@ -1,4 +1,5 @@
-import type { AssetInput } from '../types/asset';
+import { formatCostInput } from './money';
+import type { Asset, AssetInput } from '../types/asset';
 
 /**
  * The shape of the Asset form and the mappings at its two edges — the blank form
@@ -53,5 +54,32 @@ export function toAssetPayload(values: AssetFormValues): AssetInput {
     ...values,
     assetCost: values.assetCost.replace(/,/g, ''),
     verification: values.verification === 'Yes',
+  };
+}
+
+/**
+ * A stored row -> the form EditAssetModal opens with. Two things happen here that
+ * Add has no equivalent for: the cost is stored unformatted, so it goes back
+ * through the same formatter the field uses (difference 1 of the four Step 6
+ * listed in "refactoring v2.md"), and verification comes back as a boolean.
+ */
+export function assetToFormValues(asset: Asset): AssetFormValues {
+  return {
+    assetBook: asset.assetBook,
+    subsidiary: asset.subsidiary || '',
+    assetNumber: asset.assetNumber,
+    assetDescription: asset.assetDescription,
+    assetCost: formatCostInput(asset.assetCost || ''),
+    datePlaceInService: asset.datePlaceInService,
+    assetUnits: asset.assetUnits,
+    categorySegment1: asset.categorySegment1,
+    categorySegment2: asset.categorySegment2,
+    depreciationMethod: asset.depreciationMethod,
+    lifeInMonths: asset.lifeInMonths,
+    listed: asset.listed,
+    status: asset.status,
+    verification: asset.verification ? 'Yes' : 'No',
+    verificationDate: asset.verificationDate || '',
+    itemStatus: asset.itemStatus || '',
   };
 }
