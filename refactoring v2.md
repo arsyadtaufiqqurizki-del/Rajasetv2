@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6 SELESAI (2026-09-10). Berikutnya: Step 7.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7 SELESAI (2026-09-10). Berikutnya: Step 7a (B1).**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **328** (25 file) · lint: 46 → **32 problems** · gate terakhir dijalankan 2026-09-10
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **441** (32 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-10
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -653,7 +653,7 @@ Reclassification ikut memakai `useEntityForm` + `FormModal`.
 
 ---
 
-### Step 7 — Modal Maintenance & Reclassification *(±5 jam)*
+### Step 7 — Modal Maintenance & Reclassification ✅ **SELESAI 2026-09-10** *(±4 jam)*
 - Ekstrak `ui/AssetPicker.tsx` dari `AddReclassificationModal` + `AddMaintenanceModal` (2 salinan identik).
 - Pasangan Maintenance & Reclassification memakai `useEntityForm` + `FormModal`.
 
@@ -663,12 +663,108 @@ mengedit field bebas dan membedakan baris linked vs unlinked. Itu perbedaan **do
 
 **Gate:** CRUD penuh di Maintenance & Reclassification · alur verify tetap jalan.
 
+> ⚠️ **Bentrokan yang ditemukan saat eksekusi — Step 7 vs Step 7a.** Teks Step 7 meminta keempat
+> modal memakai `FormModal`, tapi `FormModal` dibangun **di atas `ui/Modal`** — mengadopsinya di sini
+> otomatis membawa seluruh perubahan behavior B1 (Esc menutup, focus trap, scroll lock, portal) yang
+> §0 wajibkan berdiri sebagai commit tersendiri, dan yang dijadwalkan di Step 7a.
+> **Keputusan: batasan §0 menang.** Step 7 dikerjakan *structure-only* — chrome hand-roll
+> `fixed inset-0` keempat modal dibiarkan apa adanya — dan penukaran chrome → `FormModal` dipindah
+> ke Step 7a, yang justru jadi lebih sederhana karena `FormModal` sudah ada sejak Step 5.
+
+**Pra-kerja (commit `1f06c48`) — jaring pengaman.** Keempat modal ini **tidak tercakup Step 0**,
+padahal Step 7 menyentuh semuanya. 62 characterization test ditulis lebih dulu terhadap kode yang
+belum diubah (**328 → 390**), tanpa satu baris perubahan production code:
+
+| File | Test | Yang dipin |
+|---|---|---|
+| `AddMaintenanceModal.test.tsx` | 16 | semantik asset picker (search per nomor & deskripsi, batas 50, hint "Menampilkan 50 dari N"), payload `addRecord` yang dirakit dari asset terpilih, fallback `assetBook` → `id`, reset saat ditutup lalu dibuka lagi |
+| `EditMaintenanceModal.test.tsx` | 12 | tiga kondisi mount (`!isOpen`, id tak cocok, id `null`), hidrasi dari record tersimpan + fallback hari-ini/Pending, payload `updateRecord` yang menyebar **seluruh** record termasuk `id`, label berbeda dari Add |
+| `AddReclassificationModal.test.tsx` | 18 | asset yang sudah tertaut tidak bisa dipilih (dan baris unlinked tidak ikut memblokir), saklar preset/Custom, argumen `addLinkedReclassification`, trim custom category, **banner error** — satu-satunya dari empat modal yang jalur errornya benar-benar terjangkau |
+| `EditReclassificationModal.test.tsx` | 16 | pemisahan linked vs unlinked (field identitas terkunci + banner, `AutocompleteInput` hilang saat linked), deteksi kategori preset vs custom, payload `updateReclassification`, `setEditingReclassification(null)` saat tutup |
+
+**Hasil (2026-09-10, commit `b3d6b48`):** 1 komponen ui + 2 modul lib baru + 3 file test baru,
+**390 → 441 test** (32 file), semuanya hijau. Golden file CSV tetap identik.
+
+| Yang dipindah | Dari | Ke |
+|---|---|---|
+| Picker asset: search + click-outside + `slice(0,50)` + hidden required input (2 salinan) | `AddMaintenanceModal:15–63` & `:114–175`, `AddReclassificationModal:11–63` & `:103–164` | `components/ui/AssetPicker.tsx` |
+| Bentuk form maintenance + mapping payload (2 salinan) | `AddMaintenanceModal:21–27` & `:76–89`, `EditMaintenanceModal:15–36` & `:48–55` | `lib/maintenanceForm.ts` → `emptyMaintenanceForm`, `emptyAddMaintenanceForm`, `recordToFormValues`, `toMaintenancePayload`, `toMaintenanceUpdate` |
+| Aturan kategori preset ↔ Custom (2 salinan) | `AddReclassificationModal:18–19` & `:72`, `EditReclassificationModal:26–27`, `:40–42` & `:59` | `lib/reclassificationForm.ts` → `splitCategory`, `resolveCategory`, `isPresetCategory` |
+| State simpan/error/loading + effect reset (4 salinan) | keempat modal | `hooks/useEntityForm.ts` (dari Step 6) |
+
+**Empat keputusan bentuk API:**
+- **Yang berbeda antara dua pemanggil picker jadi prop, bukan diseragamkan:** `triggerClassName`,
+  `panelClassName`, `placeholder`, dan `renderMoreHint(total)`. Kedua modal memakai kelas Tailwind
+  yang berbeda (`rounded-md px-3 py-2 focus:ring-2` vs `rounded-lg px-4 py-2.5 focus:ring-1`) dan
+  kalimat hint yang berbeda ("…N aset." vs "…N asset."). Menyeragamkannya = perubahan visual.
+- **State `search`/`isOpen` pindah ke dalam `AssetPicker`.** Keduanya ikut bersih saat modal unmount —
+  persis yang dulu dikerjakan manual oleh effect reset-on-close. `assets` yang diterima picker sudah
+  difilter pemanggil (`linkableAssets` di Reclassification), jadi hint pun menghitung daftar itu.
+- **Guard "belum lengkap" diletakkan di LUAR `form.handleSubmit`.** `useEntityForm.handleSubmit`
+  menaikkan `isSaving` sebelum memanggil `save`; kalau guard (asset belum dipilih / custom category
+  kosong) ditaruh di dalam, submit yang belum lengkap akan mengedipkan spinner sekejap. Dulu kode
+  `return` sebelum `setIsSubmitting(true)` — bentuk sekarang mempertahankannya.
+- **`useEntityForm.handleChange` diperlebar ke `HTMLTextAreaElement`** (tipe baru `FormFieldElement`).
+  Ini yang menghapus 2 cast `onChange={handleChange as any}` di `EditReclassificationModal`.
+
+⚠️ **Perbedaan domain dipertahankan, tidak diseragamkan:** Add-Maintenance merakit record dari asset
+terpilih vs Edit yang menulis 5 field service saja di atas record tersimpan · Add-Reclassification
+hanya menawarkan asset yang belum tertaut vs Edit yang mengunci field identitas pada baris linked ·
+nilai awal dropdown kategori tetap berbeda (`Add: 'Asset'`, `Edit: 'Needs Review'`) · label tombol
+tetap berbeda (`Save Record`/`Save Changes`/`Simpan`/`Update`, dan `Saving...` vs `Updating...`).
+
+⚠️ **Satu divergensi yang tak terjangkau.** `AddReclassificationModal` dulu memakai fallback
+`'Terjadi kesalahan'` untuk error non-`Error`; `useEntityForm` memakai `'An unexpected error occurred.'`.
+Terverifikasi tidak terjangkau: `PostgrestError` **extends `Error`** (`@supabase/postgrest-js@2.108.2`),
+jadi pesan yang benar-benar tampil (`Gagal menyimpan item: <message>`) identik dengan sebelumnya.
+
+**Banner error ditambahkan ke tiga modal yang belum punya.** `addRecord`/`updateRecord`/
+`updateReclassification` masih **menelan** error (B2 belum dikerjakan), jadi banner itu belum bisa
+tampil — markup-nya nol dampak sekarang dan siap dipakai Step 7b. Yang berubah: `catch { throw err }`
+yang tak terjangkau menjadi `setSaveError` yang tak terjangkau.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **441 test / 32 file — semua lulus** (390 lama + 51 baru) |
+| 62 test characterization pra-kerja | **lulus tanpa satu baris pun diubah** |
+| Golden file CSV | **identik** — lulus tanpa `UPDATE_GOLDEN` |
+| `npx eslint .` | **24 problems (15 error, 9 warning)** — turun 8 error dari 32/23: 6 `no-explicit-any` + 2 `set-state-in-effect` |
+| `npm run build` | sukses (33,35 s) |
+| Gate manual (CRUD penuh + alur verify) | ⬜ **belum dijalankan** — sesi ini tanpa browser; digantikan test di bawah |
+
+**Pengganti gate manual.**
+
+| Lapis | File | Test | Yang dipin |
+|---|---|---|---|
+| Perilaku modal | 4 file `*Modal.test.tsx` | 62 | tidak diubah sama sekali — CRUD lengkap kedua pasangan lewat mock context |
+| Kontrak komponen | `ui/AssetPicker.test.tsx` | 22 | kelas dari pemanggil terpasang, hidden input required/readonly, toggle & click-outside, search trim+case-insensitive, batas 50 pada daftar terfilter **dan** tak terfilter, hint hanya saat search kosong & daftar > 50, baris terpilih ditandai, mode terkontrol |
+| Mapping murni | `lib/maintenanceForm.test.ts` | 15 | jam dibaca tiap panggil (bukan sekali saat import), fallback Pending/hari-ini, `assetBook` → `id`, payload Add tanpa `id` & payload Edit **dengan** `id`, round-trip record → form → record |
+| Mapping murni | `lib/reclassificationForm.test.ts` | 14 | preset vs custom (termasuk sentinel `'Custom'` yang bukan preset & kategori kosong), trim, blank = "jangan submit", nilai awal Add vs Edit yang berbeda, round-trip baris → form → payload |
+
+Yang **tidak** tercakup test dan masih perlu dilihat mata: CRUD sungguhan di kedua halaman terhadap
+database produksi, dan alur verify (`VerifyReclassificationModal` tidak disentuh Step 7).
+
+**Delta LOC:** 4 modal **938 → 742 (−196)**, +350 baris di 3 modul bersama (`AssetPicker` 147 ·
+`reclassificationForm` 106 · `maintenanceForm` 97). Penyusutan besar menunggu Step 7a, saat chrome
+keempatnya (±50 baris masing-masing) diganti `FormModal`.
+
 ---
 
 ### Step 7a — ⚠️ B1: migrasi 6 modal ke `ui/Modal` *(±2 jam — MENGUBAH BEHAVIOR, commit terpisah)*
 `AddMaintenanceModal`, `EditMaintenanceModal`, `AddReclassificationModal`, `EditReclassificationModal`,
 `VerifyReclassificationModal`, `MaintenanceCalendarModal` — buang markup `fixed inset-0` buatan sendiri,
 pakai `ui/Modal`.
+
+> **Diperbarui setelah Step 7.** Empat modal pertama sudah memakai `useEntityForm`, jadi migrasinya
+> sekarang berarti mengganti chrome mereka dengan **`ui/FormModal`** (header + `<form>` + banner error
+> + footer sudah jadi satu komponen sejak Step 5) — bukan memasang `ui/Modal` mentah. Banner errornya
+> pun sudah terpasang di Step 7, tinggal berpindah pemilik. Dua sisanya (`VerifyReclassificationModal`,
+> `MaintenanceCalendarModal`) bukan modal form, jadi tetap langsung ke `ui/Modal`.
+> Cacat pencurian fokus B6 sudah tertutup di akar (Step 5a), jadi keempat modal form ikut sembuh
+> begitu masuk `ui/Modal`. 62 characterization test dari pra-kerja Step 7 jadi jaring pengamannya —
+> yang akan berubah dan **harus** dibarui: tiga jalur tutup (X, Cancel, Esc) dan kondisi mount, karena
+> `ui/Modal` merender lewat portal.
 
 **Perubahan yang akan dirasakan user:** Esc menutup modal (sebelumnya tidak) · fokus keyboard terperangkap
 di dalam dialog · scroll body terkunci saat modal terbuka · modal dirender lewat portal.
@@ -813,9 +909,9 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
 3 Supabase helpers ✅ ─► 4 useLookupTable + useEntityModals ✅
                                         │
 5 ui/FormModal ✅ ─► 5a ⚠️ B6 fokus ui/Modal ✅
-  └─► 6 🎯 Add/EditAssetModal ✅ ─► 7 Modal Maintenance & Reclassification ◄── di sini
+  └─► 6 🎯 Add/EditAssetModal ✅ ─► 7 Modal Maintenance & Reclassification ✅
                                         │
-                              7a ⚠️ B1 ui/Modal ─► 7b ⚠️ B2 error handling
+              7a ⚠️ B1 chrome → FormModal ◄── di sini ─► 7b ⚠️ B2 error handling
                                         │
 8 Hook halaman list ─► 8a ⚠️ B5 copy ke Inggris ─► [9 ditunda] ─► 10 Gate akhir
 ```
