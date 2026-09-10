@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5 SELESAI (2026-09-10). Berikutnya: Step 6.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a SELESAI (2026-09-10). Berikutnya: Step 6.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 6–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **293** (23 file) · lint: 46 → **42 problems** · gate terakhir dijalankan 2026-09-10
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **300** (23 file) · lint: 46 → **42 problems** · gate terakhir dijalankan 2026-09-10
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -223,9 +223,11 @@ Rekam ulang golden file setelah perubahan format yang **disengaja**:
 > `ui/Modal` menaruh `onClose` di dependency array effect fokusnya, sementara `AddAssetModal`/`EditAssetModal`
 > membuat ulang `handleClose` setiap render. Akibatnya **setiap ketikan** menjalankan ulang effect itu dan
 > memindahkan fokus ke tombol X — mengetik spasi lalu menekan tombol X dan menutup modal.
-> Dipin sementara di blok `known defect` pada `AddAssetModal.test.tsx`. Perbaikannya masuk Step 5/6
-> (saat handler pindah ke `ui/FormModal` + `useEntityForm`); hapus blok itu ketika sudah diperbaiki.
-> Ini bukan bagian dari B1/B2/B5 — pertimbangkan menambahkannya sebagai B6.
+> Dipin sementara di blok `known defect` pada `AddAssetModal.test.tsx`. Ini bukan bagian dari
+> B1/B2/B5 — didaftarkan sebagai **B6** di §5. ✅ **Diperbaiki di Step 5a (2026-09-10)**; blok
+> `known defect` sudah diganti test yang memin perilaku baru. Blok itu bekerja persis seperti
+> maksudnya: ia **gagal** begitu perbaikannya masuk, jadi perubahan perilakunya tidak bisa lewat
+> tanpa terlihat.
 
 ---
 
@@ -497,14 +499,64 @@ berada di dalam `<form>` yang sama, submit lewat tombol footer, tiga jalur `onCl
 muncul/menghilang, `isSaving` menonaktifkan seluruh kontrol + menukar label + memblokir Esc,
 `className` default vs timpaan.
 
-⚠️ **Cacat fokus dari Step 0 sengaja BELUM diperbaiki.** Blok `known defect` di `AddAssetModal.test.tsx`
-masih hijau — artinya perilakunya benar-benar tidak berubah, sesuai batasan *structure-only* Step 5.
-`AddAssetModal` masih membuat ulang `handleClose` tiap render, jadi effect fokus `ui/Modal` masih
-berjalan ulang tiap ketikan. Perbaikannya menunggu Step 6 (`useEntityForm` menstabilkan handler) —
-lihat B6 di §5.
+⚠️ **Cacat fokus dari Step 0 sengaja TIDAK diperbaiki di step ini.** Blok `known defect` di
+`AddAssetModal.test.tsx` tetap hijau sepanjang Step 5 — artinya perilakunya benar-benar tidak berubah,
+sesuai batasan *structure-only*. Perbaikannya dikerjakan tepat sesudahnya sebagai **Step 5a** di bawah.
 
 **Delta LOC:** `AddAssetModal.tsx` **396 → 353 (−43)**, +96 baris di `ui/FormModal.tsx`.
 Baru jadi penghematan bersih di Step 6–7 saat pemanggil kedua sampai keenam ikut memakainya.
+
+---
+
+### Step 5a — ⚠️ B6: hentikan pencurian fokus di `ui/Modal` ✅ **SELESAI 2026-09-10** *(±1 jam — MENGUBAH BEHAVIOR, commit terpisah)*
+
+**Keputusan 2026-09-10:** B6 disetujui, dan diperbaiki **di akar masalahnya** (`ui/Modal`) sebagai
+commit tersendiri sebelum Step 6 — bukan dibiarkan ikut arus lewat `useEntityForm`. Alasannya:
+`useEntityForm` hanya menyembuhkan dua modal asset, sementara jebakan yang sama menunggu setiap
+modal form berikutnya di Step 7. Satu perbaikan di `ui/Modal` menutupnya untuk kesembilan konsumen
+sekarang dan seterusnya.
+
+**Penyebab.** Effect fokus/scroll/keydown di `ui/Modal` mencantumkan `onClose` dan `closeOnEscape`
+di dependency array-nya. Pemanggil membuat ulang `handleClose` tiap render dan membalik
+`closeOnEscape` saat menyimpan, jadi effect itu berjalan ulang **tiap ketikan** dan memfokuskan
+ulang elemen fokusable pertama di panel — tombol X di header. Spasi berikutnya menekan tombol itu.
+
+**Perbaikan.** `onClose` dan `closeOnEscape` dibaca lewat ref yang disegarkan tiap render; dependency
+array effect utama menyusut jadi `[isOpen]`. Semantiknya sekarang lurus: pasang fokus, kunci scroll
+dan daftarkan handler **satu kali per buka**, bukan tiap render. Esc tetap memanggil `onClose`
+**terbaru** dan tetap menghormati `closeOnEscape` terbaru — dua-duanya dipin test.
+
+**Perubahan yang akan dirasakan user:** mengetik di `AddAssetModal`/`EditAssetModal` tidak lagi
+melempar fokus ke tombol X, dan spasi tidak lagi menutup modal + membuang isian. Fokus bertahan
+di field tempat user mengetik.
+
+**Cakupan terverifikasi.** Dari 9 konsumen `ui/Modal`, hanya `AddAssetModal` dan `EditAssetModal`
+yang benar-benar terkena. Pembedanya: keduanya mendefinisikan `handleClose` **di komponen yang sama**
+yang render ulang tiap ketikan. Konsumen lain (`BulkEditModal`, `DeleteConfirmModal`, `ConfirmModal`,
+dst.) menerima `onClose`/`onCancel` sebagai prop dari halaman induk yang tidak ikut render saat user
+mengetik, jadi identitasnya sudah stabil. `DeleteConfirmModal` punya kondisi mirip (input ketik
+`DELETE`, state di halaman) tapi elemen fokusable pertamanya adalah input itu sendiri — fokus
+dikembalikan ke tempat yang sama, jadi tak pernah terlihat.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **300 test / 23 file — semua lulus** (293 lama + 7 baru, 2 diganti) |
+| Blok `known defect` Step 0 | **gagal lalu dihapus** — persis seperti maksudnya; diganti 3 test yang memin perilaku baru |
+| Golden file CSV | **identik** — lulus tanpa `UPDATE_GOLDEN` |
+| `npx eslint .` | **42 problems (33 error, 9 warning)** — tidak berubah; `Modal.tsx` & `FormModal.tsx` nol masalah |
+| `npm run build` | sukses (10,56 s) |
+| Gate manual (ketik di modal browser sungguhan) | ⬜ **belum dijalankan** — sesi ini tanpa browser; digantikan test di bawah |
+
+**Test baru (7, menggantikan 2):**
+
+| File | Test | Yang dipin |
+|---|---|---|
+| `ui/Modal.test.tsx` | +5 | fokus bertahan di field saat pemanggil render ulang dengan `onClose` baru · spasi tidak sampai ke tombol close · fokus tidak bergerak saat `closeOnEscape` berbalik (mis. saat save mulai) · Esc memanggil `onClose` **terbaru**, bukan yang basi · `closeOnEscape` terbaru tetap dihormati bolak-balik |
+| `AddAssetModal.test.tsx` | 3 (ganti 2) | fokus bertahan lintas ketikan · `MacBook Pro M3` masuk utuh ke Asset Description tanpa modal tertutup · format ribuan tetap jalan saat diketik digit per digit (`2499` → `2,499`) |
+| `EditAssetModal.test.tsx` | +1 | idem untuk Edit, plus `setEditingAsset` tidak ikut terpanggil |
+
+Yang **tidak** tercakup test dan masih perlu dilihat mata: mengetik di modal sungguhan di browser.
 
 ---
 
@@ -528,10 +580,10 @@ jalankan test Step 0 di antaranya.
 
 **Gate:** buat asset baru & edit asset lalu bandingkan baris database sebelum/sesudah · semua test hijau.
 
-**Catatan B6:** `useEntityForm` akan menstabilkan `handleClose` (`useCallback`), yang **memperbaiki**
-cacat fokus dari Step 0 sebagai efek samping. Itu perubahan yang terlihat user (mengetik spasi tidak
-lagi menutup modal) — putuskan dulu sebelum mulai. Kalau disetujui, hapus blok `known defect` di
-`AddAssetModal.test.tsx` dan ganti dengan test yang memin perilaku baru, di commit yang sama.
+**Catatan B6:** sudah beres di Step 5a — `ui/Modal` tidak lagi mencuri fokus, dan blok `known defect`
+sudah diganti test perilaku baru. Step 6 karena itu tidak lagi memikul perubahan behavior terselubung;
+`useEntityForm` boleh saja membungkus `handleClose` dengan `useCallback` (tetap praktik yang benar),
+tapi gate-nya sekarang murni structure-only.
 
 ---
 
@@ -694,7 +746,7 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
                                         │
 3 Supabase helpers ✅ ─► 4 useLookupTable + useEntityModals ✅
                                         │
-5 ui/FormModal ✅
+5 ui/FormModal ✅ ─► 5a ⚠️ B6 fokus ui/Modal ✅
   └─► 6 🎯 Add/EditAssetModal ◄── di sini ─► 7 Modal Maintenance & Reclassification
                                         │
                               7a ⚠️ B1 ui/Modal ─► 7b ⚠️ B2 error handling
@@ -719,7 +771,7 @@ Semua ditemukan saat analisis. Status per 2026-09-09 setelah konfirmasi:
 | B3 | 4 provider data mount di root `App.tsx`, semuanya fetch saat mount — termasuk saat user di halaman Login | Fetch penuh sebelum login; waktu muat awal | ⏸️ ditunda — sesi terpisah |
 | B4 | `Reclassification.tsx:220` — `h-[calc(100vh-[180px])]` (kurung siku bersarang, kelas Tailwind invalid) | Tinggi container tidak sesuai maksud | ⏸️ ditunda — tata letak akan bergeser |
 | B5 | Bahasa campur Indonesia/Inggris di UI (8 file pakai `i18n/id`, 11 pakai `i18n/en`, plus ±25 string hardcoded) | Seluruh UI jadi bahasa Inggris | ✅ **DISETUJUI** → Step 8a. Bahasa target: **Inggris** |
-| B6 | Fokus dicuri tiap ketikan di Add/EditAssetModal — `onClose` di dep array effect fokus `ui/Modal` + `handleClose` dibuat ulang tiap render (ditemukan di Step 0) | Mengetik spasi di field mana pun **menutup modal** dan membuang isian; setelah diperbaiki, fokus bertahan di field | ⬜ **BELUM DIPUTUSKAN** — Step 5 sengaja mempertahankannya (structure-only). Perbaikan alami jatuh di Step 6 saat `useEntityForm` menstabilkan `handleClose`; blok `known defect` di `AddAssetModal.test.tsx` dihapus di commit yang sama |
+| B6 | Fokus dicuri tiap ketikan di Add/EditAssetModal — `onClose` di dep array effect fokus `ui/Modal` + `handleClose` dibuat ulang tiap render (ditemukan di Step 0) | Mengetik spasi di field mana pun **menutup modal** dan membuang isian; setelah diperbaiki, fokus bertahan di field | ✅ **DISETUJUI 2026-09-10** → Step 5a **SELESAI**. Diperbaiki di akar (`ui/Modal`, ref + dep array `[isOpen]`), bukan lewat `useEntityForm`, supaya kesembilan konsumen ikut sembuh |
 
 **Diputuskan 2026-09-09:** `server/index.js:149–183` (`"Jawab dalam Bahasa Indonesia"`) **tidak diubah**.
 Asisten AI tetap menjawab dalam bahasa Indonesia; tidak ada deploy Cloud Run dalam rencana ini.
@@ -741,6 +793,7 @@ dibiarkan Indonesia.
 | Refactor bertabrakan dengan pekerjaan fitur (RBAC ada di antrean) | Menyeluruh | Satu step = satu commit; jangan campur dengan fitur |
 | `throw` baru tidak tertangkap → layar putih dari ErrorBoundary | Step 7b (B2) | Telusuri setiap call site sebelum ubah tanda tangan; uji dengan jaringan mati |
 | Autofokus `ui/Modal` membuka dropdown asset picker | Step 7a (B1) | Periksa tiap modal satu per satu setelah migrasi |
+| Effect `ui/Modal` berjalan ulang di tengah pengetikan dan mencuri fokus | Step 5a (B6) | Dep array menyusut jadi `[isOpen]`; `onClose`/`closeOnEscape` dibaca lewat ref. Dipin 5 test di `Modal.test.tsx` |
 | Nilai DB ikut diterjemahkan → trigger sync & filter putus | Step 8a (B5) | Daftar terlarang eksplisit di Step 8a: preset kategori, status, listed, itemStatus |
 | Baris `report_history` lama tak cocok lagi dengan label baru | Step 8a (B5) | Pertahankan cek dua-bentuk di `Reports.tsx:166`; uji "Run again" pada laporan lama |
 | Teks `Guide.tsx` menyebut nama tombol yang berubah | Step 8a (B5) | Perbarui `Guide.tsx:74` & `:155` di commit yang sama |

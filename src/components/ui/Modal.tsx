@@ -21,6 +21,17 @@ export default function Modal({ isOpen, onClose, children, labelledBy, className
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  // Read through refs so the effect below depends on `isOpen` alone. Callers routinely
+  // recreate `onClose` on every render (and flip `closeOnEscape` while saving); listing
+  // either as a dependency re-ran the effect mid-typing and yanked focus back to the
+  // panel's first focusable element. See B6 in "refactoring v2.md" §5.
+  const onCloseRef = useRef(onClose);
+  const closeOnEscapeRef = useRef(closeOnEscape);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    closeOnEscapeRef.current = closeOnEscape;
+  });
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -34,7 +45,7 @@ export default function Modal({ isOpen, onClose, children, labelledBy, className
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        if (closeOnEscape) onClose();
+        if (closeOnEscapeRef.current) onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !panel) return;
@@ -59,7 +70,7 @@ export default function Modal({ isOpen, onClose, children, labelledBy, className
       document.body.style.overflow = previousOverflow;
       previouslyFocused.current?.focus?.();
     };
-  }, [isOpen, onClose, closeOnEscape]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

@@ -8,9 +8,8 @@ import AddAssetModal from './AddAssetModal';
 // Step 5 (ui/FormModal) and Step 6 (merge with EditAssetModal) start moving the code.
 // Nothing here asserts what the behaviour *should* be — only what it is today.
 //
-// Fields are filled with fireEvent.change rather than userEvent.type on purpose:
-// see the "known defect" block at the bottom — focus is stolen after every render,
-// so character-by-character typing does not survive in this modal.
+// Fields are filled with fireEvent.change rather than userEvent.type for speed —
+// this modal has 16 of them. The "typing" block at the bottom covers real keystrokes.
 
 const mockAddAsset = vi.fn();
 const mockSetIsAddModalOpen = vi.fn();
@@ -299,36 +298,40 @@ describe('AddAssetModal — chrome', () => {
   });
 });
 
-describe('AddAssetModal — known defect: focus is stolen on every render', () => {
-  // ui/Modal's focus effect lists `onClose` in its dependency array, and AddAssetModal
-  // recreates `handleClose` on every render. So each keystroke re-runs the effect and
-  // refocuses the panel's first focusable element — the X button. Typing a space then
-  // activates that button and closes the modal.
-  //
-  // This is NOT desired behaviour. It is pinned here so the fix (Step 5/6, when these
-  // handlers move into ui/FormModal + useEntityForm) is a deliberate, visible change
-  // rather than an accident. When it starts failing, delete this block.
-  it('moves focus to the close button after a single keystroke', async () => {
+describe('AddAssetModal — typing (B6 regression)', () => {
+  // Until B6 was fixed in ui/Modal, every keystroke re-ran the focus effect and moved
+  // focus to the X button, so typing a space closed the modal and threw the form away.
+  // These two replace the "known defect" block that pinned the broken behaviour.
+  it('keeps focus in the field across keystrokes', async () => {
     const user = userEvent.setup();
     render(<AddAssetModal />);
 
     await user.click(field('assetNumber'));
+    await user.keyboard('AST');
+
+    expect(field('assetNumber').value).toBe('AST');
     expect(document.activeElement).toBe(field('assetNumber'));
-
-    await user.keyboard('A');
-
-    expect(field('assetNumber').value).toBe('A');
-    expect(document.activeElement).not.toBe(field('assetNumber'));
-    expect(document.activeElement?.tagName).toBe('BUTTON');
   });
 
-  it('closes the modal when a space lands on the stolen focus', async () => {
+  it('accepts a space in Asset Description instead of closing the modal', async () => {
     const user = userEvent.setup();
     render(<AddAssetModal />);
 
     await user.click(field('assetDescription'));
-    await user.keyboard('A B');
+    await user.keyboard('MacBook Pro M3');
 
-    expect(mockSetIsAddModalOpen).toHaveBeenCalledWith(false);
+    expect(field('assetDescription').value).toBe('MacBook Pro M3');
+    expect(mockSetIsAddModalOpen).not.toHaveBeenCalled();
+  });
+
+  it('still formats Asset Cost while typing digit by digit', async () => {
+    const user = userEvent.setup();
+    render(<AddAssetModal />);
+
+    await user.click(field('assetCost'));
+    await user.keyboard('2499');
+
+    expect(field('assetCost').value).toBe('2,499');
+    expect(document.activeElement).toBe(field('assetCost'));
   });
 });

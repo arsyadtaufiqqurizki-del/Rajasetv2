@@ -274,3 +274,21 @@ describe('EditAssetModal — chrome (difference 2)', () => {
     expect(mockUpdateAsset).not.toHaveBeenCalled();
   });
 });
+
+describe('EditAssetModal — typing (B6 regression)', () => {
+  // Same defect as AddAssetModal: ui/Modal re-ran its focus effect on every render
+  // because handleClose is recreated each time, so a typed space hit the X button.
+  it('keeps focus in the field and accepts a space instead of closing', async () => {
+    const user = userEvent.setup();
+    render(<EditAssetModal />);
+
+    const description = field('assetDescription');
+    await user.clear(description);
+    await user.keyboard('MacBook Air M4');
+
+    expect(description.value).toBe('MacBook Air M4');
+    expect(document.activeElement).toBe(field('assetDescription'));
+    expect(mockSetIsEditModalOpen).not.toHaveBeenCalled();
+    expect(mockSetEditingAsset).not.toHaveBeenCalled();
+  });
+});
