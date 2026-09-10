@@ -1,0 +1,6 @@
+Asset Book,Subsidiary,Asset Number,Asset Description,Asset Cost,Book Value,Date Place In Service,Asset Units,Asset Category Segment 1,Asset Category Segment 2,Depreciation Method,Life in Months,Listed,Status,Verification,Verification Date,Item Status
+Corporate,PT Raja Prima,AN-001,Generic Asset,2499.00,277.6666666666668,2024-01-01,1,IT Equipment,HQ,Straight Line,36,Audited,Active,Yes,2024-06-01,Asset
+Corporate,PT Raja Prima,AN-002,"Server, rack ""A""",150000.55,37362.791968275174,2023-03-15,1,IT Equipment,HQ,Declining Balance,60,Audited,Active,Yes,2024-06-01,Asset
+Corporate,PT Raja Prima,AN-003,'=SUM(A1:A2),0,0,2024-01-01,1,IT Equipment,'-Basement,Straight Line,36,Non-Listed,Retired,No,,Asset
+Corporate,,AN-004,Land parcel,5000000,5000000,2024-01-01,1,IT Equipment,HQ,Straight Line,Unlimited,Audited,Active,Yes,2024-06-01,
+Corporate,PT Raja Prima,AN-005,Fully depreciated rig,12000,0,2020-01-01,3,IT Equipment,HQ,Straight Line,12,Audited,Active,Yes,2024-06-01,Asset
