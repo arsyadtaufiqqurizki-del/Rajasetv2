@@ -148,21 +148,22 @@ describe('Maintenance — single record delete flow', () => {
     await waitFor(() => expect(mockDeleteRecord).toHaveBeenCalledWith('m-3'));
   });
 
-  it('closes the dialog without any error surface when deleteRecord fails silently (B2 baseline)', async () => {
-    // MaintenanceContext.deleteRecord swallows Supabase errors: it sets context error
-    // state and resolves. The page therefore closes the dialog as if the delete worked.
-    // Step 7b (B2) deliberately changes this — when it does, this test should be updated.
+  it('shows an error Toast and keeps the dialog open when deleteRecord rejects (B2)', async () => {
+    // Step 7b (B2): deleteRecord now throws on Supabase error.
+    // Maintenance.tsx confirmDelete catches it in the catch block and stores the message
+    // in deleteError which is surfaced via the Toast component. The ConfirmModal stays
+    // open so the user can retry or cancel manually.
     const user = userEvent.setup();
-    mockDeleteRecord.mockResolvedValue(undefined);
+    mockDeleteRecord.mockRejectedValue(new Error('Network error'));
     renderPage();
 
     await user.click(deleteButtons()[0]);
     await user.click(dialogButton('Delete'));
 
-    await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'Delete Record' })).not.toBeInTheDocument()
-    );
-    expect(screen.queryByText(/failed/i)).not.toBeInTheDocument();
+    // Toast with error message should appear
+    expect(await screen.findByRole('status')).toHaveTextContent('Network error');
+    // Dialog stays open — user can retry or cancel
+    expect(screen.getByRole('heading', { name: 'Delete Record' })).toBeInTheDocument();
   });
 });
 

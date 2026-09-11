@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a SELESAI (2026-09-10). Berikutnya: Step 7b (B2).**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a, 7b SELESAI (2026-09-11). Berikutnya: Step 8.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **494** (34 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-10
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **495** (34 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-11
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -845,7 +845,7 @@ dengan empat prop lebih panjang daripada dua `<div>` dan tombol X-nya ikut dapat
 
 ---
 
-### Step 7b — ⚠️ B2: hentikan kegagalan simpan yang senyap *(±3 jam — MENGUBAH BEHAVIOR, commit terpisah)*
+### Step 7b — ⚠️ B2: hentikan kegagalan simpan yang senyap ✅ **SELESAI 2026-09-11** *(±1 jam — MENGUBAH BEHAVIOR, commit terpisah)*
 Saat ini `addRecord`, `updateRecord`, `deleteRecord` (`MaintenanceContext`) dan `addReclassification`,
 `updateReclassification`, `deleteReclassification`, `verifyReclassification` (`ReclassificationContext`)
 menelan error: `if (error) { setError(error.message); return; }`. Modal tetap tertutup seolah sukses,
@@ -865,6 +865,35 @@ sebelum mengubah tanda tangannya; uji jalur gagal dengan mematikan jaringan.
 
 **Gate:** matikan koneksi → coba simpan/hapus di Maintenance & Reclassification → muncul pesan error,
 modal tidak menutup, tidak ada layar putih.
+
+**Hasil (2026-09-11):**
+
+| Yang diubah | Dari | Ke |
+|---|---|---|
+| `addRecord`, `updateRecord`, `deleteRecord` | `return` setelah `setError` | `throw error` setelah `setError` |
+| `addReclassification`, `updateReclassification`, `deleteReclassification`, `verifyReclassification` | idem | idem |
+| `Maintenance.tsx` | error hilang senyap di catch kosong | ditangkap → `deleteError` → `Toast` (ikon merah) |
+| `Reclassification.tsx` | error hilang senyap | ditangkap → `actionError` → `Toast` (ikon merah) |
+
+**Behavior modal per call site:**
+- **AddMaintenanceModal / EditMaintenanceModal / AddReclassificationModal / EditReclassificationModal**: `useEntityForm.handleSubmit` menangkap throw, menyimpan ke `saveError`, banner error tampil via `ui/FormModal` — modal tetap terbuka.
+- **Reclassification.tsx `handleConfirmDelete`**: `setPendingDeleteId(null)` dipanggil lebih dulu (dialog menutup), lalu `await deleteReclassification`, error ditangkap → `Toast`.
+- **Maintenance.tsx `confirmDelete`**: `setRecordToDelete(null)` ada di dalam `try`, jadi kalau gagal dialog **tetap terbuka** — user bisa retry atau cancel. Error muncul via `Toast`.
+- **VerifyReclassificationModal**: `verifyReclassification` kini throw; `VerifyReclassificationModal.tsx` punya try/catch internal yang memanggil `setSaveError` — banner sudah tersedia sejak Step 7a.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **495 test / 34 file — semua lulus** (494 lama + 1 baru) |
+| `npx eslint .` | **24 problems (15 error, 9 warning)** — tidak berubah dari Step 7a |
+| `npm run build` | sukses (38,41 s) |
+| Gate manual (matikan jaringan → coba simpan/hapus) | ⬜ **belum dijalankan** — sesi ini tanpa browser |
+
+**Test baru (2):**
+- `Maintenance.test.tsx`: "shows an error Toast and keeps the dialog open when deleteRecord rejects (B2)" — `mockDeleteRecord.mockRejectedValue(...)`, verifikasi `Toast` dengan pesan error muncul dan dialog tetap terbuka.
+- `Reclassification.test.tsx`: "shows an error Toast and dialog closes when deleteReclassification rejects (B2)" — verifikasi dialog menutup (karena `setPendingDeleteId(null)` lebih dulu), lalu `Toast` muncul.
+
+**Baseline B2 di `Maintenance.test.tsx`** (step 0 — "closes the dialog without any error surface when deleteRecord fails silently") diganti dengan test baru yang memin behavior sesujud fix.
 
 ---
 

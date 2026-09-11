@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Settings as SettingsIcon } from 'lucide-react';
+import { Settings as SettingsIcon, AlertCircle } from 'lucide-react';
 import { formatCurrency, parseCost } from '../lib/money';
 import { useMaintenance } from '../contexts/MaintenanceContext';
 import { useMaintenanceFilters } from '../hooks/useMaintenanceFilters';
@@ -14,6 +14,7 @@ import MultiSelectDropdown from '../components/ui/MultiSelectDropdown';
 import FilterBar from '../components/ui/FilterBar';
 import Pagination from '../components/ui/Pagination';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import Toast from '../components/ui/Toast';
 
 export default function Maintenance() {
   const { records, deleteRecord } = useMaintenance();
@@ -24,6 +25,7 @@ export default function Maintenance() {
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -68,6 +70,8 @@ export default function Maintenance() {
       const minDelay = new Promise(resolve => setTimeout(resolve, 600));
       await Promise.all([deleteRecord(recordToDelete), minDelay]);
       setRecordToDelete(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete record.');
     } finally {
       setIsDeleting(false);
     }
@@ -193,6 +197,12 @@ export default function Maintenance() {
           onViewCalendar={() => setIsCalendarModalOpen(true)}
         />
       </div>
+
+      <Toast
+        message={deleteError}
+        icon={<AlertCircle className="h-4 w-4 text-error shrink-0" />}
+        onClose={() => setDeleteError(null)}
+      />
     </div>
   );
 }

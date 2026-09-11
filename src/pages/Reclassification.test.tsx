@@ -343,4 +343,24 @@ describe('Reclassification — single-row actions', () => {
     expect(mockSetVerifying).toHaveBeenCalledWith(expect.objectContaining({ id: 'r-1' }));
     expect(mockSetIsVerifyModalOpen).toHaveBeenCalledWith(true);
   });
+
+  it('shows an error Toast and dialog closes when deleteReclassification rejects (B2)', async () => {
+    // Step 7b (B2): deleteReclassification now throws on Supabase error.
+    // handleConfirmDelete closes the ConfirmModal first (setPendingDeleteId(null)),
+    // awaits deleteReclassification, catches the error and stores it in actionError
+    // which is rendered by the Toast component.
+    const user = userEvent.setup();
+    mockDeleteReclassification.mockRejectedValue(new Error('Connection refused'));
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Delete Item' }));
+    await user.click(screen.getByRole('button', { name: 'Hapus' }));
+
+    // Confirm dialog closes
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Hapus Item Reclassification' })).not.toBeInTheDocument()
+    );
+    // Toast with error message appears
+    expect(await screen.findByRole('status')).toHaveTextContent('Connection refused');
+  });
 });

@@ -120,7 +120,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
       .select(RECLASSIFICATION_SELECT)
       .single();
 
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     setReclassifications(prev => [fromDb(data), ...prev]);
     if (!skipLog) {
       logActivity({
@@ -170,7 +170,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
       .select(RECLASSIFICATION_SELECT)
       .single();
 
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     setReclassifications(prev => prev.map(r => r.id === id ? fromDb(data) : r));
     logActivity({
       actionType: 'UPDATE_RECLASSIFICATION',
@@ -183,7 +183,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
   const deleteReclassification = async (id: string) => {
     const target = reclassifications.find(r => r.id === id);
     const { error } = await supabase.from('asset_reclassifications').delete().eq('id', id);
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     setReclassifications(prev => prev.filter(r => r.id !== id));
     logActivity({
       actionType: 'DELETE_RECLASSIFICATION',
@@ -231,7 +231,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
       .select(RECLASSIFICATION_SELECT)
       .single();
 
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     const updated = fromDb(data);
     setReclassifications(prev => prev.map(r => r.id === id ? updated : r));
     logActivity({

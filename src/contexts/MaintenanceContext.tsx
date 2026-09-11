@@ -81,7 +81,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       .select()
       .single();
 
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     setRecords(prev => [fromDb(data), ...prev]);
     logActivity({ actionType: 'ADD_MAINTENANCE', entityType: 'maintenance', entityId: data.id, details: { assetName: record.assetDescription, scheduledDate: record.scheduledDate } });
   };
@@ -95,14 +95,14 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       .select()
       .single();
 
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     setRecords(prev => prev.map(r => r.id === id ? fromDb(data) : r));
     logActivity({ actionType: 'UPDATE_MAINTENANCE', entityType: 'maintenance', entityId: id, details: { assetName: updated.assetDescription, from: existing?.status, to: updated.status } });
   };
 
   const deleteRecord = async (id: string) => {
     const { error } = await supabase.from('maintenance_records').delete().eq('id', id);
-    if (error) { setError(error.message); return; }
+    if (error) { setError(error.message); throw error; }
     setRecords(prev => prev.filter(r => r.id !== id));
   };
 

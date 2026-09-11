@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { AlertCircle } from 'lucide-react';
 import { sanitizeCell, toCsvBlob, downloadBlob } from '../lib/csv';
 import { useReclassification } from '../contexts/ReclassificationContext';
 import { useAsset } from '../contexts/AssetContext';
@@ -15,6 +16,7 @@ import ReclassificationTable from '../components/ReclassificationTable';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DeleteProgressModal, { type DeleteProgressState } from '../components/DeleteProgressModal';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import Toast from '../components/ui/Toast';
 import { id as copy } from '../i18n/id';
 
 export default function Reclassification() {
@@ -85,6 +87,7 @@ export default function Reclassification() {
   );
   const [isDeleteOrphansModalOpen, setIsDeleteOrphansModalOpen] = useState(false);
   const [deleteOrphansConfirmText, setDeleteOrphansConfirmText] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const stats = useMemo(() => {
     const total = reclassifications.length;
@@ -147,9 +150,15 @@ export default function Reclassification() {
     setPendingDeleteId(id);
   }, []);
 
-  const handleConfirmDelete = useCallback(() => {
-    if (pendingDeleteId) deleteReclassification(pendingDeleteId);
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
     setPendingDeleteId(null);
+    try {
+      await deleteReclassification(id);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to delete item.');
+    }
   }, [pendingDeleteId, deleteReclassification]);
 
   const handleSelectAll = useCallback((checked: boolean) => {
@@ -392,6 +401,12 @@ export default function Reclassification() {
         destructive
         onConfirm={handleConfirmDelete}
         onCancel={() => setPendingDeleteId(null)}
+      />
+
+      <Toast
+        message={actionError}
+        icon={<AlertCircle className="h-4 w-4 text-error shrink-0" />}
+        onClose={() => setActionError(null)}
       />
     </div>
   );
