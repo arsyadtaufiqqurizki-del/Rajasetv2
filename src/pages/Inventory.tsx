@@ -20,12 +20,15 @@ import AssetFilters from '../components/AssetFilters';
 import AssetTable, { ASSET_COLUMNS, DEFAULT_VISIBLE_COLUMNS, ASSET_CSV_FIELDS } from '../components/AssetTable';
 import AssetDetailPanel from '../components/AssetDetailPanel';
 import Pagination from '../components/ui/Pagination';
+import { useRowSelection } from '../hooks/useRowSelection';
+import { usePagination } from '../hooks/usePagination';
+import { useBulkDelete } from '../hooks/useBulkDelete';
 import ColumnVisibilityDropdown from '../components/ColumnVisibilityDropdown';
 import { useColumnVisibility } from '../hooks/useColumnVisibility';
 import InventorySkeleton from '../components/InventorySkeleton';
 import ImportProgressModal, { type ImportModalState } from '../components/ImportProgressModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
-import DeleteProgressModal, { type DeleteProgressState } from '../components/DeleteProgressModal';
+import DeleteProgressModal from '../components/DeleteProgressModal';
 import BulkEditModal from '../components/BulkEditModal';
 import BulkEditProgressModal, { type BulkEditProgressState } from '../components/BulkEditProgressModal';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -37,15 +40,6 @@ import Papa from 'papaparse';
 const PAGE_SIZE_KEY = 'rajaset:inventory:pageSize';
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
-function loadPageSize(): number {
-  try {
-    const parsed = Number(localStorage.getItem(PAGE_SIZE_KEY));
-    return PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : 10;
-  } catch {
-    return 10;
-  }
-}
-
 export default function Inventory() {
   const { assets, loading, error, refetch, deleteAsset, deleteMultipleAssets, deleteAllAssets, bulkUpdateAssets, setEditingAsset, setIsEditModalOpen, setIsAddModalOpen, subsidiaries, categories1, categories2, itemStatuses, addAsset } = useAsset();
 
@@ -53,40 +47,21 @@ export default function Inventory() {
   const [isExporting, setIsExporting] = useState(false);
   const [notice, setNotice] = useState<{ message: string; variant: 'success' | 'error' } | null>(null);
 
-  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState<number>(() => loadPageSize());
+  const selection = useRowSelection();
+  const selectedAssets = selection.selectedIds;
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(PAGE_SIZE_KEY, String(itemsPerPage));
-    } catch {
-      // localStorage unavailable (private mode, etc.) — page size just won't persist
-    }
-  }, [itemsPerPage]);
-
-  const handlePageSizeChange = useCallback((size: number) => {
-    setItemsPerPage(size);
-    setCurrentPage(1);
-  }, []);
+  const pagination = usePagination({
+    storageKey: PAGE_SIZE_KEY,
+    pageSizeOptions: PAGE_SIZE_OPTIONS,
+  });
 
   const { visibleColumns, toggleColumn, showAll: showAllColumns } = useColumnVisibility(
     'rajaset:inventory:columns',
     DEFAULT_VISIBLE_COLUMNS
   );
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
-
-  const [deleteProgressModal, setDeleteProgressModal] = useState<DeleteProgressState>({
-    isOpen: false,
-    status: 'deleting',
-    total: 0,
-    processed: 0,
-    failedCount: 0,
-  });
 
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
   const [bulkEditProgress, setBulkEditProgress] = useState<BulkEditProgressState>({
@@ -137,8 +112,8 @@ export default function Inventory() {
     filteredAssets,
     clearFilters,
   } = useAssetFilters(assets, searchParams, setSearchParams, () => {
-    setCurrentPage(1);
-    setSelectedAssets(new Set());
+    pagination.resetPage();
+    selection.clearSelection();
   }, bookValues);
 
   // Auto-dismiss notice toast
@@ -148,12 +123,30 @@ export default function Inventory() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredAssets.length / itemsPerPage));
+  const currentPage = pagination.currentPage;
+  const setCurrentPage = pagination.setCurrentPage;
+  const itemsPerPage = pagination.itemsPerPage;
+  const handlePageSizeChange = pagination.handlePageSizeChange;
+  const totalPages = pagination.totalPagesFor(filteredAssets.length);
+  const paginatedAssets = pagination.paginate(filteredAssets);
 
-  const paginatedAssets = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredAssets.slice(start, start + itemsPerPage);
-  }, [filteredAssets, currentPage, itemsPerPage]);
+  const bulkDelete = useBulkDelete({
+    getSelectedIds: () => selection.selectedIds,
+    getFilteredCount: () => filteredAssets.length,
+    hasNoFilters: () =>
+      filterSubsidiary.length === 0 && filterCategory.length === 0 && filterLocation.length === 0 &&
+      filterStatus.length === 0 && filterListed.length === 0 && filterVerification.length === 0 &&
+      filterItemStatus.length === 0 && !dateFrom && !dateTo && !costMin && !costMax && !debouncedSearchQuery,
+    deleteAll: (onProgress) => deleteAllAssets(onProgress),
+    deleteMultiple: (ids, onProgress) => deleteMultipleAssets(ids, onProgress),
+    clearSelection: selection.clearSelection,
+  });
+  const isDeleteModalOpen = bulkDelete.isDeleteModalOpen;
+  const deleteConfirmText = bulkDelete.deleteConfirmText;
+  const setDeleteConfirmText = bulkDelete.setDeleteConfirmText;
+  const deleteProgressModal = bulkDelete.deleteProgress;
+  const setDeleteProgressModal = bulkDelete.setDeleteProgress;
+  const handleConfirmDeleteSelected = bulkDelete.handleConfirmDeleteSelected;
 
   const filteredTotals = useMemo(() => {
     let cost = 0;
@@ -186,25 +179,13 @@ export default function Inventory() {
     setPendingDeleteId(null);
   }, [pendingDeleteId, deleteAsset]);
 
+  // AssetTable calls onSelectAll with the checkbox state only; the hook covers the
+  // whole filtered list (not just the visible page), as before.
   const handleSelectAll = useCallback((checked: boolean) => {
-    if (checked) {
-      setSelectedAssets(new Set(filteredAssets.map(a => a.id)));
-    } else {
-      setSelectedAssets(new Set());
-    }
-  }, [filteredAssets]);
+    selection.handleSelectAll(checked, filteredAssets.map(a => a.id));
+  }, [selection, filteredAssets]);
 
-  const handleSelectAsset = useCallback((assetId: string, checked: boolean) => {
-    setSelectedAssets(prev => {
-      const newSet = new Set(prev);
-      if (checked) {
-        newSet.add(assetId);
-      } else {
-        newSet.delete(assetId);
-      }
-      return newSet;
-    });
-  }, []);
+  const handleSelectAsset = selection.handleSelectOne;
 
   const handleExportCSV = useCallback((scope: 'all' | 'selected', columnsScope: 'visible' | 'all') => {
     const sourceAssets = scope === 'selected'
@@ -310,30 +291,6 @@ export default function Inventory() {
     downloadBlob('invalid_rows.csv', toCsvBlob(dataToExport));
   }, [importModal.invalidRows]);
 
-  const handleConfirmDeleteSelected = useCallback(async () => {
-    if (deleteConfirmText !== 'DELETE') return;
-    const total = selectedAssets.size;
-    const noFilters = filterSubsidiary.length === 0 && filterCategory.length === 0 && filterLocation.length === 0 && filterStatus.length === 0 && filterListed.length === 0 && filterVerification.length === 0 && filterItemStatus.length === 0 && !dateFrom && !dateTo && !costMin && !costMax && !debouncedSearchQuery;
-    const allSelected = selectedAssets.size === filteredAssets.length;
-
-    setIsDeleteModalOpen(false);
-    setDeleteConfirmText('');
-    setDeleteProgressModal({ isOpen: true, status: 'deleting', total, processed: 0, failedCount: 0 });
-
-    const onProgress = (processed: number, failedCount: number) => {
-      setDeleteProgressModal(prev => ({ ...prev, processed, failedCount }));
-    };
-
-    if (noFilters && allSelected) {
-      await deleteAllAssets(onProgress);
-    } else {
-      await deleteMultipleAssets(Array.from(selectedAssets), onProgress);
-    }
-
-    setSelectedAssets(new Set());
-    setDeleteProgressModal(prev => ({ ...prev, status: 'done' }));
-  }, [deleteConfirmText, selectedAssets, filterSubsidiary, filterCategory, filterLocation, filterStatus, filterListed, filterVerification, filterItemStatus, dateFrom, dateTo, costMin, costMax, debouncedSearchQuery, filteredAssets, deleteAllAssets, deleteMultipleAssets]);
-
   const handleApplyBulkEdit = useCallback(async (patch: AssetBulkPatch) => {
     const ids = Array.from(selectedAssets);
     const total = ids.length;
@@ -350,14 +307,14 @@ export default function Inventory() {
     );
 
     setBulkEditProgress(prev => ({ ...prev, status: 'done' }));
-    setSelectedAssets(new Set());
+    selection.clearSelection();
 
     setNotice(
       failed > 0
         ? { message: `Updated ${updated} assets, ${failed} failed`, variant: 'error' }
         : { message: `Updated ${updated} asset${updated === 1 ? '' : 's'}`, variant: 'success' },
     );
-  }, [selectedAssets, bulkUpdateAssets]);
+  }, [selectedAssets, bulkUpdateAssets, selection]);
 
   return (
     <div className="flex flex-col gap-6 w-full h-[calc(100vh-11rem)] min-h-[600px]">
@@ -458,7 +415,7 @@ export default function Inventory() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setIsDeleteModalOpen(true); setDeleteConfirmText(""); }}
+                    onClick={bulkDelete.openDeleteModal}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -467,7 +424,7 @@ export default function Inventory() {
                   <span className="w-px self-stretch bg-outline-variant" aria-hidden="true" />
                   <button
                     type="button"
-                    onClick={() => setSelectedAssets(new Set())}
+                    onClick={selection.clearSelection}
                     className="font-medium text-secondary hover:text-primary transition-colors"
                   >
                     Clear selection
@@ -528,7 +485,7 @@ export default function Inventory() {
         selectedCount={selectedAssets.size}
         confirmText={deleteConfirmText}
         onConfirmTextChange={setDeleteConfirmText}
-        onCancel={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
+        onCancel={bulkDelete.closeDeleteModal}
         onConfirm={handleConfirmDeleteSelected}
       />
 

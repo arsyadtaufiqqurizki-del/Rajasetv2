@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a, 7b SELESAI (2026-09-11). Berikutnya: Step 8.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a, 7b, 8 SELESAI (2026-09-11). Berikutnya: Step 8a.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8–8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **495** (34 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-11
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8 ✅ · 8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Test: 63 → **522** (38 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-11
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -897,7 +897,7 @@ modal tidak menutup, tidak ada layar putih.
 
 ---
 
-### Step 8 — Hook halaman list *(±5 jam)*
+### Step 8 — Hook halaman list ✅ **SELESAI 2026-09-11**
 - `useRowSelection`, `usePagination(pageSizeConfig)`, `useBulkDelete`.
 - Adopsi di `Inventory.tsx` lalu `Reclassification.tsx`; `Maintenance.tsx` hanya `usePagination`.
 - `Inventory.tsx` 624 → ±430; `Reclassification.tsx` 398 → ±300.
@@ -913,6 +913,74 @@ Maintenance tetap 10 tanpa persistensi.
 
 **Gate:** pilih semua → hapus dengan & tanpa filter aktif, bandingkan jumlah baris terhapus dengan
 perilaku sekarang · page size Inventory masih tersimpan setelah reload.
+
+**Pra-kerja — jaring pengaman.** Pola list Inventory **belum terpinned** (satu-satunya halaman tanpa
+test seleksi/paginasi/bulk-delete), padahal Step 8 menyentuhnya paling dalam. 8 characterization test
+ditulis lebih dulu terhadap kode yang belum diubah, mengikuti pola pra-kerja Step 7:
+`src/pages/Inventory.list.test.tsx` — paginasi 10-per-halaman (label `Showing 1–10 of 12 assets`),
+select-all lintas halaman, routing `deleteAll` vs `deleteMultiple` (+ cabang filter `?subsidiary=`),
+gate teks `DELETE`, persistensi page size ke localStorage + restore saat mount. Lolos 8/8 sebelum
+satu baris production code disentuh (satu assertion awal ambigu — angka `12` muncul juga di totals
+bar — diperbaiki ke `toHaveTextContent` sebelum pra-kerja dinyatakan hijau).
+
+**Hasil (2026-09-11):** 3 hook + 4 file test baru, **495 → 522 test** (38 file), semuanya hijau.
+Golden file CSV tetap identik. `tsc` bersih, `eslint` tetap **24 problems** (tidak ada lint baru),
+`build` sukses.
+
+| Yang dipindah | Dari | Ke |
+|---|---|---|
+| `Set` seleksi + selectAll/selectOne (2 salinan) | `Inventory:189–207`, `Reclassification:164–182` | `hooks/useRowSelection.ts` → `{ selectedIds, setSelectedIds, handleSelectAll(checked, filteredIds), handleSelectOne, clearSelection }` |
+| State paginasi + `totalPages` + slice (3 salinan) | `Inventory:57–71` & `:151–156`, `Reclassification:33–34` & `:100–104`, `Maintenance:30–31` & `:44–49` | `hooks/usePagination.ts` → `{ currentPage, setCurrentPage, resetPage, itemsPerPage, handlePageSizeChange, totalPagesFor(count), paginate(items) }` |
+| Alur bulk delete: gate `DELETE` → routing → progress (2 salinan) | `Inventory:313–335`, `Reclassification:184–206` | `hooks/useBulkDelete.ts` → `{ isDeleteModalOpen, deleteConfirmText, deleteProgress, open/closeDeleteModal, handleConfirmDeleteSelected }` |
+| Persistensi page size Inventory | `Inventory:40–47` (`loadPageSize`) + effect persist | `usePagination` mode `storageKey` (`rajaset:inventory:pageSize`, opsi 10/25/50/100) |
+
+**Tiga keputusan bentuk API:**
+- **`usePagination` tidak menerima items.** Bentuk pertama (`usePagination(filtered, opts)`) memaksa
+  callback filter-change (`() => pagination.resetPage()`) mengakses `pagination` sebelum dideklarasikan —
+  `tsc` lolos tapi `react-hooks/immutability` menolak (+3 error). Hook sekarang hanya mengelola
+  state halaman + ukuran; derivasi (`paginate(items)` / `totalPagesFor(count)`) dilakukan di halaman,
+  tepat di tempat `slice` inline dulu berada. Lambda `onPrev`/`onNext` asli dikembalikan apa adanya.
+- **Predikat `noFilters` di-inject sebagai `hasNoFilters()` + `getFilteredCount()`**, bukan ditebak
+  hook. Daftar kondisi tetap milik halaman (Inventory 11, Reclassification 5) — risiko "bulk delete
+  melebar jadi hapus-semua" dari register §6 tertutup di level bentuk API.
+- **`handleSelectAll(checked, filteredIds)` menerima daftar id sebagai argumen.** Tabel memanggil
+  `onSelectAll(checked)` satu argumen; halaman membungkus satu baris
+  (`selection.handleSelectAll(checked, filteredAssets.map(a => a.id))`) supaya `AssetTable`/
+  `ReclassificationTable` tidak disentuh sama sekali.
+
+⚠️ **Perbedaan antar-halaman dipertahankan, tidak diseragamkan:** Inventory mereset halaman
+**dan** seleksi saat filter berubah, Reclassification & Maintenance hanya mereset halaman ·
+Inventory persist page size + opsi 10/25/50/100, dua lainnya tetap 10 tanpa persistensi ·
+`handleConfirmDeleteOrphans` tetap memanggil `deleteMultipleReclassifications` langsung (tidak lewat
+hook — tidak pernah bisa melebar ke `deleteAll`) · hapus-satu-baris (`pendingDeleteId` +
+`ConfirmModal`) tidak disentuh.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **522 test / 38 file — semua lulus** (495 lama + 27 baru) |
+| 8 test characterization pra-kerja | **lulus tanpa satu baris production code diubah** |
+| Golden file CSV | **identik** — lulus tanpa `UPDATE_GOLDEN` |
+| `npx eslint .` | **24 problems (15 error, 9 warning)** — sama persis dengan baseline Step 7b; file yang disentuh nol masalah |
+| `npm run build` | sukses (18,97 s; hanya peringatan lama soal ukuran chunk >500 kB) |
+| Gate manual (bulk delete ±filter, reload page size) | ⬜ **belum dijalankan** — sesi ini tanpa browser; digantikan test di bawah |
+
+**Pengganti gate manual.**
+
+| Lapis | File | Test | Yang dipin |
+|---|---|---|---|
+| Perilaku halaman | `pages/Inventory.list.test.tsx` (pra-kerja) | 8 | tidak diubah — paginasi, select-all lintas halaman, routing `deleteAll`/`deleteMultiple`, gate `DELETE`, persist + restore page size |
+| Perilaku halaman | `pages/Reclassification.test.tsx` + `pages/Maintenance.test.tsx` | 27 | tidak diubah sama sekali — routing orphan yang tidak boleh lewat `deleteAll` tetap hijau |
+| Semantik hook | `hooks/useRowSelection.test.ts` | 5 | select-all 12 id lintas halaman, uncheck mengosongkan, tambah/hapus satu id, clear |
+| Semantik hook | `hooks/usePagination.test.ts` | 8 | slice 10/halaman, clamp, `resetPage`, persist + validasi opsi + restore, ganti ukuran reset ke halaman 1 |
+| Semantik hook | `hooks/useBulkDelete.test.ts` | 6 | gate `DELETE`, open/close membersihkan teks, routing di ketiga cabang, `onProgress` → progress modal, `clearSelection` + status `done` |
+
+Yang **tidak** tercakup test dan masih perlu dilihat mata: bulk delete sungguhan terhadap database
+produksi, dan reload browser untuk persistensi page size.
+
+**Delta LOC:** 3 halaman **1.198 → 1.018 (−180)** (`Inventory` 577 → 482 · `Reclassification`
+413 → 351 · `Maintenance` 208 → 185), +235 baris di 3 hook bersama. Sama seperti Step 2–4,
+nilainya bukan di jumlah baris melainkan di 7 salinan yang jadi 3 dan 27 test yang jalan.
 
 ---
 
@@ -1008,9 +1076,9 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
 5 ui/FormModal ✅ ─► 5a ⚠️ B6 fokus ui/Modal ✅
   └─► 6 🎯 Add/EditAssetModal ✅ ─► 7 Modal Maintenance & Reclassification ✅
                                         │
-              7a ⚠️ B1 chrome → FormModal ✅ ─► 7b ⚠️ B2 error handling ◄── di sini
-                                        │
-8 Hook halaman list ─► 8a ⚠️ B5 copy ke Inggris ─► [9 ditunda] ─► 10 Gate akhir
+               7a ⚠️ B1 chrome → FormModal ✅ ─► 7b ⚠️ B2 error handling ✅ ─► 8 Hook halaman list ✅
+                                         │
+8a ⚠️ B5 copy ke Inggris ◄── di sini ─► [9 ditunda] ─► 10 Gate akhir
 ```
 
 **Estimasi total: ±46 jam** (36 jam refactor + 10 jam untuk B1, B2, B5; Step 9 ditunda).

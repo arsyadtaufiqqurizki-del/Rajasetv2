@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Settings as SettingsIcon, AlertCircle } from 'lucide-react';
 import { formatCurrency, parseCost } from '../lib/money';
@@ -15,6 +15,7 @@ import FilterBar from '../components/ui/FilterBar';
 import Pagination from '../components/ui/Pagination';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import Toast from '../components/ui/Toast';
+import { usePagination } from '../hooks/usePagination';
 
 export default function Maintenance() {
   const { records, deleteRecord } = useMaintenance();
@@ -27,8 +28,7 @@ export default function Maintenance() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const pagination = usePagination();
 
   const {
     filterSubsidiary, setFilterSubsidiary,
@@ -39,14 +39,12 @@ export default function Maintenance() {
     activeFilters,
     filteredRecords,
     clearFilters,
-  } = useMaintenanceFilters(records, searchParams, setSearchParams, () => setCurrentPage(1));
+  } = useMaintenanceFilters(records, searchParams, setSearchParams, () => pagination.resetPage());
 
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
-
-  const paginatedRecords = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredRecords.slice(start, start + itemsPerPage);
-  }, [filteredRecords, currentPage]);
+  const currentPage = pagination.currentPage;
+  const setCurrentPage = pagination.setCurrentPage;
+  const totalPages = pagination.totalPagesFor(filteredRecords.length);
+  const paginatedRecords = pagination.paginate(filteredRecords);
 
   const activeRecords = records.filter(r => r.status === 'In Progress' || r.status === 'Pending');
   const overdueRecords = records.filter(r => r.status === 'Overdue');

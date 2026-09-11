@@ -10,11 +10,14 @@ import MultiSelectDropdown from '../components/ui/MultiSelectDropdown';
 import FilterBar from '../components/ui/FilterBar';
 import Pagination from '../components/ui/Pagination';
 import ProgressModal from '../components/ui/ProgressModal';
+import { useRowSelection } from '../hooks/useRowSelection';
+import { usePagination } from '../hooks/usePagination';
+import { useBulkDelete } from '../hooks/useBulkDelete';
 import ReclassificationStats from '../components/ReclassificationStats';
 import ReclassificationToolbar from '../components/ReclassificationToolbar';
 import ReclassificationTable from '../components/ReclassificationTable';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
-import DeleteProgressModal, { type DeleteProgressState } from '../components/DeleteProgressModal';
+import DeleteProgressModal from '../components/DeleteProgressModal';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import Toast from '../components/ui/Toast';
 import { id as copy } from '../i18n/id';
@@ -30,9 +33,10 @@ export default function Reclassification() {
   const { assets, itemStatuses } = useAsset();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const selection = useRowSelection();
+  const selectedItems = selection.selectedIds;
+
+  const pagination = usePagination();
 
   const {
     filterCategory, setFilterCategory,
@@ -46,19 +50,30 @@ export default function Reclassification() {
     activeFilters,
     filteredItems,
     clearFilters,
-  } = useReclassificationFilters(reclassifications, itemStatuses, searchParams, setSearchParams, () => setCurrentPage(1));
+  } = useReclassificationFilters(reclassifications, itemStatuses, searchParams, setSearchParams, () => pagination.resetPage());
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const [deleteProgressModal, setDeleteProgressModal] = useState<DeleteProgressState>({
-    isOpen: false,
-    status: 'deleting',
-    total: 0,
-    processed: 0,
-    failedCount: 0,
+  const currentPage = pagination.currentPage;
+  const setCurrentPage = pagination.setCurrentPage;
+  const totalPages = pagination.totalPagesFor(filteredItems.length);
+  const paginatedItems = pagination.paginate(filteredItems);
+
+  const bulkDelete = useBulkDelete({
+    getSelectedIds: () => selection.selectedIds,
+    getFilteredCount: () => filteredItems.length,
+    hasNoFilters: () =>
+      filterCategory.length === 0 && filterVerified.length === 0 && filterOwnership.length === 0 &&
+      filterAssetCategory.length === 0 && filterLocation.length === 0 && !debouncedSearchQuery,
+    deleteAll: (onProgress) => deleteAllReclassifications(onProgress),
+    deleteMultiple: (ids, onProgress) => deleteMultipleReclassifications(ids, onProgress),
+    clearSelection: selection.clearSelection,
   });
+  const isDeleteModalOpen = bulkDelete.isDeleteModalOpen;
+  const deleteConfirmText = bulkDelete.deleteConfirmText;
+  const setDeleteConfirmText = bulkDelete.setDeleteConfirmText;
+  const deleteProgressModal = bulkDelete.deleteProgress;
+  const handleConfirmDeleteSelected = bulkDelete.handleConfirmDeleteSelected;
 
   const [syncModal, setSyncModal] = useState<{
     isOpen: boolean;
@@ -96,12 +111,6 @@ export default function Reclassification() {
     const needsReview = reclassifications.filter(r => r.category === 'Needs Review').length;
     return { total, verified, unverified, needsReview };
   }, [reclassifications]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
-  const paginatedItems = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredItems.slice(start, start + itemsPerPage);
-  }, [filteredItems, currentPage]);
 
   const handleExportCSV = useCallback(() => {
     const dataToExport = filteredItems.map(item => ({
@@ -162,48 +171,12 @@ export default function Reclassification() {
   }, [pendingDeleteId, deleteReclassification]);
 
   const handleSelectAll = useCallback((checked: boolean) => {
-    if (checked) {
-      setSelectedItems(new Set(filteredItems.map(item => item.id)));
-    } else {
-      setSelectedItems(new Set());
-    }
-  }, [filteredItems]);
+    selection.handleSelectAll(checked, filteredItems.map(item => item.id));
+  }, [selection, filteredItems]);
 
-  const handleSelectItem = useCallback((id: string, checked: boolean) => {
-    setSelectedItems(prev => {
-      const newSet = new Set(prev);
-      if (checked) {
-        newSet.add(id);
-      } else {
-        newSet.delete(id);
-      }
-      return newSet;
-    });
-  }, []);
+  const handleSelectItem = selection.handleSelectOne;
 
-  const handleConfirmDeleteSelected = useCallback(async () => {
-    if (deleteConfirmText !== 'DELETE') return;
-    const total = selectedItems.size;
-    const noFilters = filterCategory.length === 0 && filterVerified.length === 0 && filterOwnership.length === 0 && filterAssetCategory.length === 0 && filterLocation.length === 0 && !debouncedSearchQuery;
-    const allSelected = selectedItems.size === filteredItems.length;
-
-    setIsDeleteModalOpen(false);
-    setDeleteConfirmText('');
-    setDeleteProgressModal({ isOpen: true, status: 'deleting', total, processed: 0, failedCount: 0 });
-
-    const onProgress = (processed: number, failedCount: number) => {
-      setDeleteProgressModal(prev => ({ ...prev, processed, failedCount }));
-    };
-
-    if (noFilters && allSelected) {
-      await deleteAllReclassifications(onProgress);
-    } else {
-      await deleteMultipleReclassifications(Array.from(selectedItems), onProgress);
-    }
-
-    setSelectedItems(new Set());
-    setDeleteProgressModal(prev => ({ ...prev, status: 'done' }));
-  }, [deleteConfirmText, selectedItems, filterCategory, filterVerified, filterOwnership, filterAssetCategory, filterLocation, debouncedSearchQuery, filteredItems, deleteAllReclassifications, deleteMultipleReclassifications]);
+  const setDeleteProgressModal = bulkDelete.setDeleteProgress;
 
   // Deliberately calls deleteMultipleReclassifications directly (never
   // deleteAllReclassifications) so this action can never widen into a full-table
@@ -223,7 +196,7 @@ export default function Reclassification() {
     });
 
     setDeleteProgressModal(prev => ({ ...prev, status: 'done' }));
-  }, [deleteOrphansConfirmText, deletedAssetRows, deleteMultipleReclassifications]);
+  }, [deleteOrphansConfirmText, deletedAssetRows, deleteMultipleReclassifications, setDeleteProgressModal]);
 
   return (
     <div className="flex flex-col gap-6 w-full h-[calc(100vh-[180px])] min-h-[600px]">
@@ -238,7 +211,7 @@ export default function Reclassification() {
           onExport={handleExportCSV}
           onAddNew={() => setIsAddModalOpen(true)}
           selectedCount={selectedItems.size}
-          onDeleteSelectedClick={() => { setIsDeleteModalOpen(true); setDeleteConfirmText(''); }}
+          onDeleteSelectedClick={bulkDelete.openDeleteModal}
         />
       </div>
 
@@ -381,7 +354,7 @@ export default function Reclassification() {
         selectedCount={selectedItems.size}
         confirmText={deleteConfirmText}
         onConfirmTextChange={setDeleteConfirmText}
-        onCancel={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
+        onCancel={bulkDelete.closeDeleteModal}
         onConfirm={handleConfirmDeleteSelected}
         itemLabel="reclassification items"
       />
