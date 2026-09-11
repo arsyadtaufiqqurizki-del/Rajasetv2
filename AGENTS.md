@@ -47,12 +47,28 @@ npm run clean      # Remove dist/ and server.js
 │   ├── index.css                 # Tailwind + custom theme
 │   ├── lib/
 │   │   ├── supabase.ts           # Supabase client (the one actually used everywhere)
+│   │   ├── supabase/fetchAllRows.ts # Chunked select loop (1000/chunk), keeps partial rows on error
+│   │   ├── supabase/batchWrite.ts   # batchDelete/batchUpdate (100/batch) + onProgress
 │   │   ├── activityLogger.ts     # logActivity() helper — writes to activity_logs table
-│   │   └── utils.ts              # cn() utility (clsx + twMerge)
-│   ├── utils/supabase/client.ts  # UNUSED duplicate client — dead code, wrong env var name, do not use
+│   │   ├── utils.ts              # cn() utility (clsx + twMerge)
+│   │   ├── money.ts              # Currency formatting + formatCostInput()
+│   │   ├── csv.ts                # CSV helpers incl. sanitizeCell (formula-injection guard)
+│   │   ├── dates.ts              # Date helpers incl. formatLastUpdate()
+│   │   ├── assetCsv.ts           # CSV import/export mapping + validation (from Inventory.tsx)
+│   │   ├── assetRules.ts         # Listed ↔ Verification rules (applyListedChange/applyVerificationChange)
+│   │   ├── assetForm.ts          # AssetFormValues, EMPTY_ASSET_FORM, toAssetPayload, assetToFormValues
+│   │   ├── maintenanceForm.ts    # Maintenance form shapes + payload mappers
+│   │   └── reclassificationForm.ts # Preset/Custom category rules (splitCategory/resolveCategory)
+│   ├── i18n/en.ts                # All UI copy (English). id.ts removed in Step 8a — do not re-add
 │   ├── hooks/
 │   │   ├── useActivityLog.ts     # Fetches activity_logs + Realtime subscription + unread count
-│   │   └── useSystemAlerts.ts    # Computes overdue-maintenance / broken-asset alerts
+│   │   ├── useSystemAlerts.ts    # Computes overdue-maintenance / broken-asset alerts
+│   │   ├── useEntityForm.ts      # formData + isSaving + saveError + reset-on-open (no useEffect reset)
+│   │   ├── useLookupTable.ts     # Optimistic master-data CRUD (values/hydrate/add/remove)
+│   │   ├── useEntityModals.ts    # Add/edit modal trio state (+ useModalState for verify)
+│   │   ├── useRowSelection.ts    # Set selection + selectAll/selectOne
+│   │   ├── usePagination.ts      # Page + pageSize slice (pageSize configurable, optional localStorage)
+│   │   └── useBulkDelete.ts      # DELETE-gate confirm + progress bulk-delete flow
 │   ├── contexts/
 │   │   ├── AuthContext.tsx        # Supabase Auth (email/password), session-based
 │   │   ├── AssetContext.tsx       # Asset CRUD (Supabase `assets` table) + master data + `lastFetchedAt`
@@ -63,13 +79,15 @@ npm run clean      # Remove dist/ and server.js
 │   │   ├── Layout.tsx            # Sidebar + header + outlet
 │   │   ├── NotificationBell.tsx  # Bell icon, activity feed + system alerts panel
 │   │   ├── AutocompleteInput.tsx # Reusable autocomplete input
-│   │   ├── AddAssetModal.tsx     # Add asset form modal
-│   │   ├── EditAssetModal.tsx    # Edit asset form modal
-│   │   ├── AddMaintenanceModal.tsx
-│   │   ├── EditMaintenanceModal.tsx
-│   │   ├── AddReclassificationModal.tsx
-│   │   ├── EditReclassificationModal.tsx
-│   │   └── VerifyReclassificationModal.tsx
+│   │   ├── AssetFormFields.tsx   # Shared 16-field body for Add/Edit Asset (uses assetRules + formatCostInput)
+│   │   ├── AddAssetModal.tsx     # Thin: EMPTY_ASSET_FORM + addAsset (FormModal + useEntityForm)
+│   │   ├── EditAssetModal.tsx    # Thin: assetToFormValues + updateAsset (idem)
+│   │   ├── AddMaintenanceModal.tsx  # FormModal + AssetPicker + useEntityForm
+│   │   ├── EditMaintenanceModal.tsx # idem (service fields over stored record)
+│   │   ├── AddReclassificationModal.tsx  # idem (linkable-assets only)
+│   │   ├── EditReclassificationModal.tsx # idem (linked rows lock identity fields)
+│   │   ├── VerifyReclassificationModal.tsx # ui/Modal (non-form)
+│   │   └── ui/                   # Modal (portal+focus trap+Esc+scroll lock), FormModal, AssetPicker, Pagination, FilterBar, ConfirmModal, ProgressModal, StatCard, Toast
 │   └── pages/
 │       ├── Login.tsx             # Login page (Supabase email/password)
 │       ├── Dashboard.tsx         # Overview with charts & KPIs
@@ -316,7 +334,7 @@ PORT                       # default 8080
 
 ## Known Issues / Cleanup Candidates
 
-- `src/utils/supabase/client.ts` adalah duplikat client Supabase yang **tidak dipakai** di mana pun — dan pakai nama env var yang salah (`VITE_SUPABASE_PUBLISHABLE_KEY` alih-alih `VITE_SUPABASE_ANON_KEY`). Aman dihapus.
+- ~~`src/utils/supabase/client.ts` duplikat dead code~~ — **dihapus di Step 1** refactor v2 (2026-09-10).
 - `claudememo.md` masih mendeskripsikan state sebelum migrasi Supabase (login access code, data in-memory) — sudah tidak akurat, jangan dijadikan acuan.
 - `.env.example` tidak sinkron dengan env var yang benar-benar dipakai kode (lihat bagian Environment Variables di atas).
 - `Settings.tsx` murni UI state (tidak ada backend call) — tombol "Save Changes" hanya simulasi `setTimeout`.

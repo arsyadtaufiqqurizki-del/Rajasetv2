@@ -40,7 +40,19 @@ const PAGE_SIZE = 5;
 
 const ReportContext = createContext<ReportContextType | undefined>(undefined);
 
-const fromDb = (row: any): ReportRecord => ({
+interface ReportDbRow {
+  id: string;
+  user_name?: string | null;
+  report_type?: string | null;
+  subsidiary?: string | null;
+  date_start?: string | null;
+  date_end?: string | null;
+  report_data: ReportPreview;
+  status?: string | null;
+  created_at: string;
+}
+
+const fromDb = (row: ReportDbRow): ReportRecord => ({
   id: row.id,
   userName: row.user_name ?? 'Unknown User',
   reportType: row.report_type ?? '',
@@ -78,9 +90,11 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   };
 
+  // Refetch-on-page-change: intentional external sync. State settles after the
+  // awaited Supabase call inside fetchPage, not synchronously in this effect.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- refetch on page change, see above
     fetchPage(page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
   const saveReport = async (params: SaveReportParams) => {

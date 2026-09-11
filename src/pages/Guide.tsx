@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronUp, BookOpen, Wrench, Archive, Sparkles, LayoutDashboard, ClipboardCheck, Database, BarChart2, Settings } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -182,11 +182,13 @@ export default function Guide() {
   const [openAccordions, setOpenAccordions] = useState<Record<string, boolean>>({});
 
   // Auto-open first accordion in the active tab when tab changes
-  useEffect(() => {
+  const [prevTab, setPrevTab] = useState(activeTab);
+  if (prevTab !== activeTab) {
+    setPrevTab(activeTab);
     setOpenAccordions({
       [`${activeTab}-0`]: true
     });
-  }, [activeTab]);
+  }
 
   const toggleAccordion = (id: string) => {
     setOpenAccordions(prev => ({ ...prev, [id]: !prev[id] }));

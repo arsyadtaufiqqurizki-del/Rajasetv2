@@ -67,8 +67,10 @@ export function useAiChat() {
     return () => abortControllerRef.current?.abort();
   }, []);
 
+  if (!isTyping && loadingStep !== 0) setLoadingStep(0);
+
   useEffect(() => {
-    if (!isTyping) { setLoadingStep(0); return; }
+    if (!isTyping) return;
     const interval = setInterval(() => {
       setLoadingStep(prev => (prev + 1) % loadingSteps.length);
     }, 3000);

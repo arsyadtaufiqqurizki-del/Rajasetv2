@@ -22,7 +22,23 @@ const parseAmount = (val: string): number | null => {
   return isNaN(n) ? null : n;
 };
 
-const fromDb = (row: any): MaintenanceRecord => ({
+interface MaintenanceDbRow {
+  id: string;
+  asset_book?: string | null;
+  subsidiary?: string | null;
+  asset_number?: string | null;
+  asset_description?: string | null;
+  asset_units?: string | number | null;
+  service_type?: string | null;
+  asset_category_segment1?: string | null;
+  asset_category_segment2?: string | null;
+  estimate_cost?: string | number | null;
+  actual_cost?: string | number | null;
+  status?: string | null;
+  scheduled_date?: string | null;
+}
+
+const fromDb = (row: MaintenanceDbRow): MaintenanceRecord => ({
   id: row.id,
   assetBook: row.asset_book ?? '',
   subsidiary: row.subsidiary ?? '',

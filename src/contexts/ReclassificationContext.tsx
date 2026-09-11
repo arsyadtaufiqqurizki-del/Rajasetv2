@@ -41,9 +41,35 @@ const ReclassificationContext = createContext<ReclassificationContextType | unde
 const RECLASSIFICATION_SELECT =
   '*, linked_asset:assets(asset_number, asset_description, category_segment1, category_segment2, subsidiary, asset_units)';
 
+interface LinkedAssetJoin {
+  asset_number?: string | null;
+  asset_description?: string | null;
+  category_segment1?: string | null;
+  category_segment2?: string | null;
+  subsidiary?: string | null;
+  asset_units?: string | number | null;
+}
+
+interface ReclassificationDbRow {
+  id: string;
+  asset_id?: string | null;
+  linked_asset?: LinkedAssetJoin | null;
+  asset_category?: string | null;
+  asset_description?: string | null;
+  location?: string | null;
+  unit?: string | number | null;
+  ownership?: string | null;
+  category?: string | null;
+  remarks?: string | null;
+  asset_deleted_at?: string | null;
+  verification_date?: string | null;
+  verified_by?: string | null;
+  created_at?: string | null;
+}
+
 // Rows with asset_id set mirror Asset Inventory live (via linked_asset join) so the
 // identifying fields never go stale; unlinked rows keep their own free-text columns.
-const fromDb = (row: any): Reclassification => {
+const fromDb = (row: ReclassificationDbRow): Reclassification => {
   const linked = row.linked_asset;
   return {
     id: row.id,
@@ -100,7 +126,7 @@ export function ReclassificationProvider({ children }: { children: ReactNode }) 
     const fetchAll = async () => {
       setLoading(true);
 
-      const { rows, error: fetchError } = await fetchAllRows('asset_reclassifications', {
+      const { rows, error: fetchError } = await fetchAllRows<ReclassificationDbRow>('asset_reclassifications', {
         select: RECLASSIFICATION_SELECT,
         orderBy: { column: 'created_at', ascending: false },
       });

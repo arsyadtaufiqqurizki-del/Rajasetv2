@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { AssetBulkPatch } from '../types/asset';
 import Modal from './ui/Modal';
 
@@ -27,12 +27,14 @@ export default function BulkEditModal({ isOpen, selectedCount, onCancel, onApply
     status: 'Active',
   });
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (prevIsOpen !== isOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setEnabled({ depreciationMethod: false, listed: false, status: false });
       setValues({ depreciationMethod: 'Straight Line', listed: 'Audited', status: 'Active' });
     }
-  }, [isOpen]);
+  }
 
   const toggleField = (key: keyof typeof enabled) => {
     setEnabled(prev => ({ ...prev, [key]: !prev[key] }));

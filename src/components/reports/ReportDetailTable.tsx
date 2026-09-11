@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { DetailColumn } from '../../types/report';
 import { formatCurrency } from '../../lib/money';
 import { cn } from '../../lib/utils';
@@ -17,7 +17,11 @@ export default function ReportDetailTable({ columns, data }: ReportDetailTablePr
 
   // Data is a fresh array on every Generate — reset to page 1 so a new report
   // doesn't silently open on whatever page the previous one left behind.
-  useEffect(() => { setPage(1); }, [data]);
+  const [prevData, setPrevData] = useState(data);
+  if (prevData !== data) {
+    setPrevData(data);
+    setPage(1);
+  }
 
   const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
   const pageData = useMemo(() => {

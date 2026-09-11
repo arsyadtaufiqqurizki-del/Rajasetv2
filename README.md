@@ -72,6 +72,6 @@ Fitur AI Assistant butuh server terpisah di `server/` (`npm start` di dalam fold
 Script lain:
 - `npm run build` — build produksi via Vite.
 - `npm run preview` — preview hasil build produksi.
-- `npm run lint` — type-check dengan `tsc --noEmit`.
+- `npm run lint` — `eslint .` (target: 0 error) + type-check `tsc --noEmit`.
 - `npm run clean` — hapus `dist/` dan `server.js`.
 - `npm run deploy` — build lalu deploy ke Cloudflare Workers via `wrangler`.

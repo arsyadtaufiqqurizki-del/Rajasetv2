@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Download, Loader2, Plus } from 'lucide-react';
 import { formatLastUpdate, startOfToday } from '../lib/dates';
@@ -69,11 +69,9 @@ export default function Dashboard() {
     trendSubsidiaries,
   } = useDashboardMetrics(filteredAssets, selectedYear, bookValues);
 
-  useEffect(() => {
-    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
-      setSelectedYear(availableYears[0]);
-    }
-  }, [availableYears, selectedYear]);
+  if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+    setSelectedYear(availableYears[0]);
+  }
 
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;

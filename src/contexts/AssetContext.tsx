@@ -55,7 +55,28 @@ const computeStatusLevel = (status: string): Asset['statusLevel'] => {
   return 'default';
 };
 
-const fromDb = (row: any): Asset => ({
+interface AssetDbRow {
+  id: string;
+  asset_book?: string | null;
+  subsidiary?: string | null;
+  asset_number?: string | null;
+  asset_description?: string | null;
+  asset_cost?: string | number | null;
+  date_place_in_service?: string | null;
+  asset_units?: string | number | null;
+  category_segment1?: string | null;
+  category_segment2?: string | null;
+  depreciation_method?: string | null;
+  life_in_months?: string | null;
+  listed?: string | null;
+  status?: string | null;
+  verification?: boolean | null;
+  verification_date?: string | null;
+  item_status?: string | null;
+  created_at?: string | null;
+}
+
+const fromDb = (row: AssetDbRow): Asset => ({
   id: row.id,
   assetBook: row.asset_book ?? '',
   subsidiary: row.subsidiary ?? '',
@@ -144,7 +165,7 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     // fetchAllRows pages past Supabase's default 1000-row limit; on a mid-page
     // failure it still returns the chunks that already succeeded, which is what
     // the hand-rolled loop did too.
-    const { rows, error: fetchError } = await fetchAllRows<{ updated_at?: string | null }>('assets', {
+    const { rows, error: fetchError } = await fetchAllRows<AssetDbRow & { updated_at?: string | null }>('assets', {
       orderBy: { column: 'created_at', ascending: false },
     });
     if (fetchError) setError(fetchError);
@@ -171,7 +192,10 @@ export function AssetProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, [hydrateSubsidiaries, hydrateCategories1, hydrateCategories2, hydrateItemStatuses]);
 
+  // Fetch-on-mount: intentional external sync. State settles after the awaited
+  // Supabase calls inside fetchAll, not synchronously in this effect.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount, see above
     fetchAll();
   }, [fetchAll]);
 

@@ -32,7 +32,7 @@ export function useSystemAlerts() {
 
     const overdueCount = overdueRes.count ?? 0
     if (overdueCount > 0) {
-      const names = (overdueRes.data ?? []).map((r: any) => r.asset_description).filter(Boolean)
+      const names = (overdueRes.data ?? []).map((r: { asset_description?: unknown }) => r.asset_description).filter(Boolean)
       const preview = names.slice(0, 2).join(', ') + (overdueCount > 2 ? copy.alerts.overdueMoreSuffix(overdueCount - 2) : '')
       newAlerts.push({
         type: 'MAINTENANCE_OVERDUE',
@@ -59,6 +59,9 @@ export function useSystemAlerts() {
     setAlerts(newAlerts)
   }, [])
 
+  // Fetch-on-mount: intentional external sync. State settles after the awaited
+  // Supabase calls inside fetchAlerts, not synchronously in this effect.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount, see above
   useEffect(() => { fetchAlerts() }, [fetchAlerts])
 
   return { alerts, fetchAlerts }

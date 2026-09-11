@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import Modal from './ui/Modal';
 import Pagination from './ui/Pagination';
@@ -16,10 +16,11 @@ const ITEMS_PER_PAGE = 10;
 
 export default function AllSubsidiariesModal({ isOpen, onClose, data }: AllSubsidiariesModalProps) {
   const [page, setPage] = useState(1);
-
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (prevIsOpen !== isOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) setPage(1);
-  }, [isOpen]);
+  }
 
   const totalPages = Math.max(1, Math.ceil(data.length / ITEMS_PER_PAGE));
   const indexOfFirstItem = (page - 1) * ITEMS_PER_PAGE;

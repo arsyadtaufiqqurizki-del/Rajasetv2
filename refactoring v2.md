@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a, 7b, 8, 8a, 9 SELESAI (2026-09-11). Berikutnya: Step 10.**
+> Status: **SELESAI — Step 0–10 (2026-09-11).**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8 ✅ · 8a ✅ (B5) · 9 ✅ · 10 ⬜
-> Test: 63 → **523** (38 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-11
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8 ✅ · 8a ✅ (B5) · 9 ✅ · 10 ✅
+> Test: 63 → **523** (38 file) · lint: 46 → **0 error, 8 warning** · gate terakhir dijalankan 2026-09-11
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -1085,11 +1085,23 @@ dan sort tidak berubah.
 
 ---
 
-### Step 10 — Gate akhir *(±2 jam)*
+### Step 10 — Gate akhir ✅ **SELESAI 2026-09-11**
 - Bersihkan sisa `no-explicit-any` yang belum tersapu step sebelumnya.
 - `npm run lint` → target **0 error** (dari 37).
 - `graphify update .` untuk menyegarkan knowledge graph.
 - Perbarui `AGENTS.md` / `README.md` bila struktur folder berubah.
+
+**Hasil (2026-09-11):** **15 error → 0 error** (8 warning tersisa, semuanya `react-refresh/only-export-components` yang pre-existing dan di luar cakupan). `tsc` bersih, **523 test / 38 file hijau**, `build` sukses. Golden file CSV identik.
+
+| Yang dibersihkan | Dari | Ke |
+|---|---|---|
+| `fromDb(row: any)` (4 salinan) | `AssetContext`, `MaintenanceContext`, `ReclassificationContext`, `ReportContext` | interface baris DB per tabel (`AssetDbRow`, `MaintenanceDbRow`, `ReclassificationDbRow` + `LinkedAssetJoin`, `ReportDbRow`) — body `fromDb` tidak berubah satu karakter; call site `fetchAllRows<T>` diberi generic yang sesuai |
+| `(r: any)` pada map hasil select | `useSystemAlerts.ts:35` | `(r: { asset_description?: unknown })`, `.filter(Boolean)` dipertahankan |
+| Reset-on-open / reset-on-data-change lewat `useEffect` (7 lokasi) | `AllCategoriesModal`, `AllSubsidiariesModal`, `BulkEditModal`, `ReportDetailTable`, `Dashboard` (selectedYear), `Guide` (accordion), `useAiChat` (loadingStep) | reset saat render dengan pola prev-comparison (preseden Step 6 `useEntityForm`) — menghilangkan satu frame basi, tanpa perubahan visual |
+| Fetch-on-mount / refetch-on-page-change (3 lokasi) | `AssetContext` (fetchAll), `ReportContext` (fetchPage), `useSystemAlerts` (fetchAlerts) | `eslint-disable-next-line react-hooks/set-state-in-effect` dengan justificasi — state settle setelah `await` Supabase, bukan sinkron di effect; behavior 100% sama |
+| Disable basi `react-hooks/exhaustive-deps` | `ReportContext:83` | dihapus (sudah unused → warning) |
+
+**Sengaja tidak disentuh:** 8 warning `react-refresh/only-export-components` (konstanta/helper yang diekspor bersama komponen — memindahkannya adalah churn tanpa nilai, di luar target "0 error"); `any` yang sudah di-suppress dengan disable di test/mock dan `exportPdf.ts` (mock builder & sel PDF dinamis — intentional).
 
 ---
 
@@ -1104,7 +1116,7 @@ dan sort tidak berubah.
                                         │
                7a ⚠️ B1 chrome → FormModal ✅ ─► 7b ⚠️ B2 error handling ✅ ─► 8 Hook halaman list ✅
                                          │
-8a ⚠️ B5 copy ke Inggris ✅ ─► 9 Prop filter ✅ ─► 10 Gate akhir ◄── di sini
+ 8a ⚠️ B5 copy ke Inggris ✅ ─► 9 Prop filter ✅ ─► 10 Gate akhir ✅ — SELESAI
 ```
 
 **Estimasi total: ±46 jam** (36 jam refactor + 10 jam untuk B1, B2, B5; Step 9 dikerjakan).
