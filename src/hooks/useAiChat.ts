@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { en as copy } from '../i18n/en';
 
 const CLOUD_RUN_URL = import.meta.env.VITE_AI_SERVER_URL;
 const STORAGE_KEY_MESSAGES = 'ai_assistant_messages';
@@ -23,12 +24,7 @@ type HistoryMessage = {
   content: string;
 };
 
-export const loadingSteps = [
-  'Mengambil data inventaris...',
-  'Menganalisis data aset...',
-  'Menyusun laporan...',
-  'Masih diproses, mohon tunggu sebentar...',
-];
+export const loadingSteps = copy.ai.loadingSteps;
 
 const GREETING = 'Halo! Saya adalah Asisten AI Anda. Anda bisa menanyakan apa saja seputar data aset, jadwal maintenance, atau laporan kondisi barang di Perusahaan Raja. Gunakan mode Data untuk pertanyaan seputar data aset, atau mode Chat untuk ngobrol santai tanpa akses data — bisa diganti lewat tombol di kanan atas.';
 
@@ -137,7 +133,7 @@ export function useAiChat() {
         throw new Error(errMsg);
       }
 
-      if (!response.body) throw new Error('Streaming tidak didukung oleh browser ini.');
+      if (!response.body) throw new Error(copy.ai.errors.noStreaming);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -164,7 +160,7 @@ export function useAiChat() {
       }
 
       if (!fullText) {
-        throw new Error('Server tidak mengembalikan jawaban.');
+        throw new Error(copy.ai.errors.noAnswer);
       }
 
       setMessages((prev) => {
@@ -178,7 +174,7 @@ export function useAiChat() {
       });
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
-        setError(err.message || 'Gagal menghubungi server AI.');
+        setError(err.message || copy.ai.errors.network);
         if (aiMessageId) {
           const failedId = aiMessageId;
           setMessages((prev) => prev.filter((m) => m.id !== failedId));

@@ -75,7 +75,7 @@ describe('EditMaintenanceModal — chrome', () => {
     expect(screen.getByText('Book:').parentElement).toHaveTextContent('Corporate');
     expect(screen.getByText('Subsidiary:').parentElement).toHaveTextContent('PT Raja Prima');
     expect(screen.getByText('Units:').parentElement).toHaveTextContent('1');
-    expect(screen.queryByPlaceholderText('Cari asset number atau deskripsi...')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Search asset number or description...')).not.toBeInTheDocument();
   });
 
   it('closes without saving when Cancel is pressed', () => {

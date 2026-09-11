@@ -5,6 +5,7 @@ import AssetPicker from './ui/AssetPicker';
 import FormModal from './ui/FormModal';
 import { useEntityForm } from '../hooks/useEntityForm';
 import { emptyAddMaintenanceForm, toMaintenancePayload } from '../lib/maintenanceForm';
+import { en as copy } from '../i18n/en';
 
 interface AddMaintenanceModalProps {
   isOpen: boolean;
@@ -72,7 +73,7 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
           placeholder="Select an asset"
           triggerClassName={PICKER_TRIGGER_CLASS}
           panelClassName={PICKER_PANEL_CLASS}
-          renderMoreHint={total => `Menampilkan 50 dari ${total} aset. Ketik untuk mencari.`}
+          renderMoreHint={copy.assetPicker.moreHint}
         />
       </div>
 

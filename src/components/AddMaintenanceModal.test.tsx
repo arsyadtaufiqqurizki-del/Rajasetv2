@@ -47,7 +47,7 @@ function makeAsset(over: Partial<Asset> & { id: string }): Asset {
   };
 }
 
-const SEARCH_PLACEHOLDER = 'Cari asset number atau deskripsi...';
+const SEARCH_PLACEHOLDER = 'Search asset number or description...';
 
 function openPicker() {
   fireEvent.click(screen.getByRole('button', { name: 'Select an asset' }));
@@ -129,7 +129,7 @@ describe('AddMaintenanceModal — asset picker', () => {
     render(<AddMaintenanceModal isOpen onClose={mockOnClose} />);
     openPicker();
     fireEvent.change(byPlaceholder(SEARCH_PLACEHOLDER), { target: { value: 'zzzz' } });
-    expect(screen.getByText('Tidak ada hasil')).toBeInTheDocument();
+    expect(screen.getByText('No results')).toBeInTheDocument();
   });
 
   it('caps the list at 50 and says so, but only while the search box is empty', () => {
@@ -140,10 +140,10 @@ describe('AddMaintenanceModal — asset picker', () => {
     openPicker();
 
     expect(screen.getAllByRole('listitem')).toHaveLength(50);
-    expect(screen.getByText('Menampilkan 50 dari 60 aset. Ketik untuk mencari.')).toBeInTheDocument();
+    expect(screen.getByText('Showing 50 of 60 assets. Type to search.')).toBeInTheDocument();
 
     fireEvent.change(byPlaceholder(SEARCH_PLACEHOLDER), { target: { value: 'AST-0' } });
-    expect(screen.queryByText(/Menampilkan 50 dari/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Showing 50 of/)).not.toBeInTheDocument();
   });
 
   it('closes the dropdown, clears the search and shows the picked asset in the trigger', () => {

@@ -1,8 +1,8 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a, 7b, 8 SELESAI (2026-09-11). Berikutnya: Step 8a.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a, 7b, 8, 8a SELESAI (2026-09-11). Berikutnya: Step 10.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8 ✅ · 8a ⬜ · 9 ⏸️ ditunda · 10 ⬜
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8 ✅ · 8a ✅ (B5) · 9 ⏸️ ditunda · 10 ⬜
 > Test: 63 → **522** (38 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-11
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
@@ -1048,6 +1048,20 @@ berbahasa Indonesia. Menerjemahkan keduanya justru membuat halaman terlihat lebi
 lebih rapi. Kalau suatu saat system prompt backend diubah ke Inggris, dua item ini ikut di commit
 yang sama.
 
+**Hasil (2026-09-11):** `en.ts` +9 seksi (`assetPicker`, `reclassification.*`, `maintenance`,
+`importModal`, `notifications`, `alerts`, `ai`), `id.ts` dihapus (nol importer),
+**522 test / 38 file — semua lulus** (tanpa test baru; ±30 assertion dimutakhirkan ke copy Inggris),
+golden file CSV identik, `tsc` bersih, `eslint` tetap **24 problems**, `build` sukses.
+
+| Yang dikerjakan | Catatan |
+|---|---|
+| 8a.1 — tukar import `id` → `en` | **7 file, bukan 8**: `AddMaintenanceModal`/`AddReclassificationModal` ternyata tidak pernah mengimpor i18n (murni hardcoded); file ke-7 adalah `ui/AssetPicker` (hasil ekstraksi Step 7, belum ada saat rencana ditulis) |
+| 8a.2 — string hardcoded → `en.ts` | 12 file: `Reclassification.tsx`, `ReclassificationToolbar`, `Add/EditReclassificationModal`, `AddMaintenanceModal` (hanya hint picker), `VerifyReclassificationModal`, `NotificationBell` (termasuk `timeAgo` + `getActionMeta`), `useSystemAlerts`, `useAiChat` (loadingSteps + 3 error), `AIAssistant.tsx` (chrome saja), `MaintenanceSchedulePanel`, `MaintenanceCalendarModal`, `ImportProgressModal` |
+| `en.ts` kini berisi fungsi | `moreHint(total)`, `minutesAgo/hoursAgo/daysAgo(n)`, `syncLinkedValue(n)`, judul alert dinamis — penyimpangan dari bentuk plain-data, supaya format kalimat tetap di satu tempat |
+| Locale tanggal `id-ID` → `en-US` | `VerifyReclassificationModal` + `ReclassificationTable` (format tampilan, ikut bahasa UI) |
+| `Hapus Chat` → `Clear Chat` | mengikuti nama fungsi `clearChat`; kedua kutipan verbatim di `Guide.tsx:74` (`Tambah Item` → `Add Item`) & `:155` ikut diperbarui di commit yang sama |
+| Jebakan §8a MANAGEMENT | nilai DB tidak tersentuh · cek dua-bentuk `Reports.tsx:166` dipertahankan · `server/index.js` tidak tersentuh · `GREETING` + 4 prompt saran tetap Indonesia · `'Barang Hilang'` di test tetap sebagai **data** custom category, bukan copy UI |
+
 ---
 
 ### Step 9 — *(DITUNDA)* Rapikan prop filter *(±4 jam)*
@@ -1078,7 +1092,7 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
                                         │
                7a ⚠️ B1 chrome → FormModal ✅ ─► 7b ⚠️ B2 error handling ✅ ─► 8 Hook halaman list ✅
                                          │
-8a ⚠️ B5 copy ke Inggris ◄── di sini ─► [9 ditunda] ─► 10 Gate akhir
+8a ⚠️ B5 copy ke Inggris ✅ ─► [9 ditunda] ─► 10 Gate akhir ◄── di sini
 ```
 
 **Estimasi total: ±46 jam** (36 jam refactor + 10 jam untuk B1, B2, B5; Step 9 ditunda).

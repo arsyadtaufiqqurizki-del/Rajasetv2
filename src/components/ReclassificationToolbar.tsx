@@ -1,4 +1,5 @@
 import { Plus, Trash2, Download, RefreshCw } from 'lucide-react';
+import { en as copy } from '../i18n/en';
 
 interface ReclassificationToolbarProps {
   onSyncFromAssets: () => void;
@@ -23,7 +24,7 @@ export default function ReclassificationToolbar({
         onClick={onSyncFromAssets}
         disabled={isSyncing}
         className="flex items-center gap-2 px-4 py-2 bg-surface border border-outline-variant text-on-surface-variant rounded-md hover:text-primary hover:border-primary font-medium text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Tambahkan asset dari Inventory yang belum tertaut sebagai baseline audit"
+        title={copy.reclassification.toolbar.syncTooltip}
       >
         <RefreshCw className="h-4 w-4" />
         Sync from Assets
@@ -40,7 +41,7 @@ export default function ReclassificationToolbar({
         className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-md hover:bg-primary/90 font-medium text-sm transition-colors shadow-sm"
       >
         <Plus className="h-4 w-4" />
-        Tambah Item
+        {copy.reclassification.toolbar.addItem}
       </button>
       {selectedCount > 0 && (
         <button

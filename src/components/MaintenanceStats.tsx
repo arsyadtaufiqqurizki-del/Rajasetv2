@@ -1,6 +1,6 @@
 import { Settings as SettingsIcon, AlertTriangle, CircleDollarSign, CalendarDays } from 'lucide-react';
 import StatCard from './ui/StatCard';
-import { id as copy } from '../i18n/id';
+import { en as copy } from '../i18n/en';
 
 interface MaintenanceStatsProps {
   activeCount: number;

@@ -73,7 +73,7 @@ describe('VerifyReclassificationModal — mount condition', () => {
 describe('VerifyReclassificationModal — content', () => {
   it('shows the row identity read-only', () => {
     render(<VerifyReclassificationModal />);
-    expect(screen.getByRole('heading', { name: 'Verifikasi Item' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Verify Item' })).toBeInTheDocument();
     expect(screen.getByText('Kompresor GA-30')).toBeInTheDocument();
     expect(screen.getByText('Needs Review')).toBeInTheDocument();
     expect(screen.getByText('Gudang A')).toBeInTheDocument();
@@ -89,22 +89,22 @@ describe('VerifyReclassificationModal — content', () => {
   it('offers to verify an unverified row', () => {
     render(<VerifyReclassificationModal />);
     expect(screen.getByText('Unverified')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tandai Terverifikasi' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark as Verified' })).toBeInTheDocument();
   });
 
   it('offers to un-verify a verified row, showing who verified it and when', () => {
     mockVerifying = makeRow({ verified: true, verificationDate: '2026-03-05', verifiedBy: 'Budi' });
     render(<VerifyReclassificationModal />);
     expect(screen.getByText('Verified')).toBeInTheDocument();
-    expect(screen.getByText(/oleh Budi/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tandai Belum Terverifikasi' })).toBeInTheDocument();
+    expect(screen.getByText(/by Budi/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark as Unverified' })).toBeInTheDocument();
   });
 });
 
 describe('VerifyReclassificationModal — toggle', () => {
   it('flips an unverified row to verified and then closes', async () => {
     render(<VerifyReclassificationModal />);
-    fireEvent.click(screen.getByRole('button', { name: 'Tandai Terverifikasi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as Verified' }));
 
     await waitFor(() => expect(mockVerify).toHaveBeenCalledWith('r1', true));
     await waitFor(() => expect(mockSetIsVerifyModalOpen).toHaveBeenCalledWith(false));
@@ -114,7 +114,7 @@ describe('VerifyReclassificationModal — toggle', () => {
   it('flips a verified row back to unverified', async () => {
     mockVerifying = makeRow({ verified: true });
     render(<VerifyReclassificationModal />);
-    fireEvent.click(screen.getByRole('button', { name: 'Tandai Belum Terverifikasi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as Unverified' }));
 
     await waitFor(() => expect(mockVerify).toHaveBeenCalledWith('r1', false));
   });
@@ -123,10 +123,10 @@ describe('VerifyReclassificationModal — toggle', () => {
     let release!: () => void;
     mockVerify.mockReturnValue(new Promise<void>(r => { release = r; }));
     render(<VerifyReclassificationModal />);
-    fireEvent.click(screen.getByRole('button', { name: 'Tandai Terverifikasi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as Verified' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Batal' })).toBeDisabled());
-    expect(screen.getByRole('button', { name: 'Tandai Terverifikasi' })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Mark as Verified' })).toBeDisabled();
 
     release();
     await waitFor(() => expect(mockSetIsVerifyModalOpen).toHaveBeenCalledWith(false));
@@ -137,13 +137,13 @@ describe('VerifyReclassificationModal — toggle', () => {
 describe('VerifyReclassificationModal — ui/Modal chrome', () => {
   it('labels the dialog with the heading it renders', () => {
     render(<VerifyReclassificationModal />);
-    const heading = screen.getByRole('heading', { name: 'Verifikasi Item' });
+    const heading = screen.getByRole('heading', { name: 'Verify Item' });
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby', heading.id);
   });
 
-  it('clears both the flag and the row when Batal is pressed', () => {
+  it('clears both the flag and the row when Cancel is pressed', () => {
     render(<VerifyReclassificationModal />);
-    fireEvent.click(screen.getByRole('button', { name: 'Batal' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(mockSetIsVerifyModalOpen).toHaveBeenCalledWith(false);
     expect(mockSetVerifyingReclassification).toHaveBeenCalledWith(null);
     expect(mockVerify).not.toHaveBeenCalled();
@@ -168,9 +168,9 @@ describe('VerifyReclassificationModal — ui/Modal chrome', () => {
     let release!: () => void;
     mockVerify.mockReturnValue(new Promise<void>(r => { release = r; }));
     render(<VerifyReclassificationModal />);
-    fireEvent.click(screen.getByRole('button', { name: 'Tandai Terverifikasi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as Verified' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Batal' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled());
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(mockSetIsVerifyModalOpen).not.toHaveBeenCalled();
 

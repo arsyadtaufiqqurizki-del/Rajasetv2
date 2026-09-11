@@ -20,7 +20,7 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import DeleteProgressModal from '../components/DeleteProgressModal';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import Toast from '../components/ui/Toast';
-import { id as copy } from '../i18n/id';
+import { en as copy } from '../i18n/en';
 
 export default function Reclassification() {
   const {
@@ -203,7 +203,7 @@ export default function Reclassification() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-on-surface">Asset Reclassification</h2>
-          <p className="text-sm text-on-surface-variant mt-1">Catat dan verifikasi temuan audit fisik aset.</p>
+          <p className="text-sm text-on-surface-variant mt-1">{copy.reclassification.pageDescription}</p>
         </div>
         <ReclassificationToolbar
           onSyncFromAssets={handleSyncFromAssets}
@@ -226,7 +226,7 @@ export default function Reclassification() {
         className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm"
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
-        searchPlaceholder="Cari deskripsi atau lokasi..."
+        searchPlaceholder={copy.reclassification.searchPlaceholder}
         chips={activeFilters}
         onClearFilters={clearFilters}
       >
@@ -288,24 +288,24 @@ export default function Reclassification() {
         isOpen={syncModal.isOpen}
         status={syncModal.status === 'syncing' ? 'busy' : 'done'}
         busyTitle="Syncing from Assets..."
-        busyDescription="Menambahkan asset yang belum tertaut sebagai baseline audit."
+        busyDescription={copy.reclassification.syncBusyDescription}
         total={syncModal.total}
         processed={syncModal.processed}
         unit="assets processed"
         doneTitle="Sync Complete"
         hasWarning={syncModal.failedCount > 0 || deletedAssetRows.length > 0}
         stats={syncModal.total === 0 ? [] : [
-          { label: 'Berhasil ditautkan', value: `${syncModal.successCount} asset`, tone: 'success' },
-          ...(syncModal.failedCount > 0 ? [{ label: 'Gagal', value: `${syncModal.failedCount} asset`, tone: 'error' as const }] : []),
+          { label: copy.reclassification.syncLinkedLabel, value: copy.reclassification.syncLinkedValue(syncModal.successCount), tone: 'success' },
+          ...(syncModal.failedCount > 0 ? [{ label: copy.reclassification.syncFailedLabel, value: copy.reclassification.syncLinkedValue(syncModal.failedCount), tone: 'error' as const }] : []),
         ]}
         onClose={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
       >
         {syncModal.status === 'done' && syncModal.total === 0 && deletedAssetRows.length === 0 && (
-          <p className="text-sm text-on-surface-variant mb-4">Semua asset sudah tertaut ke Reclassification.</p>
+          <p className="text-sm text-on-surface-variant mb-4">{copy.reclassification.syncAllLinked}</p>
         )}
         {syncModal.errors.length > 0 && (
           <div className="mb-4">
-            <p className="text-xs font-semibold text-error mb-1.5">Detail error</p>
+            <p className="text-xs font-semibold text-error mb-1.5">{copy.reclassification.syncErrorHeading}</p>
             <div className="max-h-40 overflow-y-auto bg-error-container/20 border border-error/20 rounded-xl p-3 space-y-1.5">
               {syncModal.errors.map((message, idx) => (
                 <p key={idx} className="text-xs text-error break-words">{message}</p>
@@ -316,15 +316,15 @@ export default function Reclassification() {
         {syncModal.status === 'done' && deletedAssetRows.length > 0 && (
           <div className="mb-4">
             <p className="text-sm font-semibold text-amber-600 mb-1.5">
-              {deletedAssetRows.length} asset telah dihapus dari Asset Inventory
+              {copy.reclassification.syncDeletedTitle(deletedAssetRows.length)}
             </p>
             <p className="text-xs text-on-surface-variant mb-2">
-              Baris reclassification-nya masih tersimpan sebagai jejak audit, tapi asset sumbernya sudah tidak ada.
+              {copy.reclassification.syncDeletedHint}
             </p>
             <div className="max-h-40 overflow-y-auto bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 space-y-1.5 mb-3">
               {deletedAssetRows.map(r => (
                 <p key={r.id} className="text-xs text-on-surface break-words">
-                  {r.assetDescription || '(tanpa deskripsi)'}
+                  {r.assetDescription || copy.reclassification.noDescription}
                 </p>
               ))}
             </div>
@@ -333,7 +333,7 @@ export default function Reclassification() {
               onClick={() => { setDeleteOrphansConfirmText(''); setIsDeleteOrphansModalOpen(true); }}
               className="px-4 py-2 bg-error text-on-error rounded-md hover:bg-error/90 font-medium text-sm transition-colors shadow-sm"
             >
-              Hapus baris ini
+              {copy.reclassification.syncDeleteOrphans}
             </button>
           </div>
         )}

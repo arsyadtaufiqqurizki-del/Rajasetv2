@@ -283,9 +283,9 @@ describe('Reclassification — orphan (deleted-asset) rows', () => {
 
     await user.click(screen.getByRole('button', { name: /Sync from Assets/ }));
     expect(await screen.findByText('Sync Complete')).toBeInTheDocument();
-    expect(screen.getByText('1 asset telah dihapus dari Asset Inventory')).toBeInTheDocument();
+    expect(screen.getByText('1 asset deleted from Asset Inventory')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Hapus baris ini' }));
+    await user.click(screen.getByRole('button', { name: 'Delete these rows' }));
     await confirmBulkDelete(user);
 
     await waitFor(() => expect(mockDeleteMultiple).toHaveBeenCalledTimes(1));
@@ -299,16 +299,16 @@ describe('Reclassification — single-row actions', () => {
     rows = [makeRow({ id: 'r-1', assetDescription: 'Laptop' })];
   });
 
-  it('asks for confirmation before deleting one row, using the Indonesian copy', async () => {
+  it('asks for confirmation before deleting one row, using the English copy', async () => {
     const user = userEvent.setup();
     renderPage();
 
     await user.click(screen.getByRole('button', { name: 'Delete Item' }));
 
-    expect(screen.getByRole('heading', { name: 'Hapus Item Reclassification' })).toBeInTheDocument();
-    expect(screen.getByText('Yakin ingin menghapus item reclassification ini?')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Delete Reclassification Item' })).toBeInTheDocument();
+    expect(screen.getByText('Are you sure you want to delete this reclassification item?')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Hapus' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(mockDeleteReclassification).toHaveBeenCalledWith('r-1');
   });
@@ -318,10 +318,10 @@ describe('Reclassification — single-row actions', () => {
     renderPage();
 
     await user.click(screen.getByRole('button', { name: 'Delete Item' }));
-    await user.click(screen.getByRole('button', { name: 'Batal' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(mockDeleteReclassification).not.toHaveBeenCalled();
-    expect(screen.queryByRole('heading', { name: 'Hapus Item Reclassification' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Delete Reclassification Item' })).not.toBeInTheDocument();
   });
 
   it('opens the edit modal with the clicked row', async () => {
@@ -354,11 +354,11 @@ describe('Reclassification — single-row actions', () => {
     renderPage();
 
     await user.click(screen.getByRole('button', { name: 'Delete Item' }));
-    await user.click(screen.getByRole('button', { name: 'Hapus' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     // Confirm dialog closes
     await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'Hapus Item Reclassification' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Delete Reclassification Item' })).not.toBeInTheDocument()
     );
     // Toast with error message appears
     expect(await screen.findByRole('status')).toHaveTextContent('Connection refused');

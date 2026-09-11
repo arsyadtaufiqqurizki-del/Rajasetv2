@@ -1,7 +1,7 @@
 import { Edit2, Trash2, CheckCircle2, XCircle, Link2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { TableEmptyRow } from './ui/EmptyState';
-import { id as copy } from '../i18n/id';
+import { en as copy } from '../i18n/en';
 import type { Reclassification } from '../types/reclassification';
 
 interface ReclassificationTableProps {
@@ -129,7 +129,7 @@ export default function ReclassificationTable({
               </td>
               <td className="py-4 px-4 text-on-surface-variant whitespace-nowrap">
                 {item.verificationDate
-                  ? new Date(item.verificationDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                  ? new Date(item.verificationDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
                   : '-'}
               </td>
             </tr>

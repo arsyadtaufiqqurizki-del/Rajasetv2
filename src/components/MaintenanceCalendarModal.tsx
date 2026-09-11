@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MaintenanceRecord } from '../contexts/MaintenanceContext';
 import Modal from './ui/Modal';
+import { en as copy } from '../i18n/en';
 
 interface MaintenanceCalendarModalProps {
   isOpen: boolean;
@@ -198,7 +199,7 @@ export default function MaintenanceCalendarModal({ isOpen, onClose, records, onS
               {new Date(weeks.flat().find(d => toDateKey(d) === selectedDateKey)!).toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
             </h4>
             {selectedRecords.length === 0 ? (
-              <p className="text-sm text-on-surface-variant">Tidak ada jadwal maintenance pada tanggal ini.</p>
+              <p className="text-sm text-on-surface-variant">{copy.maintenance.calendarEmptyDay}</p>
             ) : (
               <>
                 {paginatedDayRecords.map(record => (

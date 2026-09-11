@@ -1,7 +1,7 @@
 import { Edit, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { TableEmptyRow } from './ui/EmptyState';
-import { id as copy } from '../i18n/id';
+import { en as copy } from '../i18n/en';
 import type { MaintenanceRecord } from '../types/maintenance';
 
 interface MaintenanceTableProps {

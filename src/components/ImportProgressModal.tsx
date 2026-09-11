@@ -1,5 +1,6 @@
 import { FileDown } from 'lucide-react';
 import ProgressModal from './ui/ProgressModal';
+import { en as copy } from '../i18n/en';
 
 export interface InvalidRow {
   rowNumber: number;
@@ -50,7 +51,7 @@ export default function ImportProgressModal({ importModal, onClose, onDownloadIn
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-              Baris yang dilewati
+              {copy.importModal.skippedRows}
             </span>
             <button
               onClick={onDownloadInvalidRows}
@@ -64,9 +65,9 @@ export default function ImportProgressModal({ importModal, onClose, onDownloadIn
             <table className="w-full">
               <thead className="bg-surface-container sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Baris</th>
+                  <th className="text-left px-3 py-2 text-on-surface-variant font-medium">{copy.importModal.rowColumn}</th>
                   <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Asset Number</th>
-                  <th className="text-left px-3 py-2 text-on-surface-variant font-medium">Alasan</th>
+                  <th className="text-left px-3 py-2 text-on-surface-variant font-medium">{copy.importModal.reasonColumn}</th>
                 </tr>
               </thead>
               <tbody>

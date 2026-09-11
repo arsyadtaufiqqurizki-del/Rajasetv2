@@ -71,7 +71,7 @@ const GUIDE_CONTENT = [
     content: [
       {
         question: "What is the Reclassification page for?",
-        answer: "It's where you audit assets against Asset Inventory. Click \"Tambah Item\" and pick an existing asset from Inventory by searching its asset number or description — you don't type in its details, those are pulled live from Inventory. You just set the audit classification (Asset, Needs Review, Inventory, or a custom category) and optional remarks."
+        answer: "It's where you audit assets against Asset Inventory. Click \"Add Item\" and pick an existing asset from Inventory by searching its asset number or description — you don't type in its details, those are pulled live from Inventory. You just set the audit classification (Asset, Needs Review, Inventory, or a custom category) and optional remarks."
       },
       {
         question: "Why can't I edit the asset description, category, location, or ownership here?",
@@ -152,7 +152,7 @@ const GUIDE_CONTENT = [
       },
       {
         question: "Does the AI Assistant remember our conversation?",
-        answer: "Chat history is saved in your browser (up to 21 messages) and the last 10 exchanges are used as context for follow-up questions. Click 'Hapus Chat' to clear the conversation."
+        answer: "Chat history is saved in your browser (up to 21 messages) and the last 10 exchanges are used as context for follow-up questions. Click 'Clear Chat' to clear the conversation."
       },
       {
         question: "Is my data secure with the AI?",

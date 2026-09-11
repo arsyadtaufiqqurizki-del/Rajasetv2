@@ -12,7 +12,7 @@ const onChange = vi.fn();
 
 const TRIGGER_CLASS = 'trigger-under-test';
 const PANEL_CLASS = 'panel-under-test';
-const SEARCH_PLACEHOLDER = 'Cari asset number atau deskripsi...';
+const SEARCH_PLACEHOLDER = 'Search asset number or description...';
 
 function options(n: number): AssetPickerOption[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -114,7 +114,7 @@ describe('AssetPicker — search', () => {
     renderPicker();
     fireEvent.click(trigger());
     fireEvent.change(search(), { target: { value: 'zzzz' } });
-    expect(screen.getByText('Tidak ada hasil')).toBeInTheDocument();
+    expect(screen.getByText('No results')).toBeInTheDocument();
   });
 
   it('offers a clear button only once something has been typed', () => {

@@ -116,21 +116,21 @@ describe('EditReclassificationModal — hydration', () => {
   it('selects the stored category when it is one of the presets', () => {
     render(<EditReclassificationModal />);
     expect(categorySelect()).toHaveValue('Needs Review');
-    expect(screen.queryByPlaceholderText('e.g. Barang Hilang')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('e.g. Lost Item')).not.toBeInTheDocument();
   });
 
   it('falls back to Custom and prefills the custom name for a non-preset category', () => {
     mockEditing = makeRow({ category: 'Barang Hilang' });
     render(<EditReclassificationModal />);
     expect(categorySelect()).toHaveValue('Custom');
-    expect(screen.getByPlaceholderText('e.g. Barang Hilang')).toHaveValue('Barang Hilang');
+    expect(screen.getByPlaceholderText('e.g. Lost Item')).toHaveValue('Barang Hilang');
   });
 });
 
 describe('EditReclassificationModal — linked vs unlinked', () => {
   it('leaves every identity field editable on an unlinked row', () => {
     render(<EditReclassificationModal />);
-    expect(screen.queryByText(/tertaut ke Asset Inventory/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/linked to Asset Inventory/)).not.toBeInTheDocument();
     expect(field('assetDescription')).toBeEnabled();
     expect(field('assetCategory')).toBeEnabled();
     expect(field('location')).toBeEnabled();
@@ -142,7 +142,7 @@ describe('EditReclassificationModal — linked vs unlinked', () => {
     mockEditing = makeRow({ assetId: 'a1', linkedAssetNumber: 'AST-001' });
     render(<EditReclassificationModal />);
 
-    expect(screen.getByText(/tertaut ke Asset Inventory \(#AST-001\)/)).toBeInTheDocument();
+    expect(screen.getByText(/linked to Asset Inventory \(#AST-001\)/)).toBeInTheDocument();
     expect(field('assetDescription')).toBeDisabled();
     expect(field('unit')).toBeDisabled();
     // Category/location/ownership swap the autocomplete for a plain disabled input,
@@ -162,7 +162,7 @@ describe('EditReclassificationModal — linked vs unlinked', () => {
   it('omits the asset number from the banner when the link has none', () => {
     mockEditing = makeRow({ assetId: 'a1', linkedAssetNumber: '' });
     render(<EditReclassificationModal />);
-    expect(screen.getByText(/tertaut ke Asset Inventory\./)).toBeInTheDocument();
+    expect(screen.getByText(/linked to Asset Inventory\./)).toBeInTheDocument();
   });
 });
 
@@ -194,7 +194,7 @@ describe('EditReclassificationModal — save flow', () => {
     render(<EditReclassificationModal />);
 
     fireEvent.change(categorySelect(), { target: { value: 'Custom' } });
-    fireEvent.change(screen.getByPlaceholderText('e.g. Barang Hilang'), { target: { value: '  Barang Hilang  ' } });
+    fireEvent.change(screen.getByPlaceholderText('e.g. Lost Item'), { target: { value: '  Barang Hilang  ' } });
     submit();
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1), { timeout: 3000 });
@@ -206,7 +206,7 @@ describe('EditReclassificationModal — save flow', () => {
     render(<EditReclassificationModal />);
 
     fireEvent.change(categorySelect(), { target: { value: 'Custom' } });
-    fireEvent.change(screen.getByPlaceholderText('e.g. Barang Hilang'), { target: { value: '   ' } });
+    fireEvent.change(screen.getByPlaceholderText('e.g. Lost Item'), { target: { value: '   ' } });
     submit();
 
     await Promise.resolve();

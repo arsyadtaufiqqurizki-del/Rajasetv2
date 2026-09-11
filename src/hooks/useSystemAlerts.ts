@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { en as copy } from '../i18n/en'
 
 export interface SystemAlert {
   type: 'MAINTENANCE_OVERDUE' | 'BROKEN_ASSETS'
@@ -32,12 +33,12 @@ export function useSystemAlerts() {
     const overdueCount = overdueRes.count ?? 0
     if (overdueCount > 0) {
       const names = (overdueRes.data ?? []).map((r: any) => r.asset_description).filter(Boolean)
-      const preview = names.slice(0, 2).join(', ') + (overdueCount > 2 ? `, +${overdueCount - 2} lainnya` : '')
+      const preview = names.slice(0, 2).join(', ') + (overdueCount > 2 ? copy.alerts.overdueMoreSuffix(overdueCount - 2) : '')
       newAlerts.push({
         type: 'MAINTENANCE_OVERDUE',
         severity: 'error',
         title: `${overdueCount} maintenance overdue`,
-        subtitle: preview || 'Segera ditindaklanjuti',
+        subtitle: preview || copy.alerts.overdueFallback,
       })
     }
 
@@ -49,8 +50,8 @@ export function useSystemAlerts() {
         newAlerts.push({
           type: 'BROKEN_ASSETS',
           severity: 'error',
-          title: `${pct}% aset berstatus Rusak`,
-          subtitle: `${broken} dari ${total} aset perlu perhatian`,
+          title: copy.alerts.brokenTitle(pct),
+          subtitle: copy.alerts.brokenSubtitle(broken, total),
         })
       }
     }

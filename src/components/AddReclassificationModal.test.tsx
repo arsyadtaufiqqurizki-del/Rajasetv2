@@ -74,11 +74,11 @@ function makeRow(over: Partial<Reclassification> & { id: string }): Reclassifica
   };
 }
 
-const SEARCH_PLACEHOLDER = 'Cari asset number atau deskripsi...';
-const TRIGGER = 'Pilih asset dari Inventory';
+const SEARCH_PLACEHOLDER = 'Search asset number or description...';
+const TRIGGER = 'Select an asset from Inventory';
 
 const categorySelect = () => screen.getByRole('combobox') as HTMLSelectElement;
-const remarks = () => screen.getByPlaceholderText('Catatan tambahan (opsional)') as HTMLTextAreaElement;
+const remarks = () => screen.getByPlaceholderText('Additional notes (optional)') as HTMLTextAreaElement;
 
 function openPicker() {
   fireEvent.click(screen.getByRole('button', { name: TRIGGER }));
@@ -112,7 +112,7 @@ describe('AddReclassificationModal — chrome', () => {
 
   it('shows the add title and the Simpan button', () => {
     render(<AddReclassificationModal />);
-    expect(screen.getByRole('heading', { name: 'Tambah Item Reclassification' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Add Reclassification Item' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Simpan' })).toBeInTheDocument();
   });
 
@@ -164,7 +164,7 @@ describe('AddReclassificationModal — asset picker', () => {
     render(<AddReclassificationModal />);
     openPicker();
     fireEvent.change(screen.getByPlaceholderText(SEARCH_PLACEHOLDER), { target: { value: 'zzzz' } });
-    expect(screen.getByText('Tidak ada hasil')).toBeInTheDocument();
+    expect(screen.getByText('No results')).toBeInTheDocument();
   });
 
   it('caps the list at 50 and counts only the linkable assets in the hint', () => {
@@ -176,7 +176,7 @@ describe('AddReclassificationModal — asset picker', () => {
     openPicker();
 
     expect(screen.getAllByRole('listitem')).toHaveLength(50);
-    expect(screen.getByText('Menampilkan 50 dari 59 asset. Ketik untuk mencari.')).toBeInTheDocument();
+    expect(screen.getByText('Showing 50 of 59 assets. Type to search.')).toBeInTheDocument();
   });
 
   it('reveals the audit-facing summary of the picked asset', () => {
@@ -203,10 +203,10 @@ describe('AddReclassificationModal — classification', () => {
 
   it('reveals the custom name field only when Custom is picked', () => {
     render(<AddReclassificationModal />);
-    expect(screen.queryByPlaceholderText('e.g. Barang Hilang')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('e.g. Lost Item')).not.toBeInTheDocument();
 
     fireEvent.change(categorySelect(), { target: { value: 'Custom' } });
-    expect(screen.getByPlaceholderText('e.g. Barang Hilang')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('e.g. Lost Item')).toBeInTheDocument();
   });
 });
 
@@ -231,7 +231,7 @@ describe('AddReclassificationModal — save flow', () => {
 
     pickAsset('AST-001');
     fireEvent.change(categorySelect(), { target: { value: 'Custom' } });
-    fireEvent.change(screen.getByPlaceholderText('e.g. Barang Hilang'), { target: { value: '  Barang Hilang  ' } });
+    fireEvent.change(screen.getByPlaceholderText('e.g. Lost Item'), { target: { value: '  Barang Hilang  ' } });
     submit();
 
     await waitFor(() => expect(mockAddLinked).toHaveBeenCalledTimes(1), { timeout: 3000 });
@@ -244,7 +244,7 @@ describe('AddReclassificationModal — save flow', () => {
 
     pickAsset('AST-001');
     fireEvent.change(categorySelect(), { target: { value: 'Custom' } });
-    fireEvent.change(screen.getByPlaceholderText('e.g. Barang Hilang'), { target: { value: '   ' } });
+    fireEvent.change(screen.getByPlaceholderText('e.g. Lost Item'), { target: { value: '   ' } });
     submit();
 
     await Promise.resolve();
@@ -267,7 +267,7 @@ describe('AddReclassificationModal — save flow', () => {
     submit();
 
     await waitFor(
-      () => expect(screen.getByText('Gagal menyimpan item: duplicate key value')).toBeInTheDocument(),
+      () => expect(screen.getByText('Failed to save item: duplicate key value')).toBeInTheDocument(),
       { timeout: 3000 },
     );
     expect(mockSetIsAddModalOpen).not.toHaveBeenCalled();
@@ -300,7 +300,7 @@ describe('AddReclassificationModal — ui/FormModal chrome', () => {
 
   it('labels the dialog with the heading it renders', () => {
     render(<AddReclassificationModal />);
-    const heading = screen.getByRole('heading', { name: 'Tambah Item Reclassification' });
+    const heading = screen.getByRole('heading', { name: 'Add Reclassification Item' });
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby', heading.id);
   });
 

@@ -3,6 +3,7 @@ import { Send, Bot, User, Sparkles, Trash2, Database, MessageCircle } from "luci
 import { cn } from "../lib/utils";
 import { renderMarkdown } from "../lib/markdown";
 import { useAiChat, loadingSteps } from "../hooks/useAiChat";
+import { en as copy } from "../i18n/en";
 
 export default function AIAssistant() {
   const [input, setInput] = useState("");
@@ -45,20 +46,20 @@ export default function AIAssistant() {
       {showConfirmClear && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 rounded-2xl">
           <div className="mx-4 w-full max-w-sm rounded-2xl bg-surface p-6 shadow-lg border border-outline-variant">
-            <h3 className="font-semibold text-on-surface mb-1">Hapus semua percakapan?</h3>
-            <p className="text-sm text-on-surface-variant mb-6">Aksi ini tidak bisa dibatalkan. Seluruh riwayat chat akan dihapus.</p>
+            <h3 className="font-semibold text-on-surface mb-1">{copy.ai.confirmClearTitle}</h3>
+            <p className="text-sm text-on-surface-variant mb-6">{copy.ai.confirmClearMessage}</p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowConfirmClear(false)}
                 className="rounded-full border border-outline-variant px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors"
               >
-                Batal
+                {copy.ai.cancel}
               </button>
               <button
                 onClick={handleClearChat}
                 className="rounded-full bg-error px-4 py-2 text-sm text-on-error hover:opacity-90 transition-opacity"
               >
-                Ya, Hapus
+                {copy.ai.confirmClear}
               </button>
             </div>
           </div>
@@ -73,7 +74,7 @@ export default function AIAssistant() {
         <div className="flex-1">
           <h2 className="font-semibold text-on-surface">Data Assistant</h2>
           <p className="text-xs text-on-surface-variant">
-            {mode === "data" ? "Tanya seputar data inventaris & maintenance" : "Ngobrol santai, tanpa akses data aset"}
+            {mode === "data" ? copy.ai.dataModeHint : copy.ai.chatModeHint}
           </p>
         </div>
         <div className="flex items-center rounded-full border border-outline-variant bg-surface p-0.5 text-xs">
@@ -108,7 +109,7 @@ export default function AIAssistant() {
           className="flex items-center gap-1.5 rounded-full border border-outline-variant px-3 py-1.5 text-xs text-on-surface-variant hover:bg-error/10 hover:text-error hover:border-error/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-on-surface-variant disabled:hover:border-outline-variant"
         >
           <Trash2 className="h-3.5 w-3.5" />
-          Hapus Chat
+          {copy.ai.clearChat}
         </button>
       </div>
 
@@ -119,7 +120,7 @@ export default function AIAssistant() {
             {wasTrimmed && idx === 1 && (
               <div className="flex items-center gap-3 py-1">
                 <div className="h-px flex-1 bg-outline-variant/50" />
-                <span className="text-[11px] text-on-surface-variant/60 select-none">Pesan lebih lama tidak ditampilkan</span>
+                <span className="text-[11px] text-on-surface-variant/60 select-none">{copy.ai.trimmedNotice}</span>
                 <div className="h-px flex-1 bg-outline-variant/50" />
               </div>
             )}
@@ -207,7 +208,7 @@ export default function AIAssistant() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Tanyakan sesuatu tentang data aset..."
+            placeholder={copy.ai.inputPlaceholder}
             className="w-full rounded-full border border-outline-variant bg-surface px-4 py-3 pr-12 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             disabled={isTyping}
           />

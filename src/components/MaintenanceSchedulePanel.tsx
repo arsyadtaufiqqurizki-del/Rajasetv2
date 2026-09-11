@@ -1,5 +1,6 @@
 import { MoreVertical } from 'lucide-react';
 import type { MaintenanceRecord } from '../types/maintenance';
+import { en as copy } from '../i18n/en';
 
 interface MaintenanceSchedulePanelProps {
   upcomingRecords: MaintenanceRecord[];
@@ -18,7 +19,7 @@ export default function MaintenanceSchedulePanel({ upcomingRecords, onViewCalend
       <div className="p-4 flex flex-col gap-4 overflow-y-auto max-h-[400px]">
         {upcomingRecords.length === 0 ? (
           <div className="text-on-surface-variant text-center my-auto min-h-[150px] flex items-center justify-center">
-            Belum ada jadwal maintenance
+            {copy.maintenance.scheduleEmpty}
           </div>
         ) : (
           upcomingRecords.map(record => (

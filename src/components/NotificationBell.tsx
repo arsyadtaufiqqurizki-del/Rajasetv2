@@ -3,18 +3,18 @@ import { AlertTriangle, Bell, Plus, Pencil, Trash2, Upload, Wrench, X } from 'lu
 import { useActivityLog, ActivityLog } from '../hooks/useActivityLog'
 import { useSystemAlerts } from '../hooks/useSystemAlerts'
 import { cn } from '../lib/utils'
-import { id as copy } from '../i18n/id'
+import { en as copy } from '../i18n/en'
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'Baru saja'
-  if (minutes < 60) return `${minutes} menit lalu`
+  if (minutes < 1) return copy.notifications.justNow
+  if (minutes < 60) return copy.notifications.minutesAgo(minutes)
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} jam lalu`
+  if (hours < 24) return copy.notifications.hoursAgo(hours)
   const days = Math.floor(hours / 24)
-  if (days === 1) return 'Kemarin'
-  return `${days} hari lalu`
+  if (days === 1) return copy.notifications.yesterday
+  return copy.notifications.daysAgo(days)
 }
 
 function getActionMeta(log: ActivityLog) {
@@ -25,56 +25,56 @@ function getActionMeta(log: ActivityLog) {
       return {
         icon: <Upload className="h-4 w-4 text-blue-500" />,
         bg: 'bg-blue-50',
-        title: `${name} mengimpor ${Number(d.success ?? 0)} aset`,
-        subtitle: d.failed ? `${d.failed} baris gagal divalidasi` : 'Semua baris berhasil',
+        title: copy.notifications.importTitle(name, Number(d.success ?? 0)),
+        subtitle: d.failed ? copy.notifications.importFailedSubtitle(Number(d.failed)) : copy.notifications.importAllOk,
       }
     case 'ADD_ASSET':
       return {
         icon: <Plus className="h-4 w-4 text-emerald-500" />,
         bg: 'bg-emerald-50',
-        title: `${name} menambahkan aset baru`,
+        title: copy.notifications.assetAdded(name),
         subtitle: String(d.assetName ?? ''),
       }
     case 'UPDATE_ASSET':
       return {
         icon: <Pencil className="h-4 w-4 text-amber-500" />,
         bg: 'bg-amber-50',
-        title: `${name} memperbarui aset`,
+        title: copy.notifications.assetUpdated(name),
         subtitle: String(d.assetName ?? ''),
       }
     case 'DELETE_ASSET':
       return {
         icon: <Trash2 className="h-4 w-4 text-red-500" />,
         bg: 'bg-red-50',
-        title: `${name} menghapus aset`,
+        title: copy.notifications.assetDeleted(name),
         subtitle: String(d.assetName ?? ''),
       }
     case 'BULK_DELETE':
       return {
         icon: <Trash2 className="h-4 w-4 text-red-500" />,
         bg: 'bg-red-50',
-        title: `${name} menghapus ${Number(d.count ?? 0)} aset sekaligus`,
-        subtitle: d.subsidiary ? `Dari ${d.subsidiary}` : '',
+        title: copy.notifications.bulkDeleted(name, Number(d.count ?? 0)),
+        subtitle: d.subsidiary ? copy.notifications.bulkDeletedFrom(String(d.subsidiary)) : '',
       }
     case 'BULK_UPDATE':
       return {
         icon: <Pencil className="h-4 w-4 text-amber-500" />,
         bg: 'bg-amber-50',
-        title: `${name} memperbarui ${Number(d.count ?? 0)} aset sekaligus`,
+        title: copy.notifications.bulkUpdated(name, Number(d.count ?? 0)),
         subtitle: Array.isArray(d.fields) ? d.fields.join(', ') : '',
       }
     case 'ADD_MAINTENANCE':
       return {
         icon: <Wrench className="h-4 w-4 text-violet-500" />,
         bg: 'bg-violet-50',
-        title: `${name} menjadwalkan maintenance`,
+        title: copy.notifications.maintenanceScheduled(name),
         subtitle: String(d.assetName ?? ''),
       }
     case 'UPDATE_MAINTENANCE':
       return {
         icon: <Wrench className="h-4 w-4 text-violet-500" />,
         bg: 'bg-violet-50',
-        title: `${name} memperbarui status maintenance`,
+        title: copy.notifications.maintenanceStatusUpdated(name),
         subtitle: d.from && d.to ? `${d.from} → ${d.to}` : String(d.assetName ?? ''),
       }
     default:
@@ -134,7 +134,7 @@ export default function NotificationBell() {
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-outline-variant bg-surface shadow-xl z-50 overflow-hidden">
           <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
-            <span className="text-sm font-semibold text-on-surface">Notifikasi</span>
+            <span className="text-sm font-semibold text-on-surface">{copy.notifications.title}</span>
             <button
               onClick={() => setOpen(false)}
               className="rounded p-1 text-on-surface-variant hover:bg-surface-container-low transition-colors"
@@ -148,7 +148,7 @@ export default function NotificationBell() {
             {alerts.length > 0 && (
               <div>
                 <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-error">
-                  Peringatan Sistem
+                  {copy.notifications.systemAlerts}
                 </p>
                 <div className="divide-y divide-red-100">
                   {alerts.map(alert => (
@@ -170,7 +170,7 @@ export default function NotificationBell() {
             <div>
               {alerts.length > 0 && (
                 <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
-                  Aktivitas Terbaru
+                  {copy.notifications.recentActivity}
                 </p>
               )}
               <div className="divide-y divide-outline-variant/40">
@@ -178,7 +178,7 @@ export default function NotificationBell() {
                   <p className="px-4 py-8 text-center text-sm text-on-surface-variant">{copy.emptyState.loading}</p>
                 ) : logs.length === 0 && alerts.length === 0 ? (
                   <p className="px-4 py-8 text-center text-sm text-on-surface-variant">
-                    Belum ada notifikasi
+                    {copy.notifications.empty}
                   </p>
                 ) : logs.length === 0 ? null : (
                   logs.map(log => {

@@ -5,6 +5,7 @@ import { useAsset } from '../contexts/AssetContext';
 import AutocompleteInput from './ui/AutocompleteInput';
 import FormModal from './ui/FormModal';
 import { useEntityForm } from '../hooks/useEntityForm';
+import { en as copy } from '../i18n/en';
 import {
   CUSTOM_CATEGORY,
   EMPTY_EDIT_RECLASSIFICATION_FORM,
@@ -36,7 +37,7 @@ export default function EditReclassificationModal() {
     initialValues: EMPTY_EDIT_RECLASSIFICATION_FORM,
     resetKey: editingReclassification,
     seed: () => (editingReclassification ? reclassificationToFormValues(editingReclassification) : null),
-    errorPrefix: 'Gagal memperbarui item',
+    errorPrefix: copy.reclassification.editModal.saveErrorPrefix,
   });
 
   if (!isEditModalOpen || !editingReclassification) return null;
@@ -82,8 +83,7 @@ export default function EditReclassificationModal() {
       {isLinked && (
         <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-on-surface-variant">
           <Link2 className="h-4 w-4 text-primary shrink-0" />
-          Item ini tertaut ke Asset Inventory{editingReclassification.linkedAssetNumber ? ` (#${editingReclassification.linkedAssetNumber})` : ''}.
-          Deskripsi/kategori/lokasi/unit/ownership mengikuti data Inventory secara live — edit lewat halaman Inventory. Hanya klasifikasi audit &amp; remarks yang bisa diubah di sini.
+          {copy.reclassification.editModal.linkedBanner(editingReclassification.linkedAssetNumber ?? '')}
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -95,7 +95,7 @@ export default function EditReclassificationModal() {
             name="assetDescription"
             value={form.values.assetDescription}
             onChange={form.handleChange}
-            placeholder="e.g. Kompresor GA-30 ditemukan di Gudang A"
+            placeholder={copy.reclassification.form.descriptionPlaceholder}
             className={DISABLABLE_FIELD_CLASS}
           />
         </div>
@@ -109,7 +109,7 @@ export default function EditReclassificationModal() {
               name="assetCategory"
               value={form.values.assetCategory}
               onChange={form.handleChange}
-              placeholder="e.g. Elektronik"
+              placeholder={copy.reclassification.form.categoryPlaceholder}
               options={categories1}
             />
           )}
@@ -123,7 +123,7 @@ export default function EditReclassificationModal() {
               name="location"
               value={form.values.location}
               onChange={form.handleChange}
-              placeholder="e.g. Gudang A"
+              placeholder={copy.reclassification.form.locationPlaceholder}
               options={categories2}
             />
           )}
@@ -150,7 +150,7 @@ export default function EditReclassificationModal() {
               name="ownership"
               value={form.values.ownership}
               onChange={form.handleChange}
-              placeholder="e.g. Divisi Operasional"
+              placeholder={copy.reclassification.form.ownershipPlaceholder}
               options={subsidiaries}
             />
           )}
@@ -170,13 +170,13 @@ export default function EditReclassificationModal() {
         </div>
         {categorySelect === CUSTOM_CATEGORY && (
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-semibold text-on-surface">Nama Custom *</label>
+            <label className="text-sm font-semibold text-on-surface">{copy.reclassification.form.customNameLabel}</label>
             <input
               required
               name="customCategory"
               value={customCategory}
               onChange={form.handleChange}
-              placeholder="e.g. Barang Hilang"
+              placeholder={copy.reclassification.form.customPlaceholder}
               className={FIELD_CLASS}
             />
           </div>
@@ -188,7 +188,7 @@ export default function EditReclassificationModal() {
             name="remarks"
             value={form.values.remarks}
             onChange={form.handleChange}
-            placeholder="Catatan tambahan (opsional)"
+            placeholder={copy.reclassification.form.remarksPlaceholder}
             rows={3}
             className={`${FIELD_CLASS} resize-none`}
           />

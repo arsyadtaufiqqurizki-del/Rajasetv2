@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useReclassification } from '../contexts/ReclassificationContext';
 import Modal from './ui/Modal';
+import { en as copy } from '../i18n/en';
 
 const TITLE_ID = 'verify-reclassification-modal-title';
 
@@ -39,7 +40,7 @@ export default function VerifyReclassificationModal() {
       className="flex flex-col"
     >
       <div className="flex items-center justify-between p-6 border-b border-outline-variant/30">
-        <h2 id={TITLE_ID} className="text-xl font-bold text-on-surface">Verifikasi Item</h2>
+        <h2 id={TITLE_ID} className="text-xl font-bold text-on-surface">{copy.reclassification.verifyModal.title}</h2>
         <button
           type="button"
           onClick={handleClose}
@@ -53,7 +54,7 @@ export default function VerifyReclassificationModal() {
       <div className="p-6 flex flex-col gap-4">
         <div className="bg-surface-container rounded-xl p-4 space-y-2 text-sm">
           <div className="flex justify-between gap-4">
-            <span className="text-on-surface-variant">Deskripsi</span>
+            <span className="text-on-surface-variant">{copy.reclassification.verifyModal.descriptionLabel}</span>
             <span className="font-semibold text-on-surface text-right">{item.assetDescription}</span>
           </div>
           <div className="flex justify-between gap-4">
@@ -61,7 +62,7 @@ export default function VerifyReclassificationModal() {
             <span className="text-on-surface">{item.category}</span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-on-surface-variant">Lokasi</span>
+            <span className="text-on-surface-variant">{copy.reclassification.verifyModal.locationLabel}</span>
             <span className="text-on-surface">{item.location || '-'}</span>
           </div>
           <div className="flex justify-between gap-4">
@@ -86,8 +87,8 @@ export default function VerifyReclassificationModal() {
             </div>
             {item.verified && item.verificationDate && (
               <div className="text-xs text-emerald-700">
-                {new Date(item.verificationDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                {item.verifiedBy ? ` oleh ${item.verifiedBy}` : ''}
+                {new Date(item.verificationDate).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {item.verifiedBy ? ` ${copy.reclassification.verifyModal.verifiedByPrefix} ${item.verifiedBy}` : ''}
               </div>
             )}
           </div>
@@ -100,7 +101,7 @@ export default function VerifyReclassificationModal() {
             disabled={isSaving}
             className="px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container transition-colors rounded-lg disabled:opacity-50"
           >
-            Batal
+            {copy.reclassification.verifyModal.cancel}
           </button>
           <button
             type="button"
@@ -113,7 +114,7 @@ export default function VerifyReclassificationModal() {
             }
           >
             {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {item.verified ? 'Tandai Belum Terverifikasi' : 'Tandai Terverifikasi'}
+            {item.verified ? copy.reclassification.verifyModal.markUnverified : copy.reclassification.verifyModal.markVerified}
           </button>
         </div>
       </div>

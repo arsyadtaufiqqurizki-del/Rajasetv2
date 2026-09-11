@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
-import { id as copy } from '../../i18n/id';
+import { en as copy } from '../../i18n/en';
 
 /** The picker only ever reads these three fields off an asset. */
 export interface AssetPickerOption {
@@ -106,7 +106,7 @@ export default function AssetPicker({
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Cari asset number atau deskripsi..."
+              placeholder={copy.assetPicker.searchPlaceholder}
               className="flex-1 bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none"
             />
             {search && (

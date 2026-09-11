@@ -4,6 +4,7 @@ import { useAsset } from '../contexts/AssetContext';
 import AssetPicker from './ui/AssetPicker';
 import FormModal from './ui/FormModal';
 import { useEntityForm } from '../hooks/useEntityForm';
+import { en as copy } from '../i18n/en';
 import {
   CUSTOM_CATEGORY,
   EMPTY_ADD_RECLASSIFICATION_FORM,
@@ -27,7 +28,7 @@ export default function AddReclassificationModal() {
     initialValues: EMPTY_ADD_RECLASSIFICATION_FORM,
     resetKey: isAddModalOpen,
     seed: () => EMPTY_ADD_RECLASSIFICATION_FORM,
-    errorPrefix: 'Gagal menyimpan item',
+    errorPrefix: copy.reclassification.addModal.saveErrorPrefix,
   });
 
   // An asset already linked to a reclassification row shouldn't be pickable again
@@ -67,7 +68,7 @@ export default function AddReclassificationModal() {
     <FormModal
       isOpen={isAddModalOpen}
       titleId={TITLE_ID}
-      title="Tambah Item Reclassification"
+      title={copy.reclassification.addModal.title}
       onClose={handleClose}
       onSubmit={handleSubmit}
       submitLabel="Simpan"
@@ -81,10 +82,10 @@ export default function AddReclassificationModal() {
           assets={linkableAssets}
           value={assetId}
           onChange={picked => form.setValues(prev => ({ ...prev, assetId: picked }))}
-          placeholder="Pilih asset dari Inventory"
+          placeholder={copy.reclassification.addModal.selectAssetPlaceholder}
           triggerClassName={PICKER_TRIGGER_CLASS}
           panelClassName={PICKER_PANEL_CLASS}
-          renderMoreHint={total => `Menampilkan 50 dari ${total} asset. Ketik untuk mencari.`}
+          renderMoreHint={copy.assetPicker.moreHint}
         />
       </div>
 
@@ -112,13 +113,13 @@ export default function AddReclassificationModal() {
         </div>
         {categorySelect === CUSTOM_CATEGORY && (
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-semibold text-on-surface">Nama Custom *</label>
+            <label className="text-sm font-semibold text-on-surface">{copy.reclassification.form.customNameLabel}</label>
             <input
               required
               name="customCategory"
               value={customCategory}
               onChange={form.handleChange}
-              placeholder="e.g. Barang Hilang"
+              placeholder={copy.reclassification.form.customPlaceholder}
               className={FIELD_CLASS}
             />
           </div>
@@ -130,7 +131,7 @@ export default function AddReclassificationModal() {
             name="remarks"
             value={form.values.remarks}
             onChange={form.handleChange}
-            placeholder="Catatan tambahan (opsional)"
+            placeholder={copy.reclassification.form.remarksPlaceholder}
             rows={3}
             className={`${FIELD_CLASS} resize-none`}
           />
