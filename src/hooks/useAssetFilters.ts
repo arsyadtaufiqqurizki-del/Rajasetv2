@@ -6,6 +6,37 @@ import type { Asset } from '../contexts/AssetContext';
 
 export type { FilterChip } from '../types/filters';
 
+export interface AssetFilterValues {
+  subsidiary: string[];
+  category: string[];
+  location: string[];
+  status: string[];
+  listed: string[];
+  verification: string[];
+  itemStatus: string[];
+  dateFrom: string;
+  dateTo: string;
+  costMin: string;
+  costMax: string;
+  searchQuery: string;
+}
+
+export interface AssetFilterActions {
+  setSubsidiary: (v: string[]) => void;
+  setCategory: (v: string[]) => void;
+  setLocation: (v: string[]) => void;
+  setStatus: (v: string[]) => void;
+  setListed: (v: string[]) => void;
+  setVerification: (v: string[]) => void;
+  setItemStatus: (v: string[]) => void;
+  setDateFrom: (v: string) => void;
+  setDateTo: (v: string) => void;
+  setCostMin: (v: string) => void;
+  setCostMax: (v: string) => void;
+  setSearchQuery: (v: string) => void;
+  clearFilters: () => void;
+}
+
 const EMPTY_BOOK_VALUES: Map<string, number> = new Map();
 
 export function useAssetFilters(
@@ -62,31 +93,40 @@ export function useAssetFilters(
   const dateRange = list.getDateRange('date');
   const costRange = list.getNumberRange('cost');
 
-  return {
-    filterSubsidiary: list.getMulti('subsidiary'),
-    setFilterSubsidiary: (v: string[]) => list.setMulti('subsidiary', v),
-    filterCategory: list.getMulti('category'),
-    setFilterCategory: (v: string[]) => list.setMulti('category', v),
-    filterLocation: list.getMulti('location'),
-    setFilterLocation: (v: string[]) => list.setMulti('location', v),
-    filterStatus: list.getMulti('status'),
-    setFilterStatus: (v: string[]) => list.setMulti('status', v),
-    filterListed: list.getMulti('listed'),
-    setFilterListed: (v: string[]) => list.setMulti('listed', v),
-    filterVerification: list.getMulti('verification'),
-    setFilterVerification: (v: string[]) => list.setMulti('verification', v),
-    filterItemStatus: list.getMulti('itemStatus'),
-    setFilterItemStatus: (v: string[]) => list.setMulti('itemStatus', v),
+  const filters: AssetFilterValues = {
+    subsidiary: list.getMulti('subsidiary'),
+    category: list.getMulti('category'),
+    location: list.getMulti('location'),
+    status: list.getMulti('status'),
+    listed: list.getMulti('listed'),
+    verification: list.getMulti('verification'),
+    itemStatus: list.getMulti('itemStatus'),
     dateFrom: dateRange.from,
-    setDateFrom: (v: string) => list.setDateFrom('date', v),
     dateTo: dateRange.to,
-    setDateTo: (v: string) => list.setDateTo('date', v),
     costMin: costRange.min,
-    setCostMin: (v: string) => list.setNumberMin('cost', v),
     costMax: costRange.max,
-    setCostMax: (v: string) => list.setNumberMax('cost', v),
     searchQuery: list.searchQuery,
+  };
+
+  const actions: AssetFilterActions = {
+    setSubsidiary: (v: string[]) => list.setMulti('subsidiary', v),
+    setCategory: (v: string[]) => list.setMulti('category', v),
+    setLocation: (v: string[]) => list.setMulti('location', v),
+    setStatus: (v: string[]) => list.setMulti('status', v),
+    setListed: (v: string[]) => list.setMulti('listed', v),
+    setVerification: (v: string[]) => list.setMulti('verification', v),
+    setItemStatus: (v: string[]) => list.setMulti('itemStatus', v),
+    setDateFrom: (v: string) => list.setDateFrom('date', v),
+    setDateTo: (v: string) => list.setDateTo('date', v),
+    setCostMin: (v: string) => list.setNumberMin('cost', v),
+    setCostMax: (v: string) => list.setNumberMax('cost', v),
     setSearchQuery: list.setSearchQuery,
+    clearFilters: list.clearFilters,
+  };
+
+  return {
+    filters,
+    actions,
     debouncedSearchQuery: list.debouncedSearchQuery,
     sortKey: list.sortKey,
     sortDirection: list.sortDirection,

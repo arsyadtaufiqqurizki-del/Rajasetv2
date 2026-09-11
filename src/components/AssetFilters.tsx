@@ -1,68 +1,37 @@
 import { useState } from 'react';
 import { ChevronUp, ChevronDown, Filter, Search, X } from 'lucide-react';
 import MultiSelectDropdown from './ui/MultiSelectDropdown';
-import type { FilterChip } from '../hooks/useAssetFilters';
+import type { AssetFilterActions, AssetFilterValues, FilterChip } from '../hooks/useAssetFilters';
 
-interface AssetFiltersProps {
+export interface AssetFilterOptions {
   subsidiaries: string[];
   categories1: string[];
   categories2: string[];
   itemStatuses: string[];
   uniqueStatuses: string[];
+}
 
-  filterSubsidiary: string[];
-  setFilterSubsidiary: (v: string[]) => void;
-  filterCategory: string[];
-  setFilterCategory: (v: string[]) => void;
-  filterLocation: string[];
-  setFilterLocation: (v: string[]) => void;
-  filterStatus: string[];
-  setFilterStatus: (v: string[]) => void;
-  filterListed: string[];
-  setFilterListed: (v: string[]) => void;
-  filterVerification: string[];
-  setFilterVerification: (v: string[]) => void;
-  filterItemStatus: string[];
-  setFilterItemStatus: (v: string[]) => void;
-
-  dateFrom: string;
-  setDateFrom: (v: string) => void;
-  dateTo: string;
-  setDateTo: (v: string) => void;
-  costMin: string;
-  setCostMin: (v: string) => void;
-  costMax: string;
-  setCostMax: (v: string) => void;
-  searchQuery: string;
-  setSearchQuery: (v: string) => void;
-
+interface AssetFiltersProps {
+  filters: AssetFilterValues;
+  actions: AssetFilterActions;
+  options: AssetFilterOptions;
   activeFilters: FilterChip[];
-  onClearFilters: () => void;
 }
 
 export default function AssetFilters({
-  subsidiaries, categories1, categories2, itemStatuses, uniqueStatuses,
-  filterSubsidiary, setFilterSubsidiary,
-  filterCategory, setFilterCategory,
-  filterLocation, setFilterLocation,
-  filterStatus, setFilterStatus,
-  filterListed, setFilterListed,
-  filterVerification, setFilterVerification,
-  filterItemStatus, setFilterItemStatus,
-  dateFrom, setDateFrom,
-  dateTo, setDateTo,
-  costMin, setCostMin,
-  costMax, setCostMax,
-  searchQuery, setSearchQuery,
-  activeFilters, onClearFilters,
+  filters, actions, options, activeFilters,
 }: AssetFiltersProps) {
+  const {
+    subsidiaries, categories1, categories2, itemStatuses, uniqueStatuses,
+  } = options;
+  const onClearFilters = actions.clearFilters;
   const hiddenActiveCount = [
-    filterLocation.length > 0,
-    filterListed.length > 0,
-    filterVerification.length > 0,
-    filterItemStatus.length > 0,
-    Boolean(dateFrom || dateTo),
-    Boolean(costMin || costMax),
+    filters.location.length > 0,
+    filters.listed.length > 0,
+    filters.verification.length > 0,
+    filters.itemStatus.length > 0,
+    Boolean(filters.dateFrom || filters.dateTo),
+    Boolean(filters.costMin || filters.costMax),
   ].filter(Boolean).length;
 
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(() => hiddenActiveCount > 0);
@@ -86,28 +55,28 @@ export default function AssetFilters({
             <input
               type="text"
               placeholder="Search by ID or Description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={filters.searchQuery}
+              onChange={(e) => actions.setSearchQuery(e.target.value)}
               className="w-full bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
             />
           </div>
           <MultiSelectDropdown
             placeholder="All Subsidiaries"
             options={subsidiaries}
-            selected={filterSubsidiary}
-            onChange={setFilterSubsidiary}
+            selected={filters.subsidiary}
+            onChange={actions.setSubsidiary}
           />
           <MultiSelectDropdown
             placeholder="All Asset Classes"
             options={categories1}
-            selected={filterCategory}
-            onChange={setFilterCategory}
+            selected={filters.category}
+            onChange={actions.setCategory}
           />
           <MultiSelectDropdown
             placeholder="All Statuses"
             options={uniqueStatuses}
-            selected={filterStatus}
-            onChange={setFilterStatus}
+            selected={filters.status}
+            onChange={actions.setStatus}
           />
           <button
             type="button"
@@ -139,27 +108,27 @@ export default function AssetFilters({
           <MultiSelectDropdown
             placeholder="All Locations"
             options={categories2}
-            selected={filterLocation}
-            onChange={setFilterLocation}
+            selected={filters.location}
+            onChange={actions.setLocation}
             searchable
           />
           <MultiSelectDropdown
             placeholder="All Listed"
             options={['Audited', 'Non-Listed']}
-            selected={filterListed}
-            onChange={setFilterListed}
+            selected={filters.listed}
+            onChange={actions.setListed}
           />
           <MultiSelectDropdown
             placeholder="All Verification"
             options={['Yes', 'No']}
-            selected={filterVerification}
-            onChange={setFilterVerification}
+            selected={filters.verification}
+            onChange={actions.setVerification}
           />
           <MultiSelectDropdown
             placeholder="All Item Statuses"
             options={itemStatuses}
-            selected={filterItemStatus}
-            onChange={setFilterItemStatus}
+            selected={filters.itemStatus}
+            onChange={actions.setItemStatus}
           />
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-on-surface-variant whitespace-nowrap" title="This field shows dates using your browser/OS date format, which may not match the DD/MM/YYYY used in the table">
@@ -168,8 +137,8 @@ export default function AssetFilters({
             <input
               type="date"
               lang="en-GB"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              value={filters.dateFrom}
+              onChange={(e) => actions.setDateFrom(e.target.value)}
               aria-label="Date place in service from (MM/DD/YYYY)"
               className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
             />
@@ -177,8 +146,8 @@ export default function AssetFilters({
             <input
               type="date"
               lang="en-GB"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              value={filters.dateTo}
+              onChange={(e) => actions.setDateTo(e.target.value)}
               aria-label="Date place in service to (MM/DD/YYYY)"
               className="bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
             />
@@ -187,16 +156,16 @@ export default function AssetFilters({
             <input
               type="number"
               placeholder="Min cost"
-              value={costMin}
-              onChange={(e) => setCostMin(e.target.value)}
+              value={filters.costMin}
+              onChange={(e) => actions.setCostMin(e.target.value)}
               className="w-28 bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
             />
             <span className="text-xs text-on-surface-variant">-</span>
             <input
               type="number"
               placeholder="Max cost"
-              value={costMax}
-              onChange={(e) => setCostMax(e.target.value)}
+              value={filters.costMax}
+              onChange={(e) => actions.setCostMax(e.target.value)}
               className="w-28 bg-surface border border-outline-variant rounded-md text-sm py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-primary text-on-surface"
             />
           </div>

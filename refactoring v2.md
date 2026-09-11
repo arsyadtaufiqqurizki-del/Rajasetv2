@@ -1,9 +1,9 @@
 # Refactoring Plan v2 — Rajaset v2
 
-> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a, 7b, 8, 8a SELESAI (2026-09-11). Berikutnya: Step 10.**
+> Status: **sedang dieksekusi — Step 0, 1, 2, 3, 4, 5, 5a, 6, 7, 7a, 7b, 8, 8a, 9 SELESAI (2026-09-11). Berikutnya: Step 10.**
 > Disusun: 2026-09-09 · Baseline commit: `6b59a11`
-> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8 ✅ · 8a ✅ (B5) · 9 ⏸️ ditunda · 10 ⬜
-> Test: 63 → **522** (38 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-11
+> Progres: 0 ✅ · 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 5a ✅ (B6) · 6 ✅ · 7 ✅ · 7a ✅ (B1) · 7b ✅ (B2) · 8 ✅ · 8a ✅ (B5) · 9 ✅ · 10 ⬜
+> Test: 63 → **523** (38 file) · lint: 46 → **24 problems** · gate terakhir dijalankan 2026-09-11
 > Pendahulu: `refactoring_plan.md` (v1, Agustus 2026 — Step 1–12 sudah dieksekusi)
 
 ---
@@ -14,7 +14,7 @@
 1. Kurangi duplikasi kode — terutama pasangan Add/Edit modal, plumbing Supabase di context, dan scaffolding halaman list.
 2. Pisahkan logic bisnis dari UI — logic yang sekarang tertanam di dalam komponen page/modal dipindah ke `lib/` (pure function) dan `hooks/` (stateful) supaya bisa diuji tanpa render.
 
-Step 0–8 dikerjakan berurutan. **Step 9 (rapikan prop filter) ditunda** sampai ada kebutuhan nyata.
+Step 0–9 dikerjakan berurutan. **Step 9 (rapikan prop filter) SELESAI 2026-09-11** atas permintaan user.
 
 **Batasan:**
 - **Structure-only, kecuali tiga pengecualian yang disetujui: B1, B2, dan B5** (lihat §5). Ketiganya
@@ -1064,12 +1064,24 @@ golden file CSV identik, `tsc` bersih, `eslint` tetap **24 problems**, `build` s
 
 ---
 
-### Step 9 — *(DITUNDA)* Rapikan prop filter *(±4 jam)*
-`useAssetFilters` mengembalikan objek `filters` tunggal; `AssetFilters` menerima satu prop.
-30 prop → 3 prop. Menyentuh `Inventory.test.tsx`.
+### Step 9 — Rapikan prop filter ✅ **SELESAI 2026-09-11**
+`useAssetFilters` mengembalikan objek `filters` + `actions` tunggal; `AssetFilters` menerima 4 prop
+terkelompok (`filters`, `actions`, `options`, `activeFilters`) — turun dari 30+ prop flat.
+`clearFilters` hidup di `actions` (alias top-level dipertahankan untuk `Inventory.tsx`/`AssetTable`).
 
 **Risiko: SEDANG, imbalan rendah.** Ini kosmetik struktural — tidak menghapus logic, hanya memindahkan
-bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru untuk RBAC).
+bentuk. Dikerjakan atas permintaan user meski sebelumnya direkomendasikan tunda.
+
+**Hasil (2026-09-11):** `useAssetFilters` mengekspor tipe `AssetFilterValues`/`AssetFilterActions`;
+`AssetFilters` mendestrukturisasi sekali per grup, bukan 30x. Query param URL, logic filter,
+dan sort tidak berubah.
+
+| Gate | Hasil |
+|---|---|
+| `npx tsc --noEmit` | bersih (exit 0) |
+| `npx vitest run` | **523 test / 38 file — semua lulus** (522 lama + 1 baru: grouped object) |
+| `npx eslint` file tersentuh | bersih |
+| `npm run build` | sukses |
 
 ---
 
@@ -1092,10 +1104,10 @@ bentuk. **Rekomendasi saya: tunda** sampai ada kebutuhan nyata (mis. filter baru
                                         │
                7a ⚠️ B1 chrome → FormModal ✅ ─► 7b ⚠️ B2 error handling ✅ ─► 8 Hook halaman list ✅
                                          │
-8a ⚠️ B5 copy ke Inggris ✅ ─► [9 ditunda] ─► 10 Gate akhir ◄── di sini
+8a ⚠️ B5 copy ke Inggris ✅ ─► 9 Prop filter ✅ ─► 10 Gate akhir ◄── di sini
 ```
 
-**Estimasi total: ±46 jam** (36 jam refactor + 10 jam untuk B1, B2, B5; Step 9 ditunda).
+**Estimasi total: ±46 jam** (36 jam refactor + 10 jam untuk B1, B2, B5; Step 9 dikerjakan).
 **Perkiraan hasil:** −1.100 s/d −1.400 LOC bersih, `Inventory.tsx` 624→±430,
 pasangan modal asset 885→±450, lint 37 error → 0, UI seluruhnya berbahasa Inggris.
 

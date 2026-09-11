@@ -55,39 +55,39 @@ describe('useAssetFilters.filteredAssets', () => {
 
   it('filters by subsidiary (multi-select, OR within dimension)', () => {
     const { result } = setup(ASSETS);
-    act(() => result.current.setFilterSubsidiary(['Alpha']));
+    act(() => result.current.actions.setSubsidiary(['Alpha']));
     expect(ids(result.current.filteredAssets)).toEqual(['1', '3']);
   });
 
   it('filters by asset class (categorySegment1)', () => {
     const { result } = setup(ASSETS);
-    act(() => result.current.setFilterCategory(['Furniture']));
+    act(() => result.current.actions.setCategory(['Furniture']));
     expect(ids(result.current.filteredAssets)).toEqual(['2']);
   });
 
   it('filters by location (categorySegment2)', () => {
     const { result } = setup(ASSETS);
-    act(() => result.current.setFilterLocation(['Branch']));
+    act(() => result.current.actions.setLocation(['Branch']));
     expect(ids(result.current.filteredAssets)).toEqual(['2', '3']);
   });
 
   it('filters by status', () => {
     const { result } = setup(ASSETS);
-    act(() => result.current.setFilterStatus(['Broken']));
+    act(() => result.current.actions.setStatus(['Broken']));
     expect(ids(result.current.filteredAssets)).toEqual(['3']);
   });
 
   it('filters by verification (Yes/No derived from boolean)', () => {
     const { result } = setup(ASSETS);
-    act(() => result.current.setFilterVerification(['No']));
+    act(() => result.current.actions.setVerification(['No']));
     expect(ids(result.current.filteredAssets)).toEqual(['2']);
   });
 
   it('filters by date range on datePlaceInService (inclusive bounds)', () => {
     const { result } = setup(ASSETS);
     act(() => {
-      result.current.setDateFrom('2024-01-01');
-      result.current.setDateTo('2024-12-31');
+      result.current.actions.setDateFrom('2024-01-01');
+      result.current.actions.setDateTo('2024-12-31');
     });
     expect(ids(result.current.filteredAssets)).toEqual(['1', '2']);
   });
@@ -95,8 +95,8 @@ describe('useAssetFilters.filteredAssets', () => {
   it('filters by cost range, parsing currency-formatted strings', () => {
     const { result } = setup(ASSETS);
     act(() => {
-      result.current.setCostMin('600');
-      result.current.setCostMax('2000');
+      result.current.actions.setCostMin('600');
+      result.current.actions.setCostMax('2000');
     });
     expect(ids(result.current.filteredAssets)).toEqual(['1']);
   });
@@ -115,10 +115,17 @@ describe('useAssetFilters.filteredAssets', () => {
   it('combines multiple filter dimensions with AND', () => {
     const { result } = setup(ASSETS);
     act(() => {
-      result.current.setFilterSubsidiary(['Alpha']);
-      result.current.setFilterStatus(['Active']);
+      result.current.actions.setSubsidiary(['Alpha']);
+      result.current.actions.setStatus(['Active']);
     });
     expect(ids(result.current.filteredAssets)).toEqual(['1']);
+  });
+
+  it('exposes filter values as a single grouped object', () => {
+    const { result } = setup(ASSETS);
+    act(() => result.current.actions.setSubsidiary(['Alpha']));
+    expect(result.current.filters.subsidiary).toEqual(['Alpha']);
+    expect(result.current.filters.searchQuery).toBe('');
   });
 
   it('clearFilters resets every dimension back to showing all assets', () => {
@@ -126,8 +133,8 @@ describe('useAssetFilters.filteredAssets', () => {
     try {
       const { result } = setup(ASSETS, 'q=dell');
       act(() => {
-        result.current.setFilterSubsidiary(['Alpha']);
-        result.current.setFilterStatus(['Broken']);
+        result.current.actions.setSubsidiary(['Alpha']);
+        result.current.actions.setStatus(['Broken']);
       });
       expect(ids(result.current.filteredAssets)).toEqual([]);
       act(() => result.current.clearFilters());

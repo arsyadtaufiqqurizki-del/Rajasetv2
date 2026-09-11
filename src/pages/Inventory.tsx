@@ -90,18 +90,8 @@ export default function Inventory() {
   );
 
   const {
-    filterSubsidiary, setFilterSubsidiary,
-    filterCategory, setFilterCategory,
-    filterLocation, setFilterLocation,
-    filterStatus, setFilterStatus,
-    filterListed, setFilterListed,
-    filterVerification, setFilterVerification,
-    filterItemStatus, setFilterItemStatus,
-    dateFrom, setDateFrom,
-    dateTo, setDateTo,
-    costMin, setCostMin,
-    costMax, setCostMax,
-    searchQuery, setSearchQuery,
+    filters,
+    actions: filterActions,
     debouncedSearchQuery,
     sortKey,
     sortDirection,
@@ -134,9 +124,9 @@ export default function Inventory() {
     getSelectedIds: () => selection.selectedIds,
     getFilteredCount: () => filteredAssets.length,
     hasNoFilters: () =>
-      filterSubsidiary.length === 0 && filterCategory.length === 0 && filterLocation.length === 0 &&
-      filterStatus.length === 0 && filterListed.length === 0 && filterVerification.length === 0 &&
-      filterItemStatus.length === 0 && !dateFrom && !dateTo && !costMin && !costMax && !debouncedSearchQuery,
+      filters.subsidiary.length === 0 && filters.category.length === 0 && filters.location.length === 0 &&
+      filters.status.length === 0 && filters.listed.length === 0 && filters.verification.length === 0 &&
+      filters.itemStatus.length === 0 && !filters.dateFrom && !filters.dateTo && !filters.costMin && !filters.costMax && !debouncedSearchQuery,
     deleteAll: (onProgress) => deleteAllAssets(onProgress),
     deleteMultiple: (ids, onProgress) => deleteMultipleAssets(ids, onProgress),
     clearSelection: selection.clearSelection,
@@ -362,37 +352,10 @@ export default function Inventory() {
       ) : (
         <>
           <AssetFilters
-            subsidiaries={subsidiaries}
-            categories1={categories1}
-            categories2={categories2}
-            itemStatuses={itemStatuses}
-            uniqueStatuses={uniqueStatuses}
-            filterSubsidiary={filterSubsidiary}
-            setFilterSubsidiary={setFilterSubsidiary}
-            filterCategory={filterCategory}
-            setFilterCategory={setFilterCategory}
-            filterLocation={filterLocation}
-            setFilterLocation={setFilterLocation}
-            filterStatus={filterStatus}
-            setFilterStatus={setFilterStatus}
-            filterListed={filterListed}
-            setFilterListed={setFilterListed}
-            filterVerification={filterVerification}
-            setFilterVerification={setFilterVerification}
-            filterItemStatus={filterItemStatus}
-            setFilterItemStatus={setFilterItemStatus}
-            dateFrom={dateFrom}
-            setDateFrom={setDateFrom}
-            dateTo={dateTo}
-            setDateTo={setDateTo}
-            costMin={costMin}
-            setCostMin={setCostMin}
-            costMax={costMax}
-            setCostMax={setCostMax}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
+            filters={filters}
+            actions={filterActions}
+            options={{ subsidiaries, categories1, categories2, itemStatuses, uniqueStatuses }}
             activeFilters={activeFilters}
-            onClearFilters={clearFilters}
           />
 
           <div className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex-1 flex flex-col overflow-hidden">
