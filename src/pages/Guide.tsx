@@ -236,30 +236,6 @@ export default function Guide() {
         {/* Main Content Area */}
         <div className="flex-1 min-w-0">
           <div className="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden shadow-sm">
-            
-            {/* Horizontal Tabs */}
-            <div className="flex overflow-x-auto border-b border-outline-variant [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {GUIDE_CONTENT.map((section) => {
-                const isActive = activeTab === section.id;
-                const Icon = section.icon;
-                return (
-                  <button
-                    key={section.id}
-                    onClick={() => setActiveTab(section.id)}
-                    className={cn(
-                      "flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors",
-                      isActive
-                        ? "border-primary text-primary bg-primary/5"
-                        : "border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low"
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {section.title}
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Accordion Content */}
             <div className="p-4 md:p-6 bg-surface-container-lowest">
               {GUIDE_CONTENT.map((section) => (
