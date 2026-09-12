@@ -173,15 +173,15 @@ describe('Maintenance — pagination', () => {
     records = makeRecords(12);
     renderPage();
 
-    expect(screen.getByText('Showing 10 of 12 entries')).toBeInTheDocument();
-    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('Showing 1–10 of 12 records')).toBeInTheDocument();
+    expect(screen.getByLabelText('Jump to page')).toHaveValue('1');
     expect(screen.getByText('Record 1')).toBeInTheDocument();
     expect(screen.queryByText('Record 11')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next page' }));
 
-    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
-    expect(screen.getByText('Showing 2 of 12 entries')).toBeInTheDocument();
+    expect(screen.getByLabelText('Jump to page')).toHaveValue('2');
+    expect(screen.getByText('Showing 11–12 of 12 records')).toBeInTheDocument();
     expect(screen.getByText('Record 11')).toBeInTheDocument();
   });
 
@@ -192,18 +192,18 @@ describe('Maintenance — pagination', () => {
     ];
     renderPage('/?subsidiary=PT+Lain');
 
-    expect(screen.getByText('Showing 1 of 1 entries')).toBeInTheDocument();
-    expect(screen.getByText('Page 1 of 1')).toBeInTheDocument();
+    expect(screen.getByText('Showing 1–1 of 1 records')).toBeInTheDocument();
+    expect(screen.getByLabelText('Jump to page')).toHaveValue('1');
     expect(screen.getByText('Other')).toBeInTheDocument();
   });
 
-  it('shows an empty page-1 state with no records at all', () => {
+  it('shows the empty state with no records at all', () => {
     records = [];
     renderPage();
 
-    expect(screen.getByText('Showing 0 of 0 entries')).toBeInTheDocument();
-    expect(screen.getByText('Page 1 of 1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled();
+    expect(screen.getByText('No maintenance activity yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Add First Record' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 });
 

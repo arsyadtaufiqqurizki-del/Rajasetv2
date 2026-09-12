@@ -166,27 +166,31 @@ export function useListFilters<T>({
 
   // Sync filters to URL query params
   useEffect(() => {
-    const params = new URLSearchParams();
-    for (const def of multiDefs) {
-      const v = multiValues[def.key] ?? [];
-      if (v.length > 0) params.set(def.key, v.join(','));
-    }
-    for (const def of dateDefs) {
-      const r = dateRanges[def.key] ?? EMPTY_DATE_RANGE;
-      if (r.from) params.set(`${def.key}From`, r.from);
-      if (r.to) params.set(`${def.key}To`, r.to);
-    }
-    for (const def of numberDefs) {
-      const r = numberRanges[def.key] ?? EMPTY_NUMBER_RANGE;
-      if (r.min) params.set(`${def.key}Min`, r.min);
-      if (r.max) params.set(`${def.key}Max`, r.max);
-    }
-    if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
-    if (sortKey) {
-      params.set('sort', sortKey);
-      if (sortDirection === 'desc') params.set('dir', 'desc');
-    }
-    setSearchParams(params, { replace: true });
+    setSearchParams((prev) => {
+      const params = new URLSearchParams();
+      for (const def of multiDefs) {
+        const v = multiValues[def.key] ?? [];
+        if (v.length > 0) params.set(def.key, v.join(','));
+      }
+      for (const def of dateDefs) {
+        const r = dateRanges[def.key] ?? EMPTY_DATE_RANGE;
+        if (r.from) params.set(`${def.key}From`, r.from);
+        if (r.to) params.set(`${def.key}To`, r.to);
+      }
+      for (const def of numberDefs) {
+        const r = numberRanges[def.key] ?? EMPTY_NUMBER_RANGE;
+        if (r.min) params.set(`${def.key}Min`, r.min);
+        if (r.max) params.set(`${def.key}Max`, r.max);
+      }
+      if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
+      if (sortKey) {
+        params.set('sort', sortKey);
+        if (sortDirection === 'desc') params.set('dir', 'desc');
+      }
+      const view = prev.get('view');
+      if (view) params.set('view', view);
+      return params;
+    }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterSignature, setSearchParams]);
 

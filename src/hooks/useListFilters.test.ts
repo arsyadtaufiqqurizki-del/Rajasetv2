@@ -28,6 +28,12 @@ const DEFS: FilterDef<Row>[] = [
 const searchFields = (r: Row) => [r.name];
 const ids = (rows: Row[]) => rows.map((r) => r.id);
 
+/** The hook syncs via a functional setSearchParams updater (so it can preserve the view param) — resolve it against empty params in assertions. */
+function resolveParams(next: unknown, prev = new URLSearchParams()): URLSearchParams {
+  if (typeof next === 'function') return (next as (p: URLSearchParams) => URLSearchParams)(prev);
+  return next as URLSearchParams;
+}
+
 function setup(initialQuery = '', onFiltersChanged = vi.fn()) {
   const initialParams = new URLSearchParams(initialQuery);
   const setSearchParams = vi.fn() as unknown as SetURLSearchParams;
@@ -92,10 +98,19 @@ describe('useListFilters', () => {
     });
     expect(setSearchParams).toHaveBeenCalled();
     const lastCall = (setSearchParams as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1);
-    const params = lastCall![0] as URLSearchParams;
+    const params = resolveParams(lastCall![0]);
     expect(params.get('category')).toBe('A');
     expect(params.get('dateFrom')).toBe('2024-01-01');
     expect(lastCall![1]).toEqual({ replace: true });
+  });
+
+  it('preserves the view param when syncing filters back to the URL', () => {
+    const { result, setSearchParams } = setup();
+    act(() => result.current.setMulti('category', ['A']));
+    const lastCall = (setSearchParams as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1);
+    const params = resolveParams(lastCall![0], new URLSearchParams('view=calendar'));
+    expect(params.get('category')).toBe('A');
+    expect(params.get('view')).toBe('calendar');
   });
 
   it('a URL saved with filters applied restores the same result set', () => {
@@ -104,7 +119,7 @@ describe('useListFilters', () => {
       first.result.current.setMulti('region', ['South']);
       first.result.current.setNumberRange('cost', '', '200');
     });
-    const savedParams = (first.setSearchParams as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)![0] as URLSearchParams;
+    const savedParams = resolveParams((first.setSearchParams as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)![0]);
 
     const restored = renderHook(() =>
       useListFilters({

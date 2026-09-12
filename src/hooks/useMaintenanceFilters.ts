@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { SetURLSearchParams } from 'react-router-dom';
 import { useListFilters, type FilterDef } from './useListFilters';
+import { parseCost } from '../lib/money';
 import type { MaintenanceRecord } from '../types/maintenance';
 
 /**
@@ -25,7 +26,24 @@ export function useMaintenanceFilters(
 
   const searchFields = useMemo(() => (r: MaintenanceRecord) => [r.assetDescription, r.assetNumber], []);
 
-  const list = useListFilters({ rows: records, defs, searchFields, searchParams, setSearchParams, onFiltersChanged });
+  const sortAccessors = useMemo<Record<string, (r: MaintenanceRecord) => string | number>>(
+    () => ({
+      assetBook: (r) => r.assetBook || '',
+      subsidiary: (r) => r.subsidiary,
+      assetNumber: (r) => r.assetNumber,
+      assetDescription: (r) => r.assetDescription,
+      serviceType: (r) => r.serviceType,
+      assetCategorySegment1: (r) => r.assetCategorySegment1,
+      assetCategorySegment2: (r) => r.assetCategorySegment2,
+      scheduledDate: (r) => r.scheduledDate,
+      estimateCost: (r) => parseCost(r.estimateCost),
+      actualCost: (r) => parseCost(r.actualCost),
+      status: (r) => r.status,
+    }),
+    []
+  );
+
+  const list = useListFilters({ rows: records, defs, searchFields, searchParams, setSearchParams, onFiltersChanged, sortAccessors });
 
   const uniqueSubsidiaries = useMemo(() => Array.from(new Set(records.map((r) => r.subsidiary).filter(Boolean))), [records]);
   const uniqueAssetBooks = useMemo(() => Array.from(new Set(records.map((r) => r.assetBook).filter(Boolean))), [records]);
@@ -41,6 +59,10 @@ export function useMaintenanceFilters(
     searchQuery: list.searchQuery,
     setSearchQuery: list.setSearchQuery,
     debouncedSearchQuery: list.debouncedSearchQuery,
+    sortKey: list.sortKey,
+    sortDirection: list.sortDirection,
+    toggleSort: list.toggleSort,
+    sortableColumns: sortAccessors,
     uniqueSubsidiaries,
     uniqueAssetBooks,
     uniqueStatuses,

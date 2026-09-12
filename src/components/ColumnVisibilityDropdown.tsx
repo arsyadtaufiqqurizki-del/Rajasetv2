@@ -2,10 +2,9 @@ import { useEffect, useRef, useState, useId, type KeyboardEvent } from 'react';
 import { Columns3, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useListNav } from '../hooks/useListNav';
-import type { AssetColumnDef } from './AssetTable';
 
 interface ColumnVisibilityDropdownProps {
-  columns: AssetColumnDef[];
+  columns: Array<{ id: string; label: string }>;
   visibleColumns: Set<string>;
   onToggleColumn: (columnId: string) => void;
   onShowAll: () => void;

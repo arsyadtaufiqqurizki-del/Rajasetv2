@@ -83,7 +83,8 @@ describe('useMaintenanceFilters', () => {
     const { result, setSearchParams } = setup();
     act(() => result.current.setFilterSubsidiary(['Alpha']));
     const lastCall = (setSearchParams as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1);
-    const params = lastCall![0] as URLSearchParams;
+    const next = lastCall![0] as (prev: URLSearchParams) => URLSearchParams;
+    const params = next(new URLSearchParams());
     expect(params.get('subsidiary')).toBe('Alpha');
   });
 

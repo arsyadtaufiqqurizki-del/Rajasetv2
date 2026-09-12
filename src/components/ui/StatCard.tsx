@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 
 interface StatCardProps {
@@ -8,9 +9,11 @@ interface StatCardProps {
   tone?: 'default' | 'danger';
   /** overrides the value's default text-primary color, e.g. to conditionally flag a non-zero count */
   valueClassName?: string;
+  /** optional mini chart (e.g. sparkline) rendered between value and footer */
+  chart?: ReactNode;
 }
 
-export default function StatCard({ label, value, icon, footer, tone = 'default', valueClassName }: StatCardProps) {
+export default function StatCard({ label, value, icon, footer, tone = 'default', valueClassName, chart }: StatCardProps) {
   return (
     <div
       className={cn(
@@ -24,7 +27,8 @@ export default function StatCard({ label, value, icon, footer, tone = 'default',
         <span>{label}</span>
         {icon}
       </div>
-      <div className={cn('text-4xl font-bold mb-2', valueClassName ?? 'text-primary')}>{value}</div>
+      <div className={cn('font-bold mb-2', chart ? 'text-2xl' : 'text-4xl', valueClassName ?? 'text-primary')}>{value}</div>
+      {chart}
       {footer && <div className="flex items-center gap-1 text-xs">{footer}</div>}
     </div>
   );
