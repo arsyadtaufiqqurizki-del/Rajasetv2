@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
-import { Edit, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
+import { Edit, Trash2, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { formatDateDMY } from '../lib/dates';
 import { TableEmptyRow } from './ui/EmptyState';
 import { en as copy } from '../i18n/en';
 import type { MaintenanceRecord } from '../types/maintenance';
+import StatusBadgeDropdown from './StatusBadgeDropdown';
+import MaintenanceRowDetail from './MaintenanceRowDetail';
 
 export interface MaintenanceColumnDef {
   id: string;
@@ -130,13 +133,21 @@ const TH_BASE = 'py-3 px-4 text-xs font-semibold text-on-surface-variant whitesp
 
 interface MaintenanceTableProps {
   records: MaintenanceRecord[];
+  allRecords: MaintenanceRecord[];
+  filteredIds: string[];
   visibleColumns: Set<string>;
   sortKey: string | null;
   sortDirection: 'asc' | 'desc';
   onToggleSort: (key: string) => void;
   sortableColumns: Record<string, (r: MaintenanceRecord) => string | number>;
+  selectedIds: Set<string>;
+  onSelectAll: (checked: boolean) => void;
+  onSelectOne: (id: string, checked: boolean) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onStatusChange: (id: string, status: string) => Promise<void>;
+  expandedRowId: string | null;
+  onToggleExpand: (id: string) => void;
   hasActiveFilters: boolean;
   onClearFilters: () => void;
   onAddNew: () => void;
@@ -144,19 +155,27 @@ interface MaintenanceTableProps {
 
 export default function MaintenanceTable({
   records,
+  allRecords,
+  filteredIds,
   visibleColumns,
   sortKey,
   sortDirection,
   onToggleSort,
   sortableColumns,
+  selectedIds,
+  onSelectAll,
+  onSelectOne,
   onEdit,
   onDelete,
+  onStatusChange,
+  expandedRowId,
+  onToggleExpand,
   hasActiveFilters,
   onClearFilters,
   onAddNew,
 }: MaintenanceTableProps) {
   const columns = MAINTENANCE_COLUMNS.filter(col => visibleColumns.has(col.id));
-  const colSpan = columns.length + 1;
+  const colSpan = columns.length + 2;
 
   const renderHeaderLabel = (col: MaintenanceColumnDef) => {
     if (!sortableColumns[col.id]) return col.label;
@@ -177,12 +196,34 @@ export default function MaintenanceTable({
     );
   };
 
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIds.has(id));
+  const someFilteredSelected = selectedIds.size > 0 && !allFilteredSelected;
+
+  const renderCell = (col: MaintenanceColumnDef, record: MaintenanceRecord) => {
+    if (col.id === 'status') {
+      return <StatusBadgeDropdown recordId={record.id} currentStatus={record.status} onStatusChange={onStatusChange} />;
+    }
+    return col.render(record);
+  };
+
   return (
     <div className="overflow-x-auto flex-1">
       <table className="w-full text-left border-collapse">
         <caption className="sr-only">Maintenance records · {records.length.toLocaleString()} shown</caption>
         <thead className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-20">
           <tr>
+            <th scope="col" className="py-3 px-4 w-12 text-center">
+              <input
+                type="checkbox"
+                className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                checked={allFilteredSelected}
+                ref={el => {
+                  if (el) el.indeterminate = someFilteredSelected;
+                }}
+                onChange={e => onSelectAll(e.target.checked)}
+                aria-label="Select all records matching the current filters"
+              />
+            </th>
             <th scope="col" className={TH_BASE}>Action</th>
             {columns.map(col => (
               <th key={col.id} scope="col" className={cn(TH_BASE, col.headerClassName)}>
@@ -192,33 +233,80 @@ export default function MaintenanceTable({
           </tr>
         </thead>
         <tbody className="text-sm divide-y divide-outline-variant/30">
-          {records.length > 0 ? records.map((record) => (
-            <tr key={record.id} className={cn('hover:bg-surface-container-lowest transition-colors', record.status === 'Overdue' ? 'bg-error-container/5' : '')}>
-              <td className="py-3 px-4 text-left whitespace-nowrap">
-                <div className="flex items-center justify-start gap-2">
-                  <button
-                    onClick={() => onEdit(record.id)}
-                    className="p-1 hover:bg-surface-container-low text-primary rounded transition-colors"
-                    title="Edit"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => onDelete(record.id)}
-                    className="p-1 hover:bg-error-container/50 text-error rounded transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </td>
-              {columns.map(col => (
-                <td key={col.id} className={typeof col.cellClassName === 'function' ? col.cellClassName(record) : col.cellClassName}>
-                  {col.render(record)}
+          {records.length > 0 ? records.flatMap((record) => {
+            const rowSelected = selectedIds.has(record.id);
+            const expanded = expandedRowId === record.id;
+            return [
+              <tr
+                key={record.id}
+                onClick={() => onToggleExpand(record.id)}
+                className={cn(
+                  'hover:bg-surface-container-lowest transition-colors cursor-pointer',
+                  record.status === 'Overdue' ? 'bg-error-container/5' : '',
+                  rowSelected && 'bg-primary/5',
+                  expanded && 'bg-surface-container-low/50'
+                )}
+              >
+                <td className="py-3 px-4 text-center" onClick={e => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                    checked={rowSelected}
+                    onChange={e => onSelectOne(record.id, e.target.checked)}
+                    aria-label={`Select record ${record.assetNumber || record.assetDescription}`}
+                  />
                 </td>
-              ))}
-            </tr>
-          )) : (
+                <td className="py-3 px-4 text-left whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-start gap-1">
+                    <button
+                      onClick={() => onToggleExpand(record.id)}
+                      className="p-1 hover:bg-surface-container-low text-on-surface-variant rounded transition-colors"
+                      title={expanded ? 'Collapse' : 'Expand'}
+                      aria-expanded={expanded}
+                    >
+                      <ChevronDown className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')} />
+                    </button>
+                    <button
+                      onClick={() => onEdit(record.id)}
+                      className="p-1 hover:bg-surface-container-low text-primary rounded transition-colors"
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(record.id)}
+                      className="p-1 hover:bg-error-container/50 text-error rounded transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+                {columns.map(col => (
+                  <td
+                    key={col.id}
+                    className={typeof col.cellClassName === 'function' ? col.cellClassName(record) : col.cellClassName}
+                    onClick={col.id === 'status' ? e => e.stopPropagation() : undefined}
+                  >
+                    {renderCell(col, record)}
+                  </td>
+                ))}
+              </tr>,
+              ...(expanded ? [
+                <tr key={`${record.id}-detail`}>
+                  <td colSpan={colSpan} className="p-0 bg-surface-container-lowest">
+                    <AnimatePresence initial={false}>
+                      <MaintenanceRowDetail
+                        record={record}
+                        history={allRecords.filter(r => r.id !== record.id && record.assetNumber !== '' && r.assetNumber === record.assetNumber)}
+                        onEditRecord={onEdit}
+                      />
+                    </AnimatePresence>
+                  </td>
+                </tr>,
+              ] : []),
+            ];
+          }) : (
             <TableEmptyRow
               colSpan={colSpan}
               message={hasActiveFilters ? copy.emptyState.noMaintenanceFiltered : copy.emptyState.noMaintenanceData}

@@ -6,6 +6,8 @@ import { useMaintenance } from '../contexts/MaintenanceContext';
 import { useMaintenanceFilters } from '../hooks/useMaintenanceFilters';
 import { usePagination } from '../hooks/usePagination';
 import { useColumnVisibility } from '../hooks/useColumnVisibility';
+import { useRowSelection } from '../hooks/useRowSelection';
+import { useBulkDelete } from '../hooks/useBulkDelete';
 import AddMaintenanceModal from '../components/AddMaintenanceModal';
 import EditMaintenanceModal from '../components/EditMaintenanceModal';
 import MaintenanceStats from '../components/MaintenanceStats';
@@ -14,6 +16,11 @@ import MaintenanceSkeleton from '../components/MaintenanceSkeleton';
 import MaintenanceEmptyState from '../components/MaintenanceEmptyState';
 import MaintenanceViewSwitcher, { type MaintenanceView } from '../components/MaintenanceViewSwitcher';
 import MaintenanceCalendarView from '../components/MaintenanceCalendarView';
+import MaintenanceBulkBar from '../components/MaintenanceBulkBar';
+import MaintenanceBulkStatusModal from '../components/MaintenanceBulkStatusModal';
+import BulkUpdateProgressModal, { type BulkUpdateProgressState } from '../components/BulkUpdateProgressModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import DeleteProgressModal from '../components/DeleteProgressModal';
 import ColumnVisibilityDropdown from '../components/ColumnVisibilityDropdown';
 import MultiSelectDropdown from '../components/ui/MultiSelectDropdown';
 import FilterBar from '../components/ui/FilterBar';
@@ -30,7 +37,7 @@ function parseView(param: string | null): MaintenanceView {
 }
 
 export default function Maintenance() {
-  const { records, loading, error, deleteRecord } = useMaintenance();
+  const { records, loading, error, deleteRecord, updateStatus, deleteMultipleRecords, deleteAllRecords, bulkUpdateStatus } = useMaintenance();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -38,6 +45,10 @@ export default function Maintenance() {
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [notice, setNotice] = useState<{ message: string; variant: 'success' | 'error' } | null>(null);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [isBulkStatusOpen, setIsBulkStatusOpen] = useState(false);
+  const [bulkStatusSaving, setBulkStatusSaving] = useState(false);
+  const [bulkUpdateProgress, setBulkUpdateProgress] = useState<BulkUpdateProgressState>({ isOpen: false, status: 'updating', total: 0, processed: 0, failedCount: 0 });
 
   const view = parseView(searchParams.get('view'));
 
@@ -76,6 +87,17 @@ export default function Maintenance() {
   const totalPages = pagination.totalPagesFor(filteredRecords.length);
   const paginatedRecords = pagination.paginate(filteredRecords);
 
+  const selection = useRowSelection();
+  const bulkDelete = useBulkDelete({
+    getSelectedIds: () => selection.selectedIds,
+    getFilteredCount: () => filteredRecords.length,
+    hasNoFilters: () =>
+      filterSubsidiary.length === 0 && filterAssetBook.length === 0 && filterStatus.length === 0 && !searchQuery,
+    deleteAll: onProgress => deleteAllRecords(onProgress),
+    deleteMultiple: (ids, onProgress) => deleteMultipleRecords(ids, onProgress),
+    clearSelection: selection.clearSelection,
+  });
+
   const activeRecords = records.filter(r => r.status === 'In Progress' || r.status === 'Pending');
   const overdueRecords = records.filter(r => r.status === 'Overdue');
 
@@ -96,6 +118,49 @@ export default function Maintenance() {
   const handleEdit = (id: string) => {
     setEditingRecordId(id);
     setIsEditModalOpen(true);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    selection.handleSelectAll(checked, filteredRecords.map(r => r.id));
+  };
+
+  const handleToggleExpand = (id: string) => {
+    setExpandedRowId(prev => (prev === id ? null : id));
+  };
+
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      await updateStatus(id, newStatus);
+      setNotice({ message: `Status updated to "${newStatus}".`, variant: 'success' });
+    } catch (err) {
+      setNotice({ message: err instanceof Error ? err.message : 'Failed to update status.', variant: 'error' });
+      throw err;
+    }
+  };
+
+  const handleConfirmBulkStatus = async (status: string) => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    setIsBulkStatusOpen(false);
+    setBulkStatusSaving(true);
+    setBulkUpdateProgress({ isOpen: true, status: 'updating', total: ids.length, processed: 0, failedCount: 0 });
+    try {
+      const { updated, failed } = await bulkUpdateStatus(ids, status, (processed, failedCount) => {
+        setBulkUpdateProgress(prev => ({ ...prev, processed, failedCount }));
+      });
+      setBulkUpdateProgress(prev => ({ ...prev, status: 'done' }));
+      selection.clearSelection();
+      setNotice(
+        failed > 0
+          ? { message: `Updated ${updated} records, ${failed} failed`, variant: 'error' }
+          : { message: `Updated ${updated} record${updated === 1 ? '' : 's'} to "${status}".`, variant: 'success' }
+      );
+    } catch (err) {
+      setBulkUpdateProgress(prev => ({ ...prev, status: 'done' }));
+      setNotice({ message: err instanceof Error ? err.message : 'Bulk update failed.', variant: 'error' });
+    } finally {
+      setBulkStatusSaving(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -149,6 +214,39 @@ export default function Maintenance() {
         onCancel={() => setRecordToDelete(null)}
       />
 
+      <DeleteConfirmModal
+        isOpen={bulkDelete.isDeleteModalOpen}
+        selectedCount={selection.selectedIds.size}
+        confirmText={bulkDelete.deleteConfirmText}
+        onConfirmTextChange={bulkDelete.setDeleteConfirmText}
+        onCancel={bulkDelete.closeDeleteModal}
+        onConfirm={() => {
+          bulkDelete.handleConfirmDeleteSelected().then(() => {
+            setNotice({ message: 'Selected maintenance records deleted.', variant: 'success' });
+          }).catch(err => {
+            setNotice({ message: err instanceof Error ? err.message : 'Bulk delete failed.', variant: 'error' });
+          });
+        }}
+        itemLabel="maintenance records"
+      />
+      <DeleteProgressModal
+        deleteProgressModal={bulkDelete.deleteProgress}
+        onClose={() => bulkDelete.setDeleteProgress(prev => ({ ...prev, isOpen: false }))}
+        itemLabel="maintenance records"
+      />
+      <MaintenanceBulkStatusModal
+        isOpen={isBulkStatusOpen}
+        selectedCount={selection.selectedIds.size}
+        isSaving={bulkStatusSaving}
+        onCancel={() => setIsBulkStatusOpen(false)}
+        onConfirm={handleConfirmBulkStatus}
+      />
+      <BulkUpdateProgressModal
+        progress={bulkUpdateProgress}
+        onClose={() => setBulkUpdateProgress(prev => ({ ...prev, isOpen: false }))}
+        itemLabel="maintenance records"
+      />
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-on-surface">Maintenance Overview</h2>
@@ -197,6 +295,15 @@ export default function Maintenance() {
                 )}
               </div>
 
+              {selection.selectedIds.size > 0 && view === 'table' && (
+                <MaintenanceBulkBar
+                  selectedCount={selection.selectedIds.size}
+                  onDelete={bulkDelete.openDeleteModal}
+                  onBulkStatus={() => setIsBulkStatusOpen(true)}
+                  onClear={selection.clearSelection}
+                />
+              )}
+
               <FilterBar
                 searchQuery={searchQuery}
                 onSearchQueryChange={setSearchQuery}
@@ -235,13 +342,21 @@ export default function Maintenance() {
               <>
                 <MaintenanceTable
                   records={paginatedRecords}
+                  allRecords={records}
+                  filteredIds={filteredRecords.map(r => r.id)}
                   visibleColumns={visibleColumns}
                   sortKey={sortKey}
                   sortDirection={sortDirection}
                   onToggleSort={toggleSort}
                   sortableColumns={sortableColumns}
+                  selectedIds={selection.selectedIds}
+                  onSelectAll={handleSelectAll}
+                  onSelectOne={selection.handleSelectOne}
                   onEdit={handleEdit}
                   onDelete={setRecordToDelete}
+                  onStatusChange={handleStatusChange}
+                  expandedRowId={expandedRowId}
+                  onToggleExpand={handleToggleExpand}
                   hasActiveFilters={activeFilters.length > 0}
                   onClearFilters={clearFilters}
                   onAddNew={() => setIsModalOpen(true)}

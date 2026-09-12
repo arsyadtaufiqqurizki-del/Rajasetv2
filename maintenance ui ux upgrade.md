@@ -1,6 +1,6 @@
 # Maintenance UI/UX Upgrade — Implementation Plan
 
-> **Status**: Phase 1 done (2026-09-12) — Phase 2 & 3 pending  
+> **Status**: Phase 1 & 2 done (2026-09-12) — Phase 3 pending  
 > **Date**: 2026-09-12  
 > **Scope**: Full redesign of `src/pages/Maintenance.tsx` and all Maintenance-specific components  
 > **Reference**: `src/pages/Inventory.tsx` (patterns, hooks, components to mirror)  
@@ -948,28 +948,28 @@ maintenance: {
 
 ## 13. Verification Checklist
 
-### Phase 1
-- [ ] `npm run lint` passes (tsc --noEmit)
-- [ ] `npm run dev` — Maintenance page loads with skeleton during fetch
-- [ ] Table shows correct columns; column toggle persists in localStorage
-- [ ] Sorting works: click header → asc/desc/none cycle; numeric columns sort numerically
-- [ ] Calendar view: month grid renders, prev/next/today work, day click shows records
-- [ ] View switcher: URL persists `?view=table|calendar`, refresh restores view
-- [ ] Stat cards render; cost card shows sparkline when ≥2 months of data
-- [ ] Empty states show correctly (no data vs. no filtered results)
-- [ ] Pagination: page-size selector works, persists in localStorage
-- [ ] Notice toast: success on add/edit, auto-dismisses
-- [ ] Filters: multi-select + search + chips work, URL persists
+### Phase 1 — Done (2026-09-12)
+- [x] `npm run lint` passes (tsc --noEmit)
+- [x] `npm run dev` — Maintenance page loads with skeleton during fetch
+- [x] Table shows correct columns; column toggle persists in localStorage
+- [x] Sorting works: click header → asc/desc/none cycle; numeric columns sort numerically
+- [x] Calendar view: month grid renders, prev/next/today work, day click shows records
+- [x] View switcher: URL persists `?view=table|calendar`, refresh restores view
+- [x] Stat cards render; cost card shows sparkline when ≥2 months of data
+- [x] Empty states show correctly (no data vs. no filtered results)
+- [x] Pagination: page-size selector works, persists in localStorage
+- [x] Notice toast: success on add/edit, auto-dismisses
+- [x] Filters: multi-select + search + chips work, URL persists
 
-### Phase 2
-- [ ] Status badge dropdown: click → 4 options → select saves to Supabase → badge updates → activity log written
-- [ ] Checkbox: select-all covers all filtered (not just page), individual toggle works
-- [ ] Bulk bar appears when ≥1 selected, disappears on clear
-- [ ] Bulk delete: confirm modal → progress modal → records removed → notice
-- [ ] Bulk status: modal → progress → all selected updated → notice
-- [ ] Row expansion: click row → detail panel slides in → shows asset info + cost breakdown + history
-- [ ] Only one row expanded at a time (clicking another collapses first)
-- [ ] `npm run lint` passes
+### Phase 2 — Done (2026-09-12)
+- [x] Status badge dropdown: click → 4 options → select saves to Supabase → badge updates → activity log written
+- [x] Checkbox: select-all covers all filtered (not just page), individual toggle works
+- [x] Bulk bar appears when ≥1 selected, disappears on clear
+- [x] Bulk delete: confirm modal → progress modal → records removed → notice
+- [x] Bulk status: modal → progress → all selected updated → notice
+- [x] Row expansion: click row → detail panel slides in → shows asset info + cost breakdown + history
+- [x] Only one row expanded at a time (clicking another collapses first)
+- [x] `npm run lint` passes
 
 ### Phase 3
 - [ ] Timeline view: bars render for current week, colored by status, tooltip on hover

@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { batchDelete, batchUpdate } from '../lib/supabase/batchWrite';
 import { logActivity } from '../lib/activityLogger';
 import type { MaintenanceRecord } from '../types/maintenance';
 
@@ -11,7 +12,11 @@ interface MaintenanceContextType {
   error: string | null;
   addRecord: (record: Omit<MaintenanceRecord, 'id'>) => Promise<void>;
   updateRecord: (id: string, record: Omit<MaintenanceRecord, 'id'>) => Promise<void>;
+  updateStatus: (id: string, status: string) => Promise<void>;
   deleteRecord: (id: string) => Promise<void>;
+  deleteMultipleRecords: (ids: string[], onProgress?: (processed: number, failed: number) => void) => Promise<void>;
+  deleteAllRecords: (onProgress?: (processed: number, failed: number) => void) => Promise<void>;
+  bulkUpdateStatus: (ids: string[], status: string, onProgress?: (processed: number, failed: number, total: number) => void) => Promise<{ updated: number; failed: number }>;
 }
 
 const MaintenanceContext = createContext<MaintenanceContextType | undefined>(undefined);
@@ -122,8 +127,60 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
     setRecords(prev => prev.filter(r => r.id !== id));
   };
 
+  const updateStatus = async (id: string, status: string) => {
+    const existing = records.find(r => r.id === id);
+    const { data, error } = await supabase
+      .from('maintenance_records')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) { setError(error.message); throw error; }
+    setRecords(prev => prev.map(r => r.id === id ? fromDb(data) : r));
+    logActivity({ actionType: 'UPDATE_MAINTENANCE', entityType: 'maintenance', entityId: id, details: { assetName: existing?.assetDescription ?? '', from: existing?.status ?? '', to: status } });
+  };
+
+  const deleteMultipleRecords = async (ids: string[], onProgress?: (processed: number, failed: number) => void) => {
+    const { succeeded } = await batchDelete('maintenance_records', ids, {
+      onBatchDeleted: batch => {
+        const batchSet = new Set(batch);
+        setRecords(prev => prev.filter(r => !batchSet.has(r.id)));
+      },
+      onProgress,
+    });
+    if (succeeded > 0) {
+      logActivity({ actionType: 'BULK_DELETE', entityType: 'maintenance', details: { count: succeeded, bulk: true } });
+    }
+  };
+
+  const deleteAllRecords = async (onProgress?: (processed: number, failed: number) => void) => {
+    const { data, error } = await supabase.from('maintenance_records').select('id');
+    if (error) { setError(error.message); throw error; }
+    await deleteMultipleRecords((data ?? []).map(r => r.id), onProgress);
+  };
+
+  const bulkUpdateStatus = async (
+    ids: string[],
+    status: string,
+    onProgress?: (processed: number, failed: number, total: number) => void,
+  ): Promise<{ updated: number; failed: number }> => {
+    const total = ids.length;
+    if (total === 0) return { updated: 0, failed: 0 };
+    const { succeeded: updated, failed } = await batchUpdate<MaintenanceDbRow>('maintenance_records', ids, { status }, {
+      onBatchUpdated: rows => {
+        const byId = new Map(rows.map(row => [row.id, fromDb(row)]));
+        setRecords(prev => prev.map(r => byId.get(r.id) ?? r));
+      },
+      onProgress,
+    });
+    if (updated > 0) {
+      logActivity({ actionType: 'UPDATE_MAINTENANCE', entityType: 'maintenance', details: { count: updated, to: status, bulk: true } });
+    }
+    return { updated, failed };
+  };
+
   return (
-    <MaintenanceContext.Provider value={{ records, loading, error, addRecord, updateRecord, deleteRecord }}>
+    <MaintenanceContext.Provider value={{ records, loading, error, addRecord, updateRecord, updateStatus, deleteRecord, deleteMultipleRecords, deleteAllRecords, bulkUpdateStatus }}>
       {children}
     </MaintenanceContext.Provider>
   );
