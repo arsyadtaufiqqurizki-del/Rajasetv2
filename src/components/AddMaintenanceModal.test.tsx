@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import AddMaintenanceModal from './AddMaintenanceModal';
 import type { Asset } from '../types/asset';
 
@@ -60,7 +60,8 @@ function pickAsset(assetNumber: string) {
 }
 
 const scheduledDate = () => document.querySelector('input[type="date"]') as HTMLInputElement;
-const statusSelect = () => screen.getByRole('combobox') as HTMLSelectElement;
+const statusRadio = (option: string) =>
+  within(screen.getByRole('radiogroup', { name: 'Status' })).getByRole('radio', { name: option });
 const byPlaceholder = (p: string) => screen.getByPlaceholderText(p) as HTMLInputElement;
 
 function submit() {
@@ -98,7 +99,7 @@ describe('AddMaintenanceModal — chrome', () => {
   it('defaults the scheduled date to today and the status to Pending', () => {
     render(<AddMaintenanceModal isOpen onClose={mockOnClose} />);
     expect(scheduledDate()).toHaveValue(new Date().toISOString().split('T')[0]);
-    expect(statusSelect()).toHaveValue('Pending');
+    expect(statusRadio('Pending')).toBeChecked();
   });
 });
 
@@ -161,8 +162,8 @@ describe('AddMaintenanceModal — asset picker', () => {
     pickAsset('AST-001');
 
     expect(screen.getByText('Subsidiary:').parentElement).toHaveTextContent('PT Raja Prima');
-    expect(screen.getByText('Category 1:').parentElement).toHaveTextContent('Heavy Equipment');
-    expect(screen.getByText('Category 2:').parentElement).toHaveTextContent('Site A');
+    expect(screen.getByText('Asset Class:').parentElement).toHaveTextContent('Heavy Equipment');
+    expect(screen.getByText('Location:').parentElement).toHaveTextContent('Site A');
     expect(screen.getByText('Units:').parentElement).toHaveTextContent('1');
   });
 });
@@ -175,7 +176,7 @@ describe('AddMaintenanceModal — save flow', () => {
     pickAsset('AST-001');
     fireEvent.change(scheduledDate(), { target: { value: '2026-10-01' } });
     fireEvent.change(byPlaceholder('e.g. Oil Change, Repair'), { target: { value: 'Oil Change' } });
-    fireEvent.change(statusSelect(), { target: { value: 'In Progress' } });
+    fireEvent.click(statusRadio('In Progress'));
     fireEvent.change(byPlaceholder('e.g. $500.00'), { target: { value: '$500.00' } });
     fireEvent.change(byPlaceholder('e.g. $450.00'), { target: { value: '$450.00' } });
     submit();

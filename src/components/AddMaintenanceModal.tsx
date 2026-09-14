@@ -81,8 +81,8 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
         <div className="grid grid-cols-2 gap-4 p-4 bg-surface-container-low rounded-lg border border-outline-variant text-sm">
           <div><span className="text-on-surface-variant">Book:</span> {selectedAsset.assetBook || selectedAsset.id}</div>
           <div><span className="text-on-surface-variant">Subsidiary:</span> {selectedAsset.subsidiary}</div>
-          <div><span className="text-on-surface-variant">Category 1:</span> {selectedAsset.categorySegment1}</div>
-          <div><span className="text-on-surface-variant">Category 2:</span> {selectedAsset.categorySegment2}</div>
+          <div><span className="text-on-surface-variant">Asset Class:</span> {selectedAsset.categorySegment1}</div>
+          <div><span className="text-on-surface-variant">Location:</span> {selectedAsset.categorySegment2}</div>
           <div><span className="text-on-surface-variant">Units:</span> {selectedAsset.assetUnits}</div>
         </div>
       )}
@@ -111,20 +111,28 @@ export default function AddMaintenanceModal({ isOpen, onClose }: AddMaintenanceM
             placeholder="e.g. Oil Change, Repair"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-on-surface mb-2">Status *</label>
-          <select
-            required
-            name="status"
-            value={form.values.status}
-            onChange={form.handleChange}
-            className={INPUT_CLASS}
+        <div className="md:col-span-2">
+          <span className="block text-sm font-medium text-on-surface mb-2">Status *</span>
+          <div
+            role="radiogroup"
+            aria-label="Status"
+            className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5"
           >
-            <option value="Pending">Pending</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Completed">Completed</option>
-            <option value="Overdue">Overdue</option>
-          </select>
+            {['Pending', 'In Progress', 'Completed', 'Overdue'].map(option => (
+              <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value={option}
+                  checked={form.values.status === option}
+                  onChange={form.handleChange}
+                  required
+                  className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
+                />
+                {option}
+              </label>
+            ))}
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-on-surface mb-2">Estimate Cost</label>
