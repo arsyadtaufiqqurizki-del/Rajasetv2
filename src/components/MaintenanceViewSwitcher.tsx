@@ -10,7 +10,7 @@ interface MaintenanceViewSwitcherProps {
 
 const VIEWS: Array<{ id: MaintenanceView; label: string; icon: typeof Table; badge?: string }> = [
   { id: 'table', label: 'Table', icon: Table },
-  { id: 'timeline', label: 'Timeline', icon: BarChart3, badge: 'Soon' },
+  { id: 'timeline', label: 'Timeline', icon: BarChart3 },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
 ];
 

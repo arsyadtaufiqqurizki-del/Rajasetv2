@@ -148,6 +148,8 @@ interface MaintenanceTableProps {
   onStatusChange: (id: string, status: string) => Promise<void>;
   expandedRowId: string | null;
   onToggleExpand: (id: string) => void;
+  focusedRowId?: string | null;
+  onFocusRow?: (id: string) => void;
   hasActiveFilters: boolean;
   onClearFilters: () => void;
   onAddNew: () => void;
@@ -170,6 +172,8 @@ export default function MaintenanceTable({
   onStatusChange,
   expandedRowId,
   onToggleExpand,
+  focusedRowId,
+  onFocusRow,
   hasActiveFilters,
   onClearFilters,
   onAddNew,
@@ -239,12 +243,16 @@ export default function MaintenanceTable({
             return [
               <tr
                 key={record.id}
-                onClick={() => onToggleExpand(record.id)}
+                onClick={() => {
+                  onFocusRow?.(record.id);
+                  onToggleExpand(record.id);
+                }}
                 className={cn(
                   'hover:bg-surface-container-lowest transition-colors cursor-pointer',
                   record.status === 'Overdue' ? 'bg-error-container/5' : '',
                   rowSelected && 'bg-primary/5',
-                  expanded && 'bg-surface-container-low/50'
+                  expanded && 'bg-surface-container-low/50',
+                  focusedRowId === record.id && 'ring-2 ring-primary ring-inset'
                 )}
               >
                 <td className="py-3 px-4 text-center" onClick={e => e.stopPropagation()}>

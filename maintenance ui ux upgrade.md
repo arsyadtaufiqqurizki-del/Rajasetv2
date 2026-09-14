@@ -1,6 +1,8 @@
 # Maintenance UI/UX Upgrade — Implementation Plan
 
-> **Status**: Phase 1 & 2 done (2026-09-12) — Phase 3 pending  
+> **Status**: Phase 1, 2 & 3 done (2026-09-14) — all phases complete
+> **Phase 3 implementation notes (2026-09-14)**: Timeline is a custom CSS-grid Gantt (not recharts BarChart — simpler, avoids rendering issues with many bars); CSV export scope = filtered/selected × visible/all via Export dropdown; keyboard hint line rendered under the table.
+> **Update (2026-09-14)**: fitur CSV import di Maintenance dihapus sesuai permintaan — hanya export yang dipertahankan. Helper import (`partitionMaintenanceRows`, `mapCsvRowToMaintenanceInput`, `MAX_IMPORT_ROWS`) dan param `skipLog` di `addRecord` ikut dibersihkan.  
 > **Date**: 2026-09-12  
 > **Scope**: Full redesign of `src/pages/Maintenance.tsx` and all Maintenance-specific components  
 > **Reference**: `src/pages/Inventory.tsx` (patterns, hooks, components to mirror)  
@@ -971,18 +973,17 @@ maintenance: {
 - [x] Only one row expanded at a time (clicking another collapses first)
 - [x] `npm run lint` passes
 
-### Phase 3
-- [ ] Timeline view: bars render for current week, colored by status, tooltip on hover
-- [ ] Timeline: prev/next/this week navigation works
-- [ ] Timeline: grouping toggle (by asset / by service type / flat)
-- [ ] Timeline: click bar → opens edit modal
-- [ ] CSV export: all/selected × visible/all columns → correct file downloaded
-- [ ] CSV import: valid rows imported, invalid rows skipped, progress modal shows counts
-- [ ] CSV import: >5000 rows rejected with error notice
-- [ ] CSV injection prevention: `sanitizeCell` applied to all exported values
-- [ ] Keyboard: ↑/↓ moves focus ring, Enter opens edit, Delete opens confirm, Esc closes
-- [ ] Keyboard: disabled when typing in inputs/selects or when modal open
-- [ ] `npm run lint` passes
+### Phase 3 — Done (2026-09-14)
+- [x] Timeline view: bars render for current week, colored by status, tooltip on hover
+- [x] Timeline: prev/next/this week navigation works
+- [x] Timeline: grouping toggle (by asset / by service type / flat)
+- [x] Timeline: click bar → opens edit modal
+- [x] CSV export: all/selected × visible/all columns → correct file downloaded
+- [x] CSV injection prevention: `sanitizeCell` applied to all exported values
+- CSV import: **removed** (2026-09-14, per request — export only)
+- [x] Keyboard: ↑/↓ moves focus ring, Enter opens edit, Delete opens confirm, Esc closes
+- [x] Keyboard: disabled when typing in inputs/selects or when modal open
+- [x] `npm run lint` passes
 
 ---
 

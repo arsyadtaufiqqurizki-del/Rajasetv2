@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Settings as SettingsIcon, AlertCircle, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Settings as SettingsIcon, AlertCircle, AlertTriangle, Download } from 'lucide-react';
 import { formatCurrency, parseCost } from '../lib/money';
+import { sanitizeCell, toCsvBlob, downloadBlob } from '../lib/csv';
+import { logActivity } from '../lib/activityLogger';
+import {
+  MAINTENANCE_CSV_COLUMN_IDS,
+  buildMaintenanceExportRows,
+} from '../lib/maintenanceCsv';
 import { useMaintenance } from '../contexts/MaintenanceContext';
 import { useMaintenanceFilters } from '../hooks/useMaintenanceFilters';
 import { usePagination } from '../hooks/usePagination';
 import { useColumnVisibility } from '../hooks/useColumnVisibility';
 import { useRowSelection } from '../hooks/useRowSelection';
 import { useBulkDelete } from '../hooks/useBulkDelete';
+import { useMaintenanceKeyboard } from '../hooks/useMaintenanceKeyboard';
 import AddMaintenanceModal from '../components/AddMaintenanceModal';
 import EditMaintenanceModal from '../components/EditMaintenanceModal';
 import MaintenanceStats from '../components/MaintenanceStats';
@@ -16,6 +23,7 @@ import MaintenanceSkeleton from '../components/MaintenanceSkeleton';
 import MaintenanceEmptyState from '../components/MaintenanceEmptyState';
 import MaintenanceViewSwitcher, { type MaintenanceView } from '../components/MaintenanceViewSwitcher';
 import MaintenanceCalendarView from '../components/MaintenanceCalendarView';
+import MaintenanceTimelineView from '../components/MaintenanceTimelineView';
 import MaintenanceBulkBar from '../components/MaintenanceBulkBar';
 import MaintenanceBulkStatusModal from '../components/MaintenanceBulkStatusModal';
 import BulkUpdateProgressModal, { type BulkUpdateProgressState } from '../components/BulkUpdateProgressModal';
@@ -46,9 +54,13 @@ export default function Maintenance() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [notice, setNotice] = useState<{ message: string; variant: 'success' | 'error' } | null>(null);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
   const [isBulkStatusOpen, setIsBulkStatusOpen] = useState(false);
   const [bulkStatusSaving, setBulkStatusSaving] = useState(false);
   const [bulkUpdateProgress, setBulkUpdateProgress] = useState<BulkUpdateProgressState>({ isOpen: false, status: 'updating', total: 0, processed: 0, failedCount: 0 });
+  const [isExporting, setIsExporting] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [exportAllColumns, setExportAllColumns] = useState(false);
 
   const view = parseView(searchParams.get('view'));
 
@@ -178,6 +190,58 @@ export default function Maintenance() {
     }
   };
 
+  const handleExportCSV = useCallback((scope: 'all' | 'selected', columnsScope: 'visible' | 'all') => {
+    const source = scope === 'selected'
+      ? filteredRecords.filter(r => selection.selectedIds.has(r.id))
+      : filteredRecords;
+    if (source.length === 0) {
+      setNotice({ message: 'No data to export.', variant: 'error' });
+      return;
+    }
+    setIsExporting(true);
+    setIsExportMenuOpen(false);
+    const columnIds = columnsScope === 'all'
+      ? MAINTENANCE_CSV_COLUMN_IDS
+      : MAINTENANCE_COLUMNS.filter(c => visibleColumns.has(c.id)).map(c => c.id);
+    setTimeout(() => {
+      const rows = buildMaintenanceExportRows(source, columnIds, sanitizeCell);
+      downloadBlob(
+        `Maintenance_${scope === 'selected' ? 'Selected_' : ''}${new Date().toISOString().split('T')[0]}.csv`,
+        toCsvBlob(rows),
+      );
+      setIsExporting(false);
+      setNotice({ message: `Exported ${source.length} row${source.length === 1 ? '' : 's'} to CSV`, variant: 'success' });
+      logActivity({ actionType: 'EXPORT_REPORT', entityType: 'maintenance', details: { format: 'CSV', count: source.length, scope } });
+    }, 0);
+  }, [filteredRecords, selection.selectedIds, visibleColumns]);
+
+  const handleKeyboardEscape = useCallback(() => {
+    if (expandedRowId !== null) {
+      setExpandedRowId(null);
+      return;
+    }
+    if (focusedRowId !== null) {
+      setFocusedRowId(null);
+      return;
+    }
+    selection.clearSelection();
+  }, [expandedRowId, focusedRowId, selection]);
+
+  const anyModalOpen =
+    isModalOpen || isEditModalOpen || recordToDelete !== null || isBulkStatusOpen ||
+    bulkDelete.isDeleteModalOpen;
+
+  useMaintenanceKeyboard({
+    enabled: view === 'table' && !loading,
+    recordIds: paginatedRecords.map(r => r.id),
+    focusedRowId,
+    onFocusChange: setFocusedRowId,
+    onEdit: handleEdit,
+    onDelete: setRecordToDelete,
+    onEscape: handleKeyboardEscape,
+    isModalOpen: anyModalOpen,
+  });
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const nextWeek = new Date(today);
@@ -285,14 +349,55 @@ export default function Maintenance() {
             <div className="p-4 border-b border-outline-variant bg-surface-bright flex flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <MaintenanceViewSwitcher activeView={view} onViewChange={setView} />
-                {view === 'table' && (
-                  <ColumnVisibilityDropdown
-                    columns={MAINTENANCE_COLUMNS}
-                    visibleColumns={visibleColumns}
-                    onToggleColumn={toggleColumn}
-                    onShowAll={showAllColumns}
-                  />
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {view === 'table' && (
+                    <ColumnVisibilityDropdown
+                      columns={MAINTENANCE_COLUMNS}
+                      visibleColumns={visibleColumns}
+                      onToggleColumn={toggleColumn}
+                      onShowAll={showAllColumns}
+                    />
+                  )}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsExportMenuOpen(prev => !prev)}
+                      disabled={isExporting || filteredRecords.length === 0}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-xs font-medium text-on-surface hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      <Download className="h-3.5 w-3.5" /> {isExporting ? 'Exporting...' : 'Export'}
+                    </button>
+                    {isExportMenuOpen && (
+                      <div className="absolute right-0 z-50 mt-1 w-64 overflow-hidden rounded-lg border border-outline-variant bg-surface shadow-lg">
+                        <label className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs text-on-surface hover:bg-surface-container-low">
+                          <input
+                            type="checkbox"
+                            checked={exportAllColumns}
+                            onChange={e => setExportAllColumns(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded border-outline-variant text-primary focus:ring-primary"
+                          />
+                          All columns (ignore visibility)
+                        </label>
+                        <div className="border-t border-outline-variant" />
+                        <button
+                          type="button"
+                          onClick={() => handleExportCSV('all', exportAllColumns ? 'all' : 'visible')}
+                          className="block w-full px-3 py-2 text-left text-xs text-on-surface hover:bg-surface-container-low"
+                        >
+                          Export All (Filtered) · {filteredRecords.length}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={selection.selectedIds.size === 0}
+                          onClick={() => handleExportCSV('selected', exportAllColumns ? 'all' : 'visible')}
+                          className="block w-full px-3 py-2 text-left text-xs text-on-surface hover:bg-surface-container-low disabled:opacity-50"
+                        >
+                          Export Selected · {selection.selectedIds.size}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {selection.selectedIds.size > 0 && view === 'table' && (
@@ -357,10 +462,15 @@ export default function Maintenance() {
                   onStatusChange={handleStatusChange}
                   expandedRowId={expandedRowId}
                   onToggleExpand={handleToggleExpand}
+                  focusedRowId={focusedRowId}
+                  onFocusRow={setFocusedRowId}
                   hasActiveFilters={activeFilters.length > 0}
                   onClearFilters={clearFilters}
                   onAddNew={() => setIsModalOpen(true)}
                 />
+                <p className="px-4 py-1.5 text-[11px] text-on-surface-variant border-t border-outline-variant/30">
+                  ↑↓ navigate · Enter to edit · Delete to remove · Esc to close
+                </p>
 
                 <Pagination
                   page={currentPage}
@@ -379,11 +489,7 @@ export default function Maintenance() {
             ) : view === 'calendar' ? (
               <MaintenanceCalendarView records={filteredRecords} onSelectRecord={handleEdit} />
             ) : (
-              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-                <BarChart3 className="h-10 w-10 text-on-surface-variant/50" aria-hidden="true" />
-                <p className="text-lg font-semibold text-on-surface">Timeline view</p>
-                <p className="text-sm text-on-surface-variant">The horizontal schedule timeline arrives in Phase 3.</p>
-              </div>
+              <MaintenanceTimelineView records={filteredRecords} onSelectRecord={handleEdit} />
             )}
           </div>
         </>

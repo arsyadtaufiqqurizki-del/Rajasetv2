@@ -175,6 +175,8 @@ export const en = {
   maintenance: {
     calendarEmptyDay: 'No maintenance scheduled for this date.',
     scheduleEmpty: 'No maintenance scheduled',
+    timelineEmpty: 'No maintenance scheduled in this period.',
+    keyboardHint: '↑↓ navigate, Enter to edit, Delete to remove, Esc to close',
   },
   importModal: {
     skippedRows: 'Skipped rows',
