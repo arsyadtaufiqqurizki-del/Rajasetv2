@@ -149,16 +149,29 @@ export default function BulkEditModal({ isOpen, selectedCount, onCancel, onApply
             />
             Status
           </label>
-          <select
-            value={values.status}
-            onChange={(e) => setValues(prev => ({ ...prev, status: e.target.value }))}
-            disabled={!enabled.status}
-            className={`w-full rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer ${enabled.status ? 'bg-surface-container-lowest' : 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-50'}`}
+          <div
+            role="radiogroup"
+            aria-label="Status"
+            className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5 ${enabled.status ? '' : 'opacity-50'}`}
           >
             {STATUS_OPTIONS.map((option) => (
-              <option key={option} value={option}>{option}</option>
+              <label
+                key={option}
+                className={`flex items-center gap-2 text-sm ${enabled.status ? 'text-on-surface cursor-pointer' : 'text-on-surface-variant cursor-not-allowed'}`}
+              >
+                <input
+                  type="radio"
+                  name="bulk-status"
+                  value={option}
+                  checked={values.status === option}
+                  onChange={(e) => setValues(prev => ({ ...prev, status: e.target.value }))}
+                  disabled={!enabled.status}
+                  className="h-4 w-4 border-outline-variant text-primary focus:ring-primary disabled:cursor-not-allowed"
+                />
+                {option}
+              </label>
             ))}
-          </select>
+          </div>
         </div>
 
         <div className="mt-2 pt-4 border-t border-outline-variant/30 flex items-center justify-between gap-3">

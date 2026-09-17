@@ -250,18 +250,25 @@ export default function AssetFormFields({
 
       <div className="flex flex-col gap-1.5 sm:col-span-2">
         <label className={LABEL_CLASS}>Status</label>
-        <select
-          name="status"
-          value={values.status}
-          onChange={handleChange}
-          className={`${INPUT_CLASS} cursor-pointer`}
+        <div
+          role="radiogroup"
+          aria-label="Status"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5"
         >
-          <option value="Active">Active</option>
-          <option value="In Maintenance">In Maintenance</option>
-          <option value="Needs Service">Needs Service</option>
-          <option value="Broken">Broken</option>
-          <option value="Retired">Retired</option>
-        </select>
+          {['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Retired'].map(option => (
+            <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
+              <input
+                type="radio"
+                name="status"
+                value={option}
+                checked={values.status === option}
+                onChange={handleChange}
+                className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
+              />
+              {option}
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
