@@ -8,7 +8,7 @@ interface DashboardAttentionRowProps {
   onToggleStatus: (status: AssetStatusOption) => void;
 }
 
-const ATTENTION_STATUSES: AssetStatusOption[] = ['Broken', 'Needs Service', 'In Maintenance'];
+const ATTENTION_STATUSES: AssetStatusOption[] = ['Broken', 'Needs Service', 'In Maintenance', 'Lost'];
 
 export default function DashboardAttentionRow({ statusCounts, filterStatus, onToggleStatus }: DashboardAttentionRowProps) {
   return (

@@ -51,7 +51,7 @@ const computeStatusLevel = (status: string): Asset['statusLevel'] => {
   const s = status.toLowerCase();
   if (s === 'active') return 'success';
   if (s.includes('maintenance')) return 'warning';
-  if (s.includes('service') || s === 'broken') return 'error';
+  if (s.includes('service') || s === 'broken' || s === 'lost') return 'error';
   return 'default';
 };
 

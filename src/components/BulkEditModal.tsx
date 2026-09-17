@@ -13,7 +13,7 @@ const TITLE_ID = 'bulk-edit-modal-title';
 
 const DEPRECIATION_METHODS = ['Straight Line', 'Declining Balance', 'Units of Production'];
 const LISTED_OPTIONS = ['Audited', 'Non-Listed'];
-const STATUS_OPTIONS = ['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Retired'];
+const STATUS_OPTIONS = ['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Lost', 'Retired'];
 
 export default function BulkEditModal({ isOpen, selectedCount, onCancel, onApply }: BulkEditModalProps) {
   const [enabled, setEnabled] = useState({

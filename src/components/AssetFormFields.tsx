@@ -255,7 +255,7 @@ export default function AssetFormFields({
           aria-label="Status"
           className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5"
         >
-          {['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Retired'].map(option => (
+          {['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Lost', 'Retired'].map(option => (
             <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
               <input
                 type="radio"
