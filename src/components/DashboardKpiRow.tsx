@@ -54,7 +54,7 @@ export default function DashboardKpiRow({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
       <StatCard
-        label="Asset Units"
+        label="Asset Type"
         icon={<Package className="h-5 w-5 text-primary" />}
         value={assetsCount}
         valueClassName={KPI_VALUE_CLASS}
