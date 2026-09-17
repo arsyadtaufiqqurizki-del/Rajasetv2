@@ -14,7 +14,7 @@ const CHART_COLORS = [
 ];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export const ASSET_STATUS_OPTIONS = ['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Lost', 'Retired'] as const;
+export const ASSET_STATUS_OPTIONS = ['Active', 'In Maintenance', 'Needs Service', 'Broken', 'Lost', 'Retired', 'Disposal'] as const;
 export type AssetStatusOption = typeof ASSET_STATUS_OPTIONS[number];
 
 export const ASSET_LISTED_OPTIONS = ['Audited', 'Non-Listed'] as const;
