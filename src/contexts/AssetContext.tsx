@@ -50,7 +50,7 @@ const AssetContext = createContext<AssetContextType | undefined>(undefined);
 const computeStatusLevel = (status: string): Asset['statusLevel'] => {
   const s = status.toLowerCase();
   if (s === 'active') return 'success';
-  if (s.includes('maintenance')) return 'warning';
+  if (s.includes('maintenance') || s.includes('review')) return 'warning';
   if (s.includes('service') || s === 'broken' || s === 'lost') return 'error';
   return 'default';
 };
