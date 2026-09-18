@@ -24,7 +24,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function Dashboard() {
   const {
-    assets, subsidiaries, categories1, categories2, lastFetchedAt,
+    assets, subsidiaries, categories1, categories2, itemStatuses, lastFetchedAt,
     loading, error, refetch, setIsAddModalOpen,
   } = useAsset();
 
@@ -40,6 +40,12 @@ export default function Dashboard() {
     filterLocation, setFilterLocation,
     filterStatus, setFilterStatus,
     filterListed, setFilterListed,
+    filterVerification, setFilterVerification,
+    filterItemStatus, setFilterItemStatus,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+    costMin, setCostMin,
+    costMax, setCostMax,
     searchQuery, setSearchQuery,
     uniqueStatuses,
     activeFilters,
@@ -200,6 +206,21 @@ export default function Dashboard() {
             uniqueStatuses={uniqueStatuses}
             filterStatus={filterStatus}
             onFilterStatusChange={setFilterStatus}
+            filterListed={filterListed}
+            onFilterListedChange={setFilterListed}
+            filterVerification={filterVerification}
+            onFilterVerificationChange={setFilterVerification}
+            itemStatuses={itemStatuses}
+            filterItemStatus={filterItemStatus}
+            onFilterItemStatusChange={setFilterItemStatus}
+            dateFrom={dateFrom}
+            onDateFromChange={setDateFrom}
+            dateTo={dateTo}
+            onDateToChange={setDateTo}
+            costMin={costMin}
+            onCostMinChange={setCostMin}
+            costMax={costMax}
+            onCostMaxChange={setCostMax}
           />
 
           <DashboardKpiRow

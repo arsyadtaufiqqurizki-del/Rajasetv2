@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { SetURLSearchParams } from 'react-router-dom';
 import { useListFilters, type FilterDef } from './useListFilters';
+import { parseCost } from '../lib/money';
 import type { Asset } from '../types/asset';
 
 export function useDashboardFilters(
@@ -16,6 +17,10 @@ export function useDashboardFilters(
       { kind: 'multi', key: 'location', label: 'Location', accessor: (a) => a.categorySegment2 },
       { kind: 'multi', key: 'status', label: 'Status', accessor: (a) => a.status },
       { kind: 'multi', key: 'listed', label: 'Listed', accessor: (a) => a.listed },
+      { kind: 'multi', key: 'verification', label: 'Verification', accessor: (a) => (a.verification ? 'Yes' : 'No') },
+      { kind: 'multi', key: 'itemStatus', label: 'Item Status', accessor: (a) => a.itemStatus },
+      { kind: 'dateRange', key: 'date', label: 'Date', accessor: (a) => a.datePlaceInService },
+      { kind: 'numberRange', key: 'cost', label: 'Cost', accessor: (a) => parseCost(a.assetCost) },
     ],
     []
   );
@@ -45,6 +50,18 @@ export function useDashboardFilters(
     setFilterStatus: (v: string[]) => list.setMulti('status', v),
     filterListed: list.getMulti('listed'),
     setFilterListed: (v: string[]) => list.setMulti('listed', v),
+    filterVerification: list.getMulti('verification'),
+    setFilterVerification: (v: string[]) => list.setMulti('verification', v),
+    filterItemStatus: list.getMulti('itemStatus'),
+    setFilterItemStatus: (v: string[]) => list.setMulti('itemStatus', v),
+    dateFrom: list.getDateRange('date').from,
+    setDateFrom: (v: string) => list.setDateFrom('date', v),
+    dateTo: list.getDateRange('date').to,
+    setDateTo: (v: string) => list.setDateTo('date', v),
+    costMin: list.getNumberRange('cost').min,
+    setCostMin: (v: string) => list.setNumberMin('cost', v),
+    costMax: list.getNumberRange('cost').max,
+    setCostMax: (v: string) => list.setNumberMax('cost', v),
     searchQuery: list.searchQuery,
     setSearchQuery: list.setSearchQuery,
     debouncedSearchQuery: list.debouncedSearchQuery,
