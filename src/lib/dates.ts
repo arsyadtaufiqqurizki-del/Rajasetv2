@@ -62,3 +62,50 @@ export function getQuartersInRange(start: Date, end: Date): { label: string; end
 
   return quarters;
 }
+
+/** Days in a 1-based month, leap-year aware. */
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+/** Two-digit years follow the Postgres/POSIX pivot: 00-69 -> 2000s, 70-99 -> 1900s. */
+function expandTwoDigitYear(yy: number): number {
+  return yy <= 69 ? 2000 + yy : 1900 + yy;
+}
+
+/** Validates a calendar date and renders it as zero-padded "YYYY-MM-DD". Null when out of range. */
+function toIsoDate(year: string, month: string, day: string): string | null {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+  if (y < 1 || y > 9999 || m < 1 || m > 12 || d < 1 || d > daysInMonth(y, m)) return null;
+  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/**
+ * Normalizes a free-text date from a CSV cell to "YYYY-MM-DD" for Postgres DATE
+ * columns. Accepts ISO ("2024-03-28", tolerating a trailing time part),
+ * "YYYY/MM/DD", and Indonesian "DD-MM-YYYY"/"DD/MM/YYYY" including two-digit
+ * years ("28-03-19" -> "2019-03-28"). Returns '' for a blank cell and null when
+ * the value is not a real calendar date, so callers can reject it up front with
+ * a clear message instead of surfacing a Postgres error per row.
+ */
+export function normalizeImportDate(value: string | undefined): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$/.exec(raw);
+  if (iso) return toIsoDate(iso[1], iso[2], iso[3]);
+
+  const slashIso = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/.exec(raw);
+  if (slashIso) return toIsoDate(slashIso[1], slashIso[2], slashIso[3]);
+
+  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})$/.exec(raw);
+  if (dmy) {
+    const year = dmy[3].length === 2 ? String(expandTwoDigitYear(Number(dmy[3]))) : dmy[3];
+    return toIsoDate(year, dmy[2], dmy[1]);
+  }
+
+  return null;
+}

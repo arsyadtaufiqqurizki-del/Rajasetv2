@@ -2,6 +2,10 @@ export const en = {
   csvImport: {
     missingAssetNumber: 'Asset Number is empty',
     missingAssetDescription: 'Asset Description is empty',
+    invalidDatePlaceInService: (value: string) =>
+      `Date Place In Service "${value}" is not a valid date (use YYYY-MM-DD, e.g. 2019-03-28)`,
+    invalidVerificationDate: (value: string) =>
+      `Verification Date "${value}" is not a valid date (use YYYY-MM-DD, e.g. 2019-03-28)`,
     saveFailedFallback: 'Failed to save to database',
   },
   emptyState: {

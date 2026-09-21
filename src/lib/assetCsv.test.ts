@@ -9,6 +9,7 @@ import {
   type AssetCsvRow,
 } from './assetCsv';
 import { sanitizeCell } from './csv';
+import { normalizeImportDate } from './dates';
 import { en as copy } from '../i18n/en';
 import type { Asset } from '../types/asset';
 
@@ -23,6 +24,45 @@ describe('normalizeListed', () => {
 
   it.each(['Non-Listed', 'no', '', '   ', 'whatever', undefined])('maps %s to Non-Listed', (input) => {
     expect(normalizeListed(input)).toBe('Non-Listed');
+  });
+});
+
+describe('normalizeImportDate', () => {
+  it.each([
+    ['2024-01-01', '2024-01-01'],
+    ['  2024-01-01  ', '2024-01-01'],
+    ['2024-1-5', '2024-01-05'],
+    ['2024/03/28', '2024-03-28'],
+    ['2024-03-28T00:00:00', '2024-03-28'],
+    ['28-03-2019', '2019-03-28'],
+    ['28/03/2019', '2019-03-28'],
+    ['28-03-19', '2019-03-28'],
+    ['28/03/19', '2019-03-28'],
+    ['5-3-24', '2024-03-05'],
+    ['01-01-70', '1970-01-01'],
+    ['01-01-69', '2069-01-01'],
+    ['29-02-2024', '2024-02-29'],
+  ])('normalizes %s to %s', (raw, expected) => {
+    expect(normalizeImportDate(raw)).toBe(expected);
+  });
+
+  it.each([undefined, '', '   '])('treats %s as an empty cell', (raw) => {
+    expect(normalizeImportDate(raw)).toBe('');
+  });
+
+  it.each([
+    'not-a-date',
+    '28-03',
+    '2019-13-01',
+    '2019-00-10',
+    '32-01-2019',
+    '31-02-2024',
+    '29-02-2023',
+    '03-28-2019',
+    '43555',
+    '28-03-201',
+  ])('rejects %s as invalid', (raw) => {
+    expect(normalizeImportDate(raw)).toBeNull();
   });
 });
 
@@ -87,6 +127,33 @@ describe('partitionCsvRows', () => {
 
   it('caps import at 5000 rows', () => {
     expect(MAX_IMPORT_ROWS).toBe(5000);
+  });
+
+  it('keeps rows with Indonesian DD-MM-YY dates and blank dates', () => {
+    const { validRows, invalidRows } = partitionCsvRows([
+      { 'Asset Number': 'AN-001', 'Asset Description': 'Laptop', 'Date Place In Service': '28-03-19' },
+      { 'Asset Number': 'AN-002', 'Asset Description': 'Monitor' },
+    ]);
+
+    expect(validRows).toHaveLength(2);
+    expect(invalidRows).toHaveLength(0);
+  });
+
+  it('rejects a row with an impossible date, naming the field and value', () => {
+    const { validRows, invalidRows } = partitionCsvRows([
+      { 'Asset Number': 'AN-001', 'Asset Description': 'Laptop', 'Date Place In Service': '31-02-2024' },
+    ]);
+
+    expect(validRows).toHaveLength(0);
+    expect(invalidRows[0].reason).toBe(copy.csvImport.invalidDatePlaceInService('31-02-2024'));
+  });
+
+  it('rejects a row with an invalid verification date', () => {
+    const { invalidRows } = partitionCsvRows([
+      { 'Asset Number': 'AN-001', 'Asset Description': 'Laptop', 'Verification Date': 'yesterday' },
+    ]);
+
+    expect(invalidRows[0].reason).toBe(copy.csvImport.invalidVerificationDate('yesterday'));
   });
 });
 
@@ -202,6 +269,18 @@ describe('mapCsvRowToAssetInput', () => {
     });
 
     expect(mapped.listed).toBe('Audited');
+  });
+
+  it('normalizes Indonesian date formats to ISO for Postgres', () => {
+    const mapped = mapCsvRowToAssetInput({
+      'Asset Number': 'AN-001',
+      'Asset Description': 'Laptop',
+      'Date Place In Service': '28-03-19',
+      'Verification Date': '05/06/2024',
+    });
+
+    expect(mapped.datePlaceInService).toBe('2019-03-28');
+    expect(mapped.verificationDate).toBe('2024-06-05');
   });
 });
 

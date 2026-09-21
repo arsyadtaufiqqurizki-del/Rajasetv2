@@ -1,5 +1,6 @@
 import type { Asset, AssetInput } from '../types/asset';
 import { en as copy } from '../i18n/en';
+import { normalizeImportDate } from './dates';
 
 /**
  * CSV import/export logic for Asset Inventory, lifted out of Inventory.tsx in Step 2
@@ -42,8 +43,9 @@ function cell(row: AssetCsvRow, header: string, field: string): string {
 
 /**
  * Splits parsed rows into importable ones and rejects. A row is rejected when Asset
- * Number or Asset Description is empty; `rowNumber` is 1-based over the file, so it
- * counts the header line (index 0 -> row 2). `validRowNumbers[i]` is the file row
+ * Number or Asset Description is empty, or when a filled date cell is not a real
+ * calendar date (see normalizeImportDate — Indonesian DD-MM-YYYY included);
+ * `rowNumber` is 1-based over the file, so it counts the header line (index 0 -> row 2). `validRowNumbers[i]` is the file row
  * number of `validRows[i]`, so callers can attribute per-row save failures back to
  * the file even though `validRows` itself carries no row number.
  */
@@ -60,10 +62,18 @@ export function partitionCsvRows(rows: AssetCsvRow[]): {
     const rowNumber = index + 2; // +2: row 1 is the header
     const assetNumber = cell(row, 'Asset Number', 'assetNumber');
     const assetDescription = cell(row, 'Asset Description', 'assetDescription');
+    const datePlaceInService = cell(row, 'Date Place In Service', 'datePlaceInService');
+    const verificationDate = cell(row, 'Verification Date', 'verificationDate');
 
     const reasons: string[] = [];
     if (!assetNumber) reasons.push(copy.csvImport.missingAssetNumber);
     if (!assetDescription) reasons.push(copy.csvImport.missingAssetDescription);
+    if (normalizeImportDate(datePlaceInService) === null) {
+      reasons.push(copy.csvImport.invalidDatePlaceInService(datePlaceInService.trim()));
+    }
+    if (normalizeImportDate(verificationDate) === null) {
+      reasons.push(copy.csvImport.invalidVerificationDate(verificationDate.trim()));
+    }
 
     if (reasons.length > 0) {
       invalidRows.push({
@@ -88,13 +98,15 @@ export function partitionCsvRows(rows: AssetCsvRow[]): {
  * 'Active' status). Only call this on rows that came back from `partitionCsvRows`.
  */
 export function mapCsvRowToAssetInput(row: AssetCsvRow): AssetInput {
+  const datePlaceInServiceRaw = cell(row, 'Date Place In Service', 'datePlaceInService');
+  const verificationDateRaw = cell(row, 'Verification Date', 'verificationDate');
   return {
     assetBook: cell(row, 'Asset Book', 'assetBook'),
     subsidiary: cell(row, 'Subsidiary', 'subsidiary') || 'Default',
     assetNumber: cell(row, 'Asset Number', 'assetNumber'),
     assetDescription: cell(row, 'Asset Description', 'assetDescription'),
     assetCost: cell(row, 'Asset Cost', 'assetCost') || '0',
-    datePlaceInService: cell(row, 'Date Place In Service', 'datePlaceInService'),
+    datePlaceInService: normalizeImportDate(datePlaceInServiceRaw) ?? datePlaceInServiceRaw.trim(),
     assetUnits: cell(row, 'Asset Units', 'assetUnits') || '1',
     categorySegment1: cell(row, 'Asset Category Segment 1', 'categorySegment1') || 'Uncategorized',
     categorySegment2: cell(row, 'Asset Category Segment 2', 'categorySegment2') || 'Uncategorized',
@@ -103,7 +115,7 @@ export function mapCsvRowToAssetInput(row: AssetCsvRow): AssetInput {
     listed: normalizeListed(row['Listed'] || row['listed']),
     status: cell(row, 'Status', 'status') || 'Active',
     verification: String(cell(row, 'Verification', 'verification') || 'No').trim().toLowerCase() === 'yes',
-    verificationDate: cell(row, 'Verification Date', 'verificationDate'),
+    verificationDate: normalizeImportDate(verificationDateRaw) ?? verificationDateRaw.trim(),
     itemStatus: cell(row, 'Item Status', 'itemStatus'),
   };
 }
