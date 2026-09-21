@@ -74,6 +74,11 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string, bookV
     const lastMonthCost = lastMonthAssets.reduce((acc, curr) => acc + parseCost(curr.assetCost), 0);
     const assetCostChange = calculateChange(currentMonthCost, lastMonthCost);
 
+    const totalUnits = assets.reduce((acc, curr) => acc + (Number(curr.assetUnits) || 0), 0);
+    const currentMonthUnits = currentMonthAssets.reduce((acc, curr) => acc + (Number(curr.assetUnits) || 0), 0);
+    const lastMonthUnits = lastMonthAssets.reduce((acc, curr) => acc + (Number(curr.assetUnits) || 0), 0);
+    const assetUnitsChange = calculateChange(currentMonthUnits, lastMonthUnits);
+
     const statusCounts = ASSET_STATUS_OPTIONS.reduce((acc, statusOption) => {
       acc[statusOption] = assets.filter(a => a.status.trim().toLowerCase() === statusOption.toLowerCase()).length;
       return acc;
@@ -153,6 +158,8 @@ export function useDashboardMetrics(assets: Asset[], selectedYear: string, bookV
     return {
       assetCountChange,
       assetCostChange,
+      totalUnits,
+      assetUnitsChange,
       statusCounts,
       listedCounts,
       totalValuation,

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Package, TrendingUp, TrendingDown, FileUp, Wallet, Layers } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { en as copy } from '../i18n/en';
@@ -6,9 +7,13 @@ import ValueWithTooltip from './ui/ValueWithTooltip';
 
 const KPI_VALUE_CLASS = 'text-3xl font-semibold text-primary';
 
+type AssetCountMode = 'rows' | 'units';
+
 interface DashboardKpiRowProps {
   assetsCount: number;
   assetCountChange: number | null;
+  totalUnits: number;
+  assetUnitsChange: number | null;
   formattedValuation: string;
   fullValuation: string;
   assetCostChange: number | null;
@@ -41,6 +46,8 @@ function ChangeFooter({ change }: { change: number | null }) {
 export default function DashboardKpiRow({
   assetsCount,
   assetCountChange,
+  totalUnits,
+  assetUnitsChange,
   formattedValuation,
   fullValuation,
   assetCostChange,
@@ -51,14 +58,30 @@ export default function DashboardKpiRow({
   fullDepreciation,
   depreciationRatio,
 }: DashboardKpiRowProps) {
+  const [countMode, setCountMode] = useState<AssetCountMode>('rows');
+  const isUnits = countMode === 'units';
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
       <StatCard
-        label="Asset Type"
+        label={
+          <span className="flex items-center gap-2">
+            <span>Asset Type</span>
+            <select
+              value={countMode}
+              onChange={(e) => setCountMode(e.target.value as AssetCountMode)}
+              aria-label="Asset count mode"
+              className="normal-case tracking-normal text-[11px] font-medium bg-surface border border-outline-variant rounded px-1.5 py-0.5 text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              <option value="rows">Rows</option>
+              <option value="units">Units</option>
+            </select>
+          </span>
+        }
         icon={<Package className="h-5 w-5 text-primary" />}
-        value={assetsCount}
+        value={(isUnits ? totalUnits : assetsCount).toLocaleString('en-US')}
         valueClassName={KPI_VALUE_CLASS}
-        footer={<ChangeFooter change={assetCountChange} />}
+        footer={<ChangeFooter change={isUnits ? assetUnitsChange : assetCountChange} />}
       />
 
       <StatCard

@@ -62,6 +62,8 @@ export default function Dashboard() {
   const {
     assetCountChange,
     assetCostChange,
+    totalUnits,
+    assetUnitsChange,
     statusCounts,
     listedCounts,
     totalValuation,
@@ -226,6 +228,8 @@ export default function Dashboard() {
           <DashboardKpiRow
             assetsCount={filteredAssets.length}
             assetCountChange={assetCountChange}
+            totalUnits={totalUnits}
+            assetUnitsChange={assetUnitsChange}
             formattedValuation={formattedValuation}
             fullValuation={fullValuation}
             assetCostChange={assetCostChange}
