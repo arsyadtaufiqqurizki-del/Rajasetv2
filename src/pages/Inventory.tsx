@@ -11,9 +11,12 @@ import { parseCost, formatCurrency } from '../lib/money';
 import {
   MAX_IMPORT_ROWS,
   buildExportRows,
+  buildFailureDownloadRows,
   mapCsvRowToAssetInput,
   partitionCsvRows,
+  toSaveFailureReason,
   type AssetCsvRow,
+  type InvalidCsvRow,
 } from '../lib/assetCsv';
 import AssetToolbar from '../components/AssetToolbar';
 import AssetFilters from '../components/AssetFilters';
@@ -81,6 +84,7 @@ export default function Inventory() {
     failedCount: 0,
     skippedCount: 0,
     invalidRows: [],
+    failedRows: [],
   });
 
   const asOf = useMemo(() => startOfToday(), []);
@@ -220,7 +224,17 @@ export default function Inventory() {
           return;
         }
 
-        const { validRows, invalidRows } = partitionCsvRows(data);
+        const { validRows, validRowNumbers, invalidRows: validationRows } = partitionCsvRows(data);
+
+        const parseErrorRows: InvalidCsvRow[] = (results.errors ?? [])
+          .filter(err => typeof err?.row === 'number' && (err.row as number) >= 0)
+          .map(err => ({
+            rowNumber: (err.row as number) + 1,
+            assetNumber: '',
+            assetDescription: '',
+            reason: `CSV parse error: ${err.message}`,
+          }));
+        const invalidRows = [...validationRows, ...parseErrorRows].sort((a, b) => a.rowNumber - b.rowNumber);
 
         setImportModal({
           isOpen: true,
@@ -231,15 +245,19 @@ export default function Inventory() {
           failedCount: 0,
           skippedCount: invalidRows.length,
           invalidRows,
+          failedRows: [],
         });
 
         const BATCH_SIZE = 10;
         let localSuccess = 0;
         let localFailed = 0;
+        const failedRowsLocal: InvalidCsvRow[] = [];
         for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
           const batch = validRows.slice(i, i + BATCH_SIZE);
-          await Promise.all(batch.map(row => {
-            return addAsset(mapCsvRowToAssetInput(row), true)
+          await Promise.all(batch.map((row, k) => {
+            const rowIndex = i + k;
+            const payload = mapCsvRowToAssetInput(row);
+            return addAsset(payload, true)
             .then(() => {
               localSuccess++;
               setImportModal(prev => ({
@@ -248,17 +266,27 @@ export default function Inventory() {
                 successCount: prev.successCount + 1,
               }));
             })
-            .catch(() => {
+            .catch((err: unknown) => {
               localFailed++;
+              const failure: InvalidCsvRow = {
+                rowNumber: validRowNumbers[rowIndex] ?? rowIndex + 2,
+                assetNumber: payload.assetNumber,
+                assetDescription: payload.assetDescription,
+                reason: toSaveFailureReason(err),
+                sourceRow: row,
+              };
+              failedRowsLocal.push(failure);
               setImportModal(prev => ({
                 ...prev,
                 processed: prev.processed + 1,
                 failedCount: prev.failedCount + 1,
+                failedRows: [...prev.failedRows, failure],
               }));
             });
           }));
         }
 
+        failedRowsLocal.sort((a, b) => a.rowNumber - b.rowNumber);
         setImportModal(prev => ({ ...prev, status: 'done' }));
         logActivity({ actionType: 'IMPORT_CSV', entityType: 'asset', details: { total: validRows.length + invalidRows.length, success: localSuccess, failed: localFailed + invalidRows.length } });
         if (event.target) event.target.value = '';
@@ -270,16 +298,12 @@ export default function Inventory() {
   }, [addAsset]);
 
   const handleDownloadInvalidRows = useCallback(() => {
-    const rows = importModal.invalidRows;
-    if (rows.length === 0) return;
-    const dataToExport = rows.map(r => ({
-      'Row Number': r.rowNumber,
-      'Asset Number': sanitizeCell(r.assetNumber),
-      'Asset Description': sanitizeCell(r.assetDescription),
-      'Reason': r.reason,
-    }));
-    downloadBlob('invalid_rows.csv', toCsvBlob(dataToExport));
-  }, [importModal.invalidRows]);
+    const failures = [...importModal.invalidRows, ...importModal.failedRows]
+      .sort((a, b) => a.rowNumber - b.rowNumber);
+    if (failures.length === 0) return;
+    const dataToExport = buildFailureDownloadRows(failures, sanitizeCell);
+    downloadBlob(`import_failed_rows_${new Date().toISOString().split('T')[0]}.csv`, toCsvBlob(dataToExport));
+  }, [importModal.invalidRows, importModal.failedRows]);
 
   const handleApplyBulkEdit = useCallback(async (patch: AssetBulkPatch) => {
     const ids = Array.from(selectedAssets);

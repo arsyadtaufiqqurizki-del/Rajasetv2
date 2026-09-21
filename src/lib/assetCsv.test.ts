@@ -82,7 +82,7 @@ describe('partitionCsvRows', () => {
   });
 
   it('preserves input order and returns empty lists for an empty file', () => {
-    expect(partitionCsvRows([])).toEqual({ validRows: [], invalidRows: [] });
+    expect(partitionCsvRows([])).toEqual({ validRows: [], validRowNumbers: [], invalidRows: [] });
   });
 
   it('caps import at 5000 rows', () => {

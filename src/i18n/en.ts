@@ -2,6 +2,7 @@ export const en = {
   csvImport: {
     missingAssetNumber: 'Asset Number is empty',
     missingAssetDescription: 'Asset Description is empty',
+    saveFailedFallback: 'Failed to save to database',
   },
   emptyState: {
     noAssetData: 'No asset data yet',
@@ -180,8 +181,10 @@ export const en = {
   },
   importModal: {
     skippedRows: 'Skipped rows',
+    failedRows: 'Failed rows (could not be saved)',
     rowColumn: 'Row',
     reasonColumn: 'Reason',
+    downloadFailed: 'Download failed rows CSV',
   },
   notifications: {
     title: 'Notifications',
