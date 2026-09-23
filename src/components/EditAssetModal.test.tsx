@@ -112,10 +112,10 @@ describe('EditAssetModal — hydration from editingAsset', () => {
     expect(field('categorySegment2').value).toBe('HQ');
     expect(field('lifeInMonths').value).toBe('60');
     expect(field('verificationDate').value).toBe('2026-02-01');
-    expect(field('itemStatus').value).toBe('Asset');
+    expect(radio('Item Status', 'Asset').checked).toBe(true);
     expect(radio('Listed', 'Audited').checked).toBe(true);
     expect(radio('Verification', 'Yes').checked).toBe(true);
-    expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('Active');
+    expect(radio('Status', 'Active').checked).toBe(true);
   });
 
   it.each([
@@ -158,7 +158,9 @@ describe('EditAssetModal — hydration from editingAsset', () => {
 
     expect(field('subsidiary').value).toBe('');
     expect(field('verificationDate').value).toBe('');
-    expect(field('itemStatus').value).toBe('');
+    expect(radio('Item Status', 'Asset').checked).toBe(false);
+    expect(radio('Item Status', 'Inventory').checked).toBe(false);
+    expect(radio('Item Status', 'Needs Review').checked).toBe(false);
   });
 });
 

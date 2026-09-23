@@ -65,6 +65,14 @@ export default function AssetFormFields({
     setValues(prev => ({ ...prev, lifeInMonths: checked ? 'Unlimited' : '60' }));
   };
 
+  const itemStatusOptions = React.useMemo(() => {
+    const preset = ['Asset', 'Inventory', 'Needs Review'];
+    const extras = [...itemStatuses, values.itemStatus].filter(
+      (s): s is string => Boolean(s) && !preset.includes(s),
+    );
+    return [...preset, ...Array.from(new Set(extras))];
+  }, [itemStatuses, values.itemStatus]);
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
       <div className="flex flex-col gap-1.5 sm:col-span-1">
@@ -316,13 +324,25 @@ export default function AssetFormFields({
       </div>
       <div className="flex flex-col gap-1.5 sm:col-span-2">
         <label className={LABEL_CLASS}>Item Status</label>
-        <AutocompleteInput
-          name="itemStatus"
-          value={values.itemStatus}
-          onChange={handleChange}
-          placeholder="e.g. Asset, Inventory, Needs Review"
-          options={itemStatuses}
-        />
+        <div
+          role="radiogroup"
+          aria-label="Item Status"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-2.5"
+        >
+          {itemStatusOptions.map(option => (
+            <label key={option} className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
+              <input
+                type="radio"
+                name="itemStatus"
+                value={option}
+                checked={values.itemStatus === option}
+                onChange={handleChange}
+                className="h-4 w-4 border-outline-variant text-primary focus:ring-primary"
+              />
+              {option}
+            </label>
+          ))}
+        </div>
       </div>
     </div>
   );
